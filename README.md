@@ -42,20 +42,12 @@ npm run dev
 
 Open the local URL Vite prints (usually `http://localhost:5173`).
 
-## Push to GitHub
+## GitHub repository
 
-If this folder is not yet a git repo:
-
-```bash
-git init -b main
-git add .
-git commit -m "Initial commit"
-```
-
-Create a new repository on [github.com/new](https://github.com/new) (empty — no README or .gitignore). Then:
+This project is connected to [github.com/brodregoss/Last-Minute-Study](https://github.com/brodregoss/Last-Minute-Study).
 
 ```bash
-git remote add origin https://github.com/YOUR_USERNAME/last-minute-study.git
+git remote add origin https://github.com/brodregoss/Last-Minute-Study.git
 git push -u origin main
 ```
 
