@@ -80,3 +80,12 @@ npm run lint     # ESLint
 ## Deploying
 
 Build the static site with `npm run build` and deploy the `dist/` folder to any host (Vercel, Netlify, Cloudflare Pages, etc.). Set the same `VITE_BASE44_*` env vars in your host's dashboard so AI features keep working in production.
+
+## Mobile app (Expo)
+
+The native app lives in [`mobile/`](mobile/). See [mobile/README.md](mobile/README.md) for simulator workflow, env setup, and the `crypto.getRandomValues` fix for Triage.
+
+```bash
+cd mobile && npm install && cp .env.example .env
+npm start   # press i for iOS Simulator
+```
