@@ -12,7 +12,9 @@ npm install
 npm start
 ```
 
-Press `i` for iOS Simulator or scan QR with Expo Go.
+Press `i` for iOS Simulator or scan QR with **Expo Go** (SDK 57).
+
+**Important:** Use `npx expo install @react-native-async-storage/async-storage` if you see `Native module is null` — Expo Go requires AsyncStorage **2.x**, not 3.x.
 
 ## Architecture
 
