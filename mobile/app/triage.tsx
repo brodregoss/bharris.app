@@ -6,30 +6,51 @@ import {
   Pressable,
   ScrollView,
   ActivityIndicator,
+  Animated,
 } from 'react-native';
-import { useLocalSearchParams, useRouter } from 'expo-router';
+import { useRouter } from 'expo-router';
+import { SafeAreaView } from 'react-native-safe-area-context';
+import { Moon, Loader2, Sparkles, Check } from 'lucide-react-native';
 import { generateTriageTerms, formatAiError } from '@/src/services/aiService';
 import { TIERS, type RawTerm } from '@/src/core/triageUtils';
 import {
   tierFromDifficulty,
   confidenceFromTriage,
   normalizeExamType,
+  TRIAGE_TIER_BORDER,
 } from '@/src/core/studyUtils';
-import type { StudySetup } from '@/src/core/types';
+import {
+  loadFlowSetup,
+  loadFlowSource,
+  saveStudyBootstrap,
+} from '@/src/services/sessionStore';
+import { Button } from '@/src/components/ui/Button';
+import { BrandHeader } from '@/src/components/ui/BrandHeader';
+import type { NoteSource, StudySetup } from '@/src/core/types';
+import { colors, radii, shadows } from '@/src/theme';
 
 export default function TriageScreen() {
   const router = useRouter();
-  const { setup: setupRaw, source: sourceRaw } = useLocalSearchParams<{
-    setup?: string;
-    source?: string;
-  }>();
-  const setup: StudySetup | undefined = setupRaw ? JSON.parse(setupRaw) : undefined;
-  const source = sourceRaw ? JSON.parse(sourceRaw) : { title: 'Intro Psychology', terms: 12 };
-  const sourceTitle = source.title || 'Intro Psychology';
-
+  const [setup, setSetup] = useState<StudySetup | undefined>();
+  const [source, setSource] = useState<NoteSource>({ kind: 'sample', title: 'Intro Psychology', terms: 12 });
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [ranked, setRanked] = useState<RawTerm[]>([]);
+  const [animating, setAnimating] = useState(true);
+  const toastOpacity = useState(new Animated.Value(0))[0];
+
+  useEffect(() => {
+    (async () => {
+      const [s, src] = await Promise.all([
+        loadFlowSetup(),
+        loadFlowSource<NoteSource>(),
+      ]);
+      if (s) setSetup(s);
+      if (src) setSource(src);
+    })();
+  }, []);
+
+  const sourceTitle = source.title || 'Intro Psychology';
 
   useEffect(() => {
     let mounted = true;
@@ -40,6 +61,8 @@ export default function TriageScreen() {
         if (mounted) {
           setRanked(terms);
           setLoading(false);
+          const total = terms.length * 0.06 + 0.6;
+          setTimeout(() => mounted && setAnimating(false), total * 1000);
         }
       } catch (err) {
         if (mounted) {
@@ -53,6 +76,16 @@ export default function TriageScreen() {
     };
   }, [sourceTitle, source.terms]);
 
+  useEffect(() => {
+    if (!loading && animating) {
+      Animated.sequence([
+        Animated.timing(toastOpacity, { toValue: 1, duration: 300, useNativeDriver: true }),
+        Animated.delay(2000),
+        Animated.timing(toastOpacity, { toValue: 0, duration: 300, useNativeDriver: true }),
+      ]).start();
+    }
+  }, [loading, animating, toastOpacity]);
+
   const cycleTier = (id: string) => {
     setRanked((prev) =>
       prev.map((t) => {
@@ -64,7 +97,7 @@ export default function TriageScreen() {
     );
   };
 
-  const lockIn = () => {
+  const lockIn = async () => {
     const studyTerms = ranked.map((t) => ({
       id: t.id,
       term: t.term,
@@ -78,42 +111,46 @@ export default function TriageScreen() {
       seen: false,
       testResult: null,
     }));
-    router.push({
-      pathname: '/study',
-      params: {
-        terms: JSON.stringify(studyTerms),
-        setup: setupRaw ?? '',
-      },
-    });
+    await saveStudyBootstrap({ terms: studyTerms, setup, resetState: true });
+    router.push('/study');
   };
+
+  const totalDone = ranked.filter((t) => t.tier === 'know_it').length;
 
   if (loading) {
     return (
-      <View style={styles.center}>
-        <ActivityIndicator size="large" color="#0f172a" />
+      <SafeAreaView style={styles.center}>
+        <Loader2 size={32} color={colors.muted} />
         <Text style={styles.loadingTitle}>Analyzing your notes…</Text>
-        <Text style={styles.loadingSub}>Extracting terms and ranking by difficulty.</Text>
-      </View>
+        <Text style={styles.loadingSub}>Extracting terms and ranking by difficulty and concept relationships.</Text>
+      </SafeAreaView>
     );
   }
 
   if (error) {
     return (
-      <View style={styles.center}>
+      <SafeAreaView style={styles.center}>
         <Text style={styles.errorTitle}>Triage failed</Text>
         <Text style={styles.errorText}>{error}</Text>
-        <Pressable style={styles.backBtn} onPress={() => router.back()}>
-          <Text style={styles.backBtnText}>Go back</Text>
-        </Pressable>
-      </View>
+        <Button label="Go back" onPress={() => router.back()} />
+      </SafeAreaView>
     );
   }
 
   return (
-    <View style={styles.container}>
+    <SafeAreaView style={styles.container} edges={['top', 'bottom']}>
       <View style={styles.header}>
-        <Text style={styles.headerTitle}>Triage your terms</Text>
-        <Text style={styles.headerSub}>Tap a card to move it between tiers.</Text>
+        <BrandHeader
+          icon={<Moon size={18} color="#fff" />}
+          title="Last Minute Study"
+          subtitle={`Triage — ${sourceTitle}`}
+          right={<Text style={styles.readyCount}>{totalDone}/{ranked.length} ready</Text>}
+        />
+      </View>
+
+      <View style={styles.subHeader}>
+        <Text style={styles.subTitle}>Triage your terms</Text>
+        <Text style={styles.subHint}>AI ranked them — tap any card to move it between tiers.</Text>
       </View>
 
       <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.board}>
@@ -125,12 +162,19 @@ export default function TriageScreen() {
                 <Text style={styles.columnLabel}>{tier.label}</Text>
                 <Text style={styles.columnCount}>{items.length}</Text>
               </View>
-              <ScrollView style={styles.columnBody}>
+              <ScrollView style={styles.columnBody} nestedScrollEnabled>
                 {items.map((item) => (
-                  <Pressable key={item.id} style={styles.card} onPress={() => cycleTier(item.id)}>
-                    <Text style={styles.cardTerm}>{item.term}</Text>
-                    <Text style={styles.cardDef} numberOfLines={2}>
-                      {item.definition}
+                  <Pressable
+                    key={item.id}
+                    onPress={() => cycleTier(item.id)}
+                    style={[
+                      styles.card,
+                      { borderLeftColor: TRIAGE_TIER_BORDER[tier.id] },
+                      shadows.card,
+                    ]}
+                  >
+                    <Text style={styles.cardTerm} numberOfLines={2}>
+                      {item.term}
                     </Text>
                   </Pressable>
                 ))}
@@ -140,58 +184,66 @@ export default function TriageScreen() {
         })}
       </ScrollView>
 
-      <Pressable style={styles.primaryBtn} onPress={lockIn}>
-        <Text style={styles.primaryBtnText}>Lock in triage</Text>
-      </Pressable>
-    </View>
+      <View style={styles.footer}>
+        <Button label="Lock in triage" onPress={lockIn} icon={<Check size={16} color="#fff" />} style={styles.lockBtn} />
+      </View>
+
+      {animating && (
+        <Animated.View style={[styles.toast, { opacity: toastOpacity }]}>
+          <Sparkles size={14} color="#fff" />
+          <Text style={styles.toastText}>AI ranking based on difficulty and card relations</Text>
+        </Animated.View>
+      )}
+    </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#fff', paddingTop: 56 },
-  center: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: 32 },
-  loadingTitle: { fontSize: 16, fontWeight: '600', marginTop: 16 },
-  loadingSub: { fontSize: 13, color: '#64748b', marginTop: 8, textAlign: 'center' },
+  container: { flex: 1, backgroundColor: colors.background },
+  center: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: 32, backgroundColor: colors.background },
+  loadingTitle: { fontSize: 14, fontWeight: '600', marginTop: 16 },
+  loadingSub: { fontSize: 12, color: colors.muted, marginTop: 8, textAlign: 'center', maxWidth: 280 },
   errorTitle: { fontSize: 22, fontWeight: '700', marginBottom: 12 },
-  errorText: { fontSize: 14, color: '#dc2626', textAlign: 'center', marginBottom: 24 },
-  backBtn: {
-    backgroundColor: '#0f172a',
-    paddingHorizontal: 24,
-    paddingVertical: 14,
-    borderRadius: 16,
-  },
-  backBtnText: { color: '#fff', fontWeight: '600' },
-  header: { paddingHorizontal: 20, marginBottom: 12 },
-  headerTitle: { fontSize: 20, fontWeight: '700' },
-  headerSub: { fontSize: 12, color: '#64748b', marginTop: 4 },
+  errorText: { fontSize: 14, color: colors.rose600, textAlign: 'center', marginBottom: 24 },
+  header: { paddingHorizontal: 20, paddingTop: 8 },
+  readyCount: { fontSize: 12, fontWeight: '500', color: colors.muted },
+  subHeader: { paddingHorizontal: 20, paddingVertical: 8 },
+  subTitle: { fontSize: 18, fontWeight: '700' },
+  subHint: { fontSize: 12, color: colors.muted, marginTop: 4 },
   board: { flex: 1, paddingHorizontal: 8 },
-  column: { width: 140, marginHorizontal: 4 },
+  column: { width: 148, marginHorizontal: 4 },
   columnHeader: {
     borderTopLeftRadius: 8,
     borderTopRightRadius: 8,
-    padding: 10,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
     flexDirection: 'row',
     justifyContent: 'space-between',
   },
-  columnLabel: { fontWeight: '700', fontSize: 13 },
-  columnCount: { fontSize: 11, opacity: 0.6 },
-  columnBody: { flex: 1, backgroundColor: '#f1f5f9', padding: 6 },
+  columnLabel: { fontWeight: '700', fontSize: 13, color: '#000' },
+  columnCount: { fontSize: 10, color: 'rgba(0,0,0,0.6)' },
+  columnBody: { flex: 1, backgroundColor: colors.slate100, padding: 8 },
   card: {
-    backgroundColor: '#fff',
-    borderRadius: 10,
+    backgroundColor: colors.card,
+    borderLeftWidth: 4,
+    borderRadius: radii.lg,
     padding: 10,
     marginBottom: 8,
-    borderWidth: 1,
-    borderColor: '#e2e8f0',
   },
-  cardTerm: { fontWeight: '700', fontSize: 13 },
-  cardDef: { fontSize: 11, color: '#64748b', marginTop: 4 },
-  primaryBtn: {
-    margin: 20,
-    backgroundColor: '#0f172a',
-    borderRadius: 16,
-    paddingVertical: 16,
+  cardTerm: { fontSize: 13, fontWeight: '600' },
+  footer: { padding: 20 },
+  lockBtn: { height: 48, borderRadius: radii.xl },
+  toast: {
+    position: 'absolute',
+    bottom: 100,
+    alignSelf: 'center',
+    flexDirection: 'row',
     alignItems: 'center',
+    gap: 8,
+    backgroundColor: colors.slate900,
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    borderRadius: 999,
   },
-  primaryBtnText: { color: '#fff', fontSize: 16, fontWeight: '600' },
+  toastText: { color: '#fff', fontSize: 12, fontWeight: '500' },
 });

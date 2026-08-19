@@ -15,7 +15,7 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
   android: {
     package: 'com.brodregoss.lastminutestudy',
   },
-  plugins: ['expo-router'],
+  plugins: ['expo-router', 'expo-image-picker'],
   experiments: {
     typedRoutes: true,
   },

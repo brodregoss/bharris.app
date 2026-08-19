@@ -1,28 +1,25 @@
 import { useEffect, useState } from 'react';
-import {
-  View,
-  Text,
-  StyleSheet,
-  Pressable,
-  ScrollView,
-  ActivityIndicator,
-} from 'react-native';
+import { View, Text, StyleSheet, Pressable, ScrollView, ActivityIndicator } from 'react-native';
 import { useRouter } from 'expo-router';
-import { generatePanicNotes, formatAiError } from '@/src/services/aiService';
+import { SafeAreaView } from 'react-native-safe-area-context';
+import Markdown from 'react-native-markdown-display';
+import { X, FileText, RefreshCw, Loader2 } from 'lucide-react-native';
+import { generatePanicNotes } from '@/src/services/aiService';
 import {
   loadSession,
   loadPanicSummary,
   savePanicSummary,
   panicSignature,
 } from '@/src/services/sessionStore';
+import { Button } from '@/src/components/ui/Button';
+import { colors, radii, shadows } from '@/src/theme';
 
 export default function PanicScreen() {
   const router = useRouter();
   const [loading, setLoading] = useState(true);
   const [generating, setGenerating] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [text, setText] = useState<string | null>(null);
-  const [signature, setSignature] = useState<string | null>(null);
+  const [error, setError] = useState(false);
+  const [summary, setSummary] = useState<{ signature: string; text: string } | null>(null);
   const [termsJson, setTermsJson] = useState<string | null>(null);
   const [currentSig, setCurrentSig] = useState<string | null>(null);
 
@@ -42,14 +39,15 @@ export default function PanicScreen() {
           confidence: t.confidence,
           missed: (t.recallHistory || []).filter((h) => h.result === 'missed').length,
           tested: t.testResult,
+          depends_on: t.depends_on || [],
         }));
       const json = JSON.stringify(payload);
       const sig = panicSignature(session.terms);
       setTermsJson(json);
       setCurrentSig(sig);
       const cached = await loadPanicSummary();
-      if (cached?.signature === sig) setText(cached.text);
-      setSignature(cached?.signature ?? null);
+      if (cached?.signature === sig) setSummary(cached);
+      else if (cached) setSummary(cached);
       setLoading(false);
     })();
   }, []);
@@ -57,14 +55,13 @@ export default function PanicScreen() {
   const generate = async () => {
     if (!termsJson || !currentSig) return;
     setGenerating(true);
-    setError(null);
+    setError(false);
     try {
       const notes = await generatePanicNotes(termsJson);
       await savePanicSummary(currentSig, notes);
-      setText(notes);
-      setSignature(currentSig);
-    } catch (err) {
-      setError(formatAiError(err));
+      setSummary({ signature: currentSig, text: notes });
+    } catch {
+      setError(true);
     }
     setGenerating(false);
   };
@@ -72,104 +69,145 @@ export default function PanicScreen() {
   if (loading) {
     return (
       <View style={styles.center}>
-        <ActivityIndicator size="large" />
+        <ActivityIndicator size="large" color={colors.slate900} />
       </View>
     );
   }
 
   if (!termsJson) {
     return (
-      <View style={styles.center}>
+      <SafeAreaView style={styles.center}>
         <Text style={styles.empty}>No terms to review yet.</Text>
-        <Pressable style={styles.backBtn} onPress={() => router.replace('/')}>
-          <Text style={styles.backBtnText}>Back to start</Text>
-        </Pressable>
-      </View>
+        <Button label="Back to start" onPress={() => router.replace('/')} />
+      </SafeAreaView>
     );
   }
 
-  const isStale = signature && currentSig && signature !== currentSig;
+  const hasSummary = !!summary?.text;
+  const isStale = hasSummary && summary.signature !== currentSig;
 
   return (
-    <View style={styles.container}>
-      <View style={styles.header}>
-        <Pressable onPress={() => router.back()}>
-          <Text style={styles.close}>✕</Text>
-        </Pressable>
-        <Text style={styles.title}>Panic review</Text>
-        <View style={{ width: 24 }} />
-      </View>
+    <SafeAreaView style={styles.container} edges={['top', 'bottom']}>
+      <Pressable style={styles.close} onPress={() => router.back()} accessibilityLabel="Exit">
+        <X size={20} color={colors.muted} />
+      </Pressable>
 
-      {!text ? (
-        <View style={styles.center}>
-          <Text style={styles.prompt}>Generate last-minute notes from your weak spots.</Text>
-          {error && <Text style={styles.error}>{error}</Text>}
-          <Pressable style={styles.primaryBtn} onPress={generate} disabled={generating}>
-            {generating ? (
-              <ActivityIndicator color="#fff" />
-            ) : (
-              <Text style={styles.primaryBtnText}>Generate notes</Text>
-            )}
-          </Pressable>
-        </View>
-      ) : (
-        <ScrollView style={styles.notes} contentContainerStyle={styles.notesContent}>
-          {isStale && (
-            <Pressable style={styles.staleBanner} onPress={generate}>
-              <Text style={styles.staleText}>Your progress changed — tap to regenerate</Text>
+      <ScrollView contentContainerStyle={styles.content}>
+        {!hasSummary && !generating && (
+          <View style={styles.promptCard}>
+            <View style={styles.promptIcon}>
+              <FileText size={20} color={colors.rose600} />
+            </View>
+            <Text style={styles.promptTitle}>Generate your panic notes?</Text>
+            <Text style={styles.promptSub}>
+              A one-page summary of what to know — built from your terms, weakest concepts first.
+            </Text>
+            <Button label="Generate notes" onPress={generate} icon={<FileText size={16} color="#fff" />} />
+          </View>
+        )}
+
+        {generating && (
+          <View style={styles.generating}>
+            <Loader2 size={28} color={colors.muted} />
+            <Text style={styles.generatingText}>Writing your notes…</Text>
+          </View>
+        )}
+
+        {hasSummary && isStale && !generating && (
+          <View style={styles.staleBanner}>
+            <RefreshCw size={16} color={colors.amber700} />
+            <Text style={styles.staleText}>Your terms changed since these notes were made.</Text>
+            <Pressable onPress={generate} style={styles.staleBtn}>
+              <Text style={styles.staleBtnText}>Regenerate</Text>
             </Pressable>
-          )}
-          <Text style={styles.notesBody}>{text}</Text>
-          <Pressable style={styles.secondaryBtn} onPress={generate} disabled={generating}>
-            <Text style={styles.secondaryBtnText}>Regenerate</Text>
-          </Pressable>
-        </ScrollView>
-      )}
-    </View>
+          </View>
+        )}
+
+        {hasSummary && !generating && (
+          <View style={styles.article}>
+            <Markdown style={mdStyles}>{summary.text}</Markdown>
+          </View>
+        )}
+
+        {error && !generating && (
+          <Text style={styles.error}>Couldn't generate notes — try again.</Text>
+        )}
+      </ScrollView>
+    </SafeAreaView>
   );
 }
 
+const mdStyles = StyleSheet.create({
+  body: { color: colors.foreground, fontSize: 14, lineHeight: 22 },
+  heading2: { fontSize: 16, fontWeight: '700', marginTop: 16, marginBottom: 6 },
+  heading3: { fontSize: 14, fontWeight: '700', marginTop: 12, marginBottom: 4 },
+  paragraph: { marginBottom: 10 },
+  bullet_list: { marginBottom: 10 },
+  list_item: { marginBottom: 4 },
+  strong: { fontWeight: '600' },
+});
+
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#fff', paddingTop: 56 },
-  center: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: 24 },
-  header: {
+  container: { flex: 1, backgroundColor: colors.background },
+  center: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: 32 },
+  close: {
+    width: 44,
+    height: 44,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginLeft: 8,
+  },
+  content: { paddingHorizontal: 20, paddingBottom: 32 },
+  empty: { fontSize: 14, color: colors.muted, marginBottom: 16 },
+  promptCard: {
+    borderRadius: radii.xl,
+    borderWidth: 1,
+    borderColor: colors.border,
+    backgroundColor: colors.card,
+    padding: 24,
+    alignItems: 'center',
+    ...shadows.card,
+  },
+  promptIcon: {
+    width: 44,
+    height: 44,
+    borderRadius: radii.lg,
+    backgroundColor: colors.rose50,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 12,
+  },
+  promptTitle: { fontSize: 16, fontWeight: '700', marginBottom: 4 },
+  promptSub: { fontSize: 14, color: colors.muted, textAlign: 'center', marginBottom: 20 },
+  generating: { alignItems: 'center', paddingVertical: 64 },
+  generatingText: { fontSize: 14, color: colors.muted, marginTop: 12 },
+  staleBanner: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: 16,
-    marginBottom: 8,
-  },
-  close: { fontSize: 20, color: '#64748b', padding: 8 },
-  title: { fontSize: 18, fontWeight: '700' },
-  empty: { fontSize: 14, color: '#64748b', marginBottom: 16 },
-  prompt: { textAlign: 'center', color: '#64748b', marginBottom: 20 },
-  error: { color: '#dc2626', marginBottom: 12, textAlign: 'center' },
-  primaryBtn: {
-    backgroundColor: '#0f172a',
-    paddingHorizontal: 28,
-    paddingVertical: 14,
-    borderRadius: 16,
-    minWidth: 180,
-    alignItems: 'center',
-  },
-  primaryBtnText: { color: '#fff', fontWeight: '600' },
-  backBtn: {
-    backgroundColor: '#0f172a',
-    paddingHorizontal: 24,
-    paddingVertical: 12,
-    borderRadius: 16,
-  },
-  backBtnText: { color: '#fff', fontWeight: '600' },
-  notes: { flex: 1 },
-  notesContent: { padding: 20, paddingBottom: 40 },
-  notesBody: { fontSize: 15, lineHeight: 24, color: '#334155' },
-  staleBanner: {
-    backgroundColor: '#fef3c7',
+    gap: 8,
+    backgroundColor: colors.amber50,
+    borderWidth: 1,
+    borderColor: '#fcd34d',
+    borderRadius: radii.lg,
     padding: 12,
-    borderRadius: 12,
     marginBottom: 16,
   },
-  staleText: { fontSize: 13, color: '#92400e', textAlign: 'center' },
-  secondaryBtn: { marginTop: 24, alignItems: 'center', padding: 12 },
-  secondaryBtnText: { color: '#2563eb', fontWeight: '600' },
+  staleText: { flex: 1, fontSize: 12, color: colors.amber800 },
+  staleBtn: {
+    borderWidth: 1,
+    borderColor: '#fbbf24',
+    borderRadius: 8,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+  },
+  staleBtnText: { fontSize: 12, color: colors.amber700, fontWeight: '600' },
+  article: {
+    borderRadius: radii.xl,
+    borderWidth: 1,
+    borderColor: colors.border,
+    backgroundColor: colors.card,
+    padding: 20,
+    ...shadows.card,
+  },
+  error: { fontSize: 14, color: colors.rose600, textAlign: 'center', marginTop: 16 },
 });

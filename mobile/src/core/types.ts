@@ -1,5 +1,5 @@
 export type ExamType = 'multiple_choice' | 'short_answer' | 'mixed' | '';
-export type ExamTiming = 'today' | 'tomorrow' | 'later' | '';
+export type ExamTiming = 'today' | 'tomorrow' | '2days' | '';
 
 export type StudySetup = {
   terms: number;
@@ -21,7 +21,7 @@ export type StudyTerm = {
   tier: StudyTier;
   confidence: Confidence;
   depends_on?: string[];
-  recallHistory?: { result: 'got_it' | 'missed' }[];
+  recallHistory?: { timestamp?: number; result: 'got_it' | 'missed' }[];
   correctStreak?: number;
   seen?: boolean;
   testResult?: boolean | null;
@@ -38,7 +38,13 @@ export type SessionData = {
   terms: StudyTerm[];
   setup?: StudySetup;
   phase?: string;
-  blockStats?: Record<string, unknown>;
+  blockStats?: Record<string, { got?: number; total?: number }>;
   stillShaky?: string[];
+  behind?: boolean;
+  stopTime?: string | null;
+  windDownAcknowledged?: boolean;
+  elapsedMs?: number;
   sessionStart?: number;
+  savedAt?: number;
+  finishedAt?: number;
 };

@@ -1,55 +1,52 @@
-import { View, Text, StyleSheet, Pressable } from 'react-native';
+import { View, Text, StyleSheet, Pressable, ScrollView } from 'react-native';
 import { useRouter } from 'expo-router';
-import { isBase44Configured } from '@/src/services/base44Client';
+import { SafeAreaView } from 'react-native-safe-area-context';
+import { ArrowLeft, Moon } from 'lucide-react-native';
+import { colors, radii } from '@/src/theme';
 
 export default function SettingsScreen() {
   const router = useRouter();
-  const aiOk = isBase44Configured();
 
   return (
-    <View style={styles.container}>
-      <Pressable onPress={() => router.back()} style={styles.back}>
-        <Text style={styles.backText}>← Back</Text>
-      </Pressable>
-      <Text style={styles.title}>Settings</Text>
-
-      <View style={styles.card}>
-        <Text style={styles.cardTitle}>AI (Base44)</Text>
-        <Text style={[styles.status, aiOk ? styles.ok : styles.bad]}>
-          {aiOk ? 'Configured' : 'Missing — add mobile/.env credentials'}
-        </Text>
-        <Text style={styles.hint}>
-          Triage and panic notes use Base44 InvokeLLM. If you stopped paying, AI calls may fail
-          with billing errors (not crypto errors).
-        </Text>
+    <SafeAreaView style={styles.container} edges={['top', 'bottom']}>
+      <View style={styles.header}>
+        <Pressable onPress={() => router.back()} style={styles.backBtn} accessibilityLabel="Back">
+          <ArrowLeft size={20} color={colors.foreground} />
+        </Pressable>
+        <Text style={styles.title}>Settings</Text>
       </View>
-
-      <View style={styles.card}>
-        <Text style={styles.cardTitle}>Development</Text>
-        <Text style={styles.hint}>
-          Run npm start in the mobile folder, press i for iOS Simulator. Xcode is only needed for
-          App Store builds or custom native code.
-        </Text>
-      </View>
-    </View>
+      <ScrollView contentContainerStyle={styles.content}>
+        <View style={styles.card}>
+          <View style={styles.cardTitleRow}>
+            <Moon size={16} color={colors.muted} />
+            <Text style={styles.cardTitle}>Why we ask when you're sleeping</Text>
+          </View>
+          <Text style={styles.cardBody}>
+            Your brain does real work locking in what you studied while you sleep — this is called memory
+            consolidation. Cramming more new material in the last 30–45 minutes before bed usually doesn't help,
+            and can even cost you sleep that would have helped more. So once you're close to your stop time, we
+            stop introducing new material and just help you review what's already shaky.
+          </Text>
+        </View>
+      </ScrollView>
+    </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#fff', padding: 24, paddingTop: 56 },
-  back: { marginBottom: 16 },
-  backText: { color: '#2563eb', fontSize: 16 },
-  title: { fontSize: 24, fontWeight: '700', marginBottom: 20 },
+  container: { flex: 1, backgroundColor: colors.background },
+  header: { flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 12, paddingTop: 8 },
+  backBtn: { width: 40, height: 40, alignItems: 'center', justifyContent: 'center' },
+  title: { fontSize: 16, fontWeight: '700' },
+  content: { paddingHorizontal: 20, paddingBottom: 32 },
   card: {
+    borderRadius: radii.xl,
     borderWidth: 1,
-    borderColor: '#e2e8f0',
-    borderRadius: 16,
-    padding: 16,
-    marginBottom: 16,
+    borderColor: colors.border,
+    backgroundColor: colors.card,
+    padding: 20,
   },
-  cardTitle: { fontSize: 16, fontWeight: '600', marginBottom: 8 },
-  status: { fontWeight: '600', marginBottom: 8 },
-  ok: { color: '#16a34a' },
-  bad: { color: '#dc2626' },
-  hint: { fontSize: 13, color: '#64748b', lineHeight: 20 },
+  cardTitleRow: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 8 },
+  cardTitle: { fontSize: 14, fontWeight: '700' },
+  cardBody: { fontSize: 12, color: colors.muted, lineHeight: 20 },
 });

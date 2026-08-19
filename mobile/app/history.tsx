@@ -1,27 +1,35 @@
 import { View, Text, StyleSheet, Pressable } from 'react-native';
 import { useRouter } from 'expo-router';
+import { SafeAreaView } from 'react-native-safe-area-context';
+import { ArrowLeft, History } from 'lucide-react-native';
+import { colors } from '@/src/theme';
 
 export default function HistoryScreen() {
   const router = useRouter();
 
   return (
-    <View style={styles.container}>
-      <Pressable onPress={() => router.back()} style={styles.back}>
-        <Text style={styles.backText}>← Back</Text>
-      </Pressable>
-      <Text style={styles.title}>Past sessions</Text>
-      <Text style={styles.sub}>
-        Session history on mobile is coming soon. Your current in-progress session is saved
-        automatically and available from the home screen.
-      </Text>
-    </View>
+    <SafeAreaView style={styles.container} edges={['top', 'bottom']}>
+      <View style={styles.header}>
+        <Pressable onPress={() => router.back()} style={styles.backBtn} accessibilityLabel="Back">
+          <ArrowLeft size={20} color={colors.foreground} />
+        </Pressable>
+        <Text style={styles.title}>Past sessions</Text>
+      </View>
+      <View style={styles.empty}>
+        <History size={32} color={colors.mutedLight} />
+        <Text style={styles.emptyText}>No past sessions yet.</Text>
+        <Text style={styles.emptySub}>Completed crams will show up here.</Text>
+      </View>
+    </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#fff', padding: 24, paddingTop: 56 },
-  back: { marginBottom: 16 },
-  backText: { color: '#2563eb', fontSize: 16 },
-  title: { fontSize: 24, fontWeight: '700', marginBottom: 12 },
-  sub: { fontSize: 15, color: '#64748b', lineHeight: 22 },
+  container: { flex: 1, backgroundColor: colors.background },
+  header: { flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 12, paddingTop: 8 },
+  backBtn: { width: 40, height: 40, alignItems: 'center', justifyContent: 'center' },
+  title: { fontSize: 16, fontWeight: '700' },
+  empty: { flex: 1, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 24 },
+  emptyText: { fontSize: 14, color: colors.muted, marginTop: 12 },
+  emptySub: { fontSize: 12, color: colors.mutedLight, marginTop: 4 },
 });

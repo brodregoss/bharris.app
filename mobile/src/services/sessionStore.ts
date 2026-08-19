@@ -4,6 +4,29 @@ import type { SessionData } from '../core/types';
 const KEY = 'lms_session_v1';
 const FINISHED_KEY = 'lms_finished_v1';
 const ONBOARDING_KEY = 'lms_onboarded';
+const BOOTSTRAP_KEY = 'lms_study_bootstrap_v1';
+
+export type StudyBootstrap = {
+  terms: SessionData['terms'];
+  setup?: SessionData['setup'];
+  initialPhase?: string;
+  resetState?: boolean;
+};
+
+export async function saveStudyBootstrap(data: StudyBootstrap) {
+  await AsyncStorage.setItem(BOOTSTRAP_KEY, JSON.stringify(data));
+}
+
+export async function consumeStudyBootstrap(): Promise<StudyBootstrap | null> {
+  try {
+    const raw = await AsyncStorage.getItem(BOOTSTRAP_KEY);
+    if (!raw) return null;
+    await AsyncStorage.removeItem(BOOTSTRAP_KEY);
+    return JSON.parse(raw) as StudyBootstrap;
+  } catch {
+    return null;
+  }
+}
 
 export async function loadSession(): Promise<SessionData | null> {
   try {
@@ -48,6 +71,36 @@ export async function isOnboarded(): Promise<boolean> {
 
 export async function setOnboarded() {
   await AsyncStorage.setItem(ONBOARDING_KEY, '1');
+}
+
+const FLOW_SETUP_KEY = 'lms_flow_setup_v1';
+
+export async function saveFlowSetup(setup: SessionData['setup']) {
+  await AsyncStorage.setItem(FLOW_SETUP_KEY, JSON.stringify(setup));
+}
+
+export async function loadFlowSetup(): Promise<SessionData['setup'] | null> {
+  try {
+    const raw = await AsyncStorage.getItem(FLOW_SETUP_KEY);
+    return raw ? JSON.parse(raw) : null;
+  } catch {
+    return null;
+  }
+}
+
+const FLOW_SOURCE_KEY = 'lms_flow_source_v1';
+
+export async function saveFlowSource(source: unknown) {
+  await AsyncStorage.setItem(FLOW_SOURCE_KEY, JSON.stringify(source));
+}
+
+export async function loadFlowSource<T>(): Promise<T | null> {
+  try {
+    const raw = await AsyncStorage.getItem(FLOW_SOURCE_KEY);
+    return raw ? JSON.parse(raw) : null;
+  } catch {
+    return null;
+  }
 }
 
 const PANIC_KEY = 'lms_panic_v1';

@@ -1,12 +1,18 @@
-import { StyleSheet, Text, View, Pressable, ActivityIndicator } from 'react-native';
+import { View, Text, StyleSheet, Pressable, ActivityIndicator } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useCallback, useEffect, useState } from 'react';
+import { SafeAreaView } from 'react-native-safe-area-context';
+import { Timer, History, Settings, ArrowRight, RotateCcw } from 'lucide-react-native';
 import {
   loadSession,
   loadFinishedSession,
   isOnboarded,
+  saveStudyBootstrap,
 } from '@/src/services/sessionStore';
+import { Button } from '@/src/components/ui/Button';
+import { IconButton } from '@/src/components/ui/BrandHeader';
 import type { SessionData } from '@/src/core/types';
+import { colors, radii, shadows } from '@/src/theme';
 
 export default function LandingScreen() {
   const router = useRouter();
@@ -33,90 +39,124 @@ export default function LandingScreen() {
     bootstrap();
   }, [bootstrap]);
 
+  const restartCram = async () => {
+    if (!finished) return;
+    const resetTerms = finished.terms.map((t) => ({
+      ...t,
+      recallHistory: [],
+      correctStreak: 0,
+      seen: false,
+      testResult: null,
+    }));
+    await saveStudyBootstrap({ terms: resetTerms, setup: finished.setup, resetState: false });
+    router.push('/study');
+  };
+
+  const practice = async () => {
+    if (!finished) return;
+    await saveStudyBootstrap({
+      terms: finished.terms,
+      setup: finished.setup,
+      initialPhase: 'test',
+      resetState: false,
+    });
+    router.push('/study');
+  };
+
   if (loading) {
     return (
       <View style={styles.center}>
-        <ActivityIndicator size="large" color="#0f172a" />
+        <ActivityIndicator size="large" color={colors.slate900} />
       </View>
     );
   }
 
   return (
-    <View style={styles.container}>
+    <SafeAreaView style={styles.container} edges={['top', 'bottom']}>
       <View style={styles.header}>
-        <Pressable onPress={() => router.push('/history')} style={styles.iconBtn}>
-          <Text style={styles.iconText}>↺</Text>
-        </Pressable>
-        <Pressable onPress={() => router.push('/settings')} style={styles.settingsBtn}>
-          <Text style={styles.settingsText}>⚙</Text>
-        </Pressable>
+        <IconButton onPress={() => router.push('/history')} accessibilityLabel="Past sessions">
+          <History size={20} color={colors.muted} />
+        </IconButton>
+        <IconButton onPress={() => router.push('/settings')} accessibilityLabel="Settings">
+          <Settings size={20} color={colors.muted} />
+        </IconButton>
       </View>
 
       <View style={styles.hero}>
-        <Text style={styles.moon}>🌙</Text>
+        <View style={styles.logo}>
+          <Timer size={28} color="#fff" />
+        </View>
         <Text style={styles.title}>Last Minute Study</Text>
-        <Text style={styles.subtitle}>Cram smarter, not harder</Text>
-      </View>
-
-      <View style={styles.actions}>
-        {session ? (
-          <Pressable style={styles.primaryBtn} onPress={() => router.push('/study')}>
-            <Text style={styles.primaryBtnText}>Continue cram</Text>
-          </Pressable>
-        ) : (
-          <Pressable style={styles.primaryBtn} onPress={() => router.push('/setup')}>
-            <Text style={styles.primaryBtnText}>Start a cram session</Text>
+        <Text style={styles.subtitle}>Ready when you are.</Text>
+        {session && (
+          <Pressable onPress={() => router.push('/panic')}>
+            <Text style={styles.panicLink}>panic notes</Text>
           </Pressable>
         )}
+      </View>
 
-        {finished && (
+      <View style={styles.footer}>
+        {session ? (
           <>
-            <Pressable
-              style={styles.secondaryBtn}
-              onPress={() => router.push({ pathname: '/study', params: { restart: '1' } })}
-            >
-              <Text style={styles.secondaryBtnText}>Restart last cram</Text>
+            <Button
+              label="Continue session"
+              onPress={() => router.push('/study')}
+              icon={<RotateCcw size={18} color="#fff" />}
+              style={styles.primaryCta}
+              textStyle={styles.primaryCtaText}
+            />
+            <Pressable onPress={() => router.push('/setup')}>
+              <Text style={styles.textLink}>Start new cram</Text>
             </Pressable>
+          </>
+        ) : (
+          <>
+            <Button
+              label="Start new cram"
+              onPress={() => router.push('/setup')}
+              icon={<ArrowRight size={18} color="#fff" />}
+              style={styles.primaryCta}
+              textStyle={styles.primaryCtaText}
+            />
+            {finished && (
+              <View style={styles.finishedRow}>
+                <Pressable onPress={restartCram}>
+                  <Text style={styles.textLink}>restart cram?</Text>
+                </Pressable>
+                <Text style={styles.dot}>·</Text>
+                <Pressable onPress={practice}>
+                  <Text style={styles.textLink}>practice</Text>
+                </Pressable>
+              </View>
+            )}
           </>
         )}
       </View>
-    </View>
+    </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#fff', paddingHorizontal: 24, paddingTop: 56 },
+  container: { flex: 1, backgroundColor: colors.background },
   center: { flex: 1, alignItems: 'center', justifyContent: 'center' },
-  header: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 48 },
-  iconBtn: { width: 36, height: 36, alignItems: 'center', justifyContent: 'center' },
-  iconText: { fontSize: 20, color: '#64748b' },
-  settingsBtn: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: '#2563eb',
+  header: { flexDirection: 'row', justifyContent: 'space-between', paddingHorizontal: 20, paddingTop: 8 },
+  hero: { flex: 1, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 24 },
+  logo: {
+    width: 56,
+    height: 56,
+    borderRadius: radii.xl,
+    backgroundColor: colors.slate900,
     alignItems: 'center',
     justifyContent: 'center',
+    marginBottom: 16,
   },
-  settingsText: { color: '#fff', fontSize: 18 },
-  hero: { flex: 1, justifyContent: 'center', alignItems: 'center' },
-  moon: { fontSize: 48, marginBottom: 16 },
-  title: { fontSize: 28, fontWeight: '700', color: '#0f172a' },
-  subtitle: { fontSize: 14, color: '#64748b', marginTop: 8 },
-  actions: { paddingBottom: 48, gap: 12 },
-  primaryBtn: {
-    backgroundColor: '#0f172a',
-    borderRadius: 16,
-    paddingVertical: 16,
-    alignItems: 'center',
-  },
-  primaryBtnText: { color: '#fff', fontSize: 16, fontWeight: '600' },
-  secondaryBtn: {
-    borderRadius: 16,
-    paddingVertical: 16,
-    alignItems: 'center',
-    borderWidth: 1,
-    borderColor: '#e2e8f0',
-  },
-  secondaryBtnText: { color: '#0f172a', fontSize: 16, fontWeight: '600' },
+  title: { fontSize: 20, fontWeight: '700', letterSpacing: -0.3 },
+  subtitle: { fontSize: 14, color: colors.muted, marginTop: 4 },
+  panicLink: { fontSize: 14, color: colors.muted, marginTop: 12, textDecorationLine: 'underline' },
+  footer: { paddingHorizontal: 24, paddingBottom: 24, gap: 12, alignItems: 'stretch' },
+  primaryCta: { height: 64, borderRadius: radii.xl, ...shadows.button },
+  primaryCtaText: { fontSize: 18, fontWeight: '700' },
+  textLink: { fontSize: 14, color: colors.muted, textAlign: 'center', textDecorationLine: 'underline' },
+  finishedRow: { flexDirection: 'row', justifyContent: 'center', alignItems: 'center', gap: 12, marginTop: 4 },
+  dot: { color: colors.mutedLight },
 });

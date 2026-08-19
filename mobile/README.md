@@ -54,14 +54,14 @@ React Native does not provide `crypto.getRandomValues()`, which the Base44 SDK n
 
 | Route | Status |
 |-------|--------|
-| `/` Landing | ✅ |
-| `/setup` | ✅ |
-| `/upload-notes` | ✅ samples only; photo upload placeholder |
-| `/triage` | ✅ AI + tap-to-move tiers |
-| `/study` | ⚠️ Basic recall loop (full web phases not ported) |
-| `/panic` | ✅ AI notes |
-| `/history` | ⚠️ Placeholder |
-| `/settings` | ✅ |
+| `/` Landing | ✅ Matches web — continue/restart/practice, corner nav |
+| `/setup` | ✅ Gradient setup with steppers + selects |
+| `/upload-notes` | ✅ Photo picker + sample notes |
+| `/triage` | ✅ AI triage board with tier colors |
+| `/study` | ✅ Full phase flow: critical → core → passive → test → confidence |
+| `/panic` | ✅ AI markdown panic notes |
+| `/history` | ✅ Placeholder (same as web) |
+| `/settings` | ✅ Sleep-protection explainer (same as web) |
 
 ## Base44 billing
 
