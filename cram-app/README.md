@@ -1,76 +1,51 @@
-# Cram App
+# Last Minute Study (cram-app)
 
-Native flashcard study app with subject-specific "gearing" — concept graphs for History/Science, minimal graph for English, math pipeline for Other.
+Native cram app — same flow, algorithm, and styling as the web app.
 
-Built with **Expo (managed) + React Native + TypeScript + React Navigation**. No web APIs.
+Built with **Expo + React Native + TypeScript + expo-router**.
 
 ## Run
 
 ```bash
 cd cram-app
+cp .env.local.example .env.local   # add Base44 credentials
 npm install
+npm run fix:storage                # if AsyncStorage errors in Expo Go
 npm start
 ```
 
 Press `i` for iOS Simulator or scan QR with **Expo Go** (SDK 57).
 
-### AsyncStorage error fix
+## Flow
 
-If you see `Native module is null, cannot access legacy storage`, you still have AsyncStorage **3.x** installed. Expo Go (SDK 57) needs **2.2.0**:
-
-```bash
-cd cram-app
-npm run fix:storage
-npx expo start --clear
+```
+Landing → Setup → Upload Notes → Triage → Study Flow → Done
+                                              ↓
+                    critical → core → passive → test → confidence
 ```
 
-Verify: `npm ls @react-native-async-storage/async-storage` should show **2.2.0**, not 3.x.
+## Smart Cram (Step 2 — later)
 
-### Broken git / can't pull updates
-
-If `git fetch` fails with `pack-....pack is far too short to be a packfile`, your local `.git` is corrupted. Either repair or re-clone:
-
-```bash
-# Option A — delete the bad pack and re-fetch (from repo root)
-rm .git/objects/pack/pack-da678d9919441af9decf70f56f24ca1f8a07dd9d.pack
-git fetch origin
-git checkout cursor/cram-app-engine-1016
-```
-
-```bash
-# Option B — fresh clone (safest)
-cd ~
-mv Last-Minute-Study Last-Minute-Study-old
-git clone https://github.com/brodregoss/Last-Minute-Study.git
-cd Last-Minute-Study
-git checkout cursor/cram-app-engine-1016
-cd cram-app && npm install && npm run fix:storage
-```
-
-You can run `npm run fix:storage` **without git** if `cram-app/` already exists on disk.
+After a session completes, subject-specific tailoring will use `src/engine/` (not wired yet).
 
 ## Architecture
 
 ```
-src/engine/          ← Pure TypeScript (no RN imports) — do not rewrite
-src/storage/         ← AsyncStorage boundary only
-src/data/            ← subjectGearing.json + sample decks (TODO: real ingestion)
-src/screens/         ← React Navigation screens
-src/components/      ← FlashcardFlow, etc.
+app/                 ← expo-router screens
+src/core/            ← studyUtils, types, triageUtils (same as web)
+src/components/      ← study blocks + UI
+src/services/        ← sessionStore, aiService, base44Client
+src/engine/          ← subject gearing engine (Smart Cram — future)
+src/data/            ← subjectGearing.json (engine config)
 ```
 
-## Flow
+## Base44
 
-1. **SubjectPicker** → pick Psych / History / Science / English / Language / Other
-2. **Other** → **ProblemPractice** (math engine)
-3. Other subjects → **Diagnostic** (first time) or **Review** (has mastery data)
-4. After diagnostic → **GapDashboard** (clustered weak spots)
-5. Tap cluster → focused **Review**
+Copy web app credentials into `cram-app/.env.local`:
 
-## Settings
+```
+EXPO_PUBLIC_BASE44_APP_ID=...
+EXPO_PUBLIC_BASE44_APP_BASE_URL=...
+```
 
-Override gearing weights per subject (stored in AsyncStorage, not bundled JSON).
-
-## Content
-
-Sample decks in `src/data/sampleDecks.ts` — marked `TODO` for real content pipeline.
+Triage and practice-test grading require Base44 AI.

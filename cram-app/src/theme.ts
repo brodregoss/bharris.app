@@ -1,43 +1,57 @@
-export const theme = {
-  colors: {
-    background: "#0f1419",
-    surface: "#1a2332",
-    surfaceElevated: "#243044",
-    border: "#2d3a4f",
-    text: "#f0f4f8",
-    textMuted: "#94a3b8",
-    textDim: "#64748b",
-    primary: "#3b82f6",
-    primaryMuted: "#1d4ed8",
-    success: "#22c55e",
-    successBg: "#14532d",
-    danger: "#ef4444",
-    dangerBg: "#450a0a",
-    warning: "#f59e0b",
-    cardFront: "#1e293b",
-    cardBack: "#172554",
-  },
-  spacing: {
-    xs: 4,
-    sm: 8,
-    md: 16,
-    lg: 24,
-    xl: 32,
-  },
-  radii: {
-    sm: 8,
-    md: 12,
-    lg: 16,
-    xl: 24,
-    card: 20,
-  },
-  typography: {
-    title: { fontSize: 22, fontWeight: "700" as const },
-    heading: { fontSize: 18, fontWeight: "600" as const },
-    body: { fontSize: 16, fontWeight: "400" as const },
-    caption: { fontSize: 13, fontWeight: "400" as const },
-    label: { fontSize: 11, fontWeight: "600" as const, letterSpacing: 1 },
-  },
+export const colors = {
+  background: '#ffffff',
+  foreground: '#0f172a',
+  muted: '#64748b',
+  mutedLight: '#94a3b8',
+  border: '#e2e8f0',
+  card: '#ffffff',
+  slate50: '#f8fafc',
+  slate100: '#f1f5f9',
+  slate900: '#0f172a',
+  slate800: '#1e293b',
+  emerald50: '#ecfdf5',
+  emerald400: '#34d399',
+  emerald600: '#059669',
+  emerald700: '#047857',
+  rose50: '#fff1f2',
+  rose400: '#fb7185',
+  rose600: '#e11d48',
+  amber50: '#fffbeb',
+  amber200: '#fde68a',
+  amber700: '#b45309',
+  amber800: '#92400e',
+  triageBlank: '#FF8A8A',
+  triageShaky: '#FFC078',
+  triageKnow: '#8CE99A',
 };
 
-export type Theme = typeof theme;
+export const spacing = {
+  screen: 24,
+  screenSm: 20,
+};
+
+export const radii = {
+  lg: 12,
+  xl: 16,
+  xxl: 24,
+  card: 16,
+  button: 16,
+  flashcard: 24,
+};
+
+export const shadows = {
+  button: {
+    shadowColor: '#0f172a',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.2,
+    shadowRadius: 8,
+    elevation: 4,
+  },
+  card: {
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.05,
+    shadowRadius: 2,
+    elevation: 1,
+  },
+};
