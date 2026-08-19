@@ -9,10 +9,12 @@ Built with **Expo + React Native + TypeScript + expo-router**.
 ```bash
 cd cram-app
 cp .env.local.example .env.local   # add Base44 credentials
-npm install
+npm install                          # uses .npmrc legacy-peer-deps if needed
 npm run fix:storage                # if AsyncStorage errors in Expo Go
 npm start
 ```
+
+If `npm install` fails with peer dependency errors, run: `npm install --legacy-peer-deps`
 
 Press `i` for iOS Simulator or scan QR with **Expo Go** (SDK 57).
 
