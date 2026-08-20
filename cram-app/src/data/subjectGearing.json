@@ -1,0 +1,63 @@
+{
+  "psych": {
+    "id": "psych",
+    "name": "Psych",
+    "usesConceptGraph": true,
+    "graphWeight": 0.5,
+    "propagationStrength": 0.4,
+    "samplingBias": "hub-first",
+    "reviewMixWeak": 0.6,
+    "clusterSensitivity": 0.5
+  },
+  "history": {
+    "id": "history",
+    "name": "History",
+    "usesConceptGraph": true,
+    "graphWeight": 0.9,
+    "propagationStrength": 0.8,
+    "samplingBias": "hub-first",
+    "reviewMixWeak": 0.55,
+    "clusterSensitivity": 0.8
+  },
+  "science": {
+    "id": "science",
+    "name": "Science",
+    "usesConceptGraph": true,
+    "graphWeight": 0.85,
+    "propagationStrength": 0.75,
+    "samplingBias": "hub-first",
+    "reviewMixWeak": 0.55,
+    "clusterSensitivity": 0.75
+  },
+  "english": {
+    "id": "english",
+    "name": "English",
+    "usesConceptGraph": true,
+    "graphWeight": 0.15,
+    "propagationStrength": 0.1,
+    "samplingBias": "even",
+    "reviewMixWeak": 0.7,
+    "clusterSensitivity": 0.15
+  },
+  "language": {
+    "id": "language",
+    "name": "Language (Spanish...)",
+    "usesConceptGraph": true,
+    "graphWeight": 0.4,
+    "propagationStrength": 0.5,
+    "samplingBias": "hub-first",
+    "reviewMixWeak": 0.5,
+    "clusterSensitivity": 0.55,
+    "languageWeights": { "grammar": 0.7, "vocab": 0.15 }
+  },
+  "other": {
+    "id": "other",
+    "name": "Other",
+    "usesConceptGraph": false,
+    "graphWeight": 0,
+    "propagationStrength": 0,
+    "samplingBias": "even",
+    "reviewMixWeak": 0.7,
+    "clusterSensitivity": 0
+  }
+}
