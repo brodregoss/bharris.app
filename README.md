@@ -1,91 +1,81 @@
 # Last Minute Study
 
-A last-minute exam cram app. Develop locally in Cursor; source code lives on GitHub.
+One app. Cram smarter before an exam.
 
-AI features (term generation, panic notes, answer grading) still use **Base44 InvokeLLM** via your hosted Base44 app backend. Everything else runs as a normal Vite + React app.
+Native iOS (Expo + React Native). Web and App Store builds come later.
 
-## Prerequisites
-
-- Node.js 20+
-- A GitHub account
-- A Base44 app (for AI credits only) — you need the app ID and backend URL
-
-## First-time setup
-
-1. Clone this repo (or download and `cd` into the project folder).
-2. Install dependencies:
+## Quick start
 
 ```bash
 npm install
+cp .env.local.example .env.local   # add Base44 credentials
+npm run ios
 ```
 
-3. Copy the environment template and add your Base44 app credentials:
+Or open in **Xcode** (after first prebuild):
 
 ```bash
+npm install
 cp .env.local.example .env.local
+npm run prebuild:ios
+npm run xcode
 ```
 
-Edit `.env.local`:
+Then press ▶ in Xcode to run on the simulator.
 
+## Daily dev
+
+| Command | What it does |
+|---------|----------------|
+| `npm start` | Metro bundler — press `i` for simulator |
+| `npm run ios` | Start + open iOS simulator (localhost) |
+| `npm run prebuild:ios` | Generate `ios/` folder for Xcode |
+| `npm run xcode` | Open project in Xcode |
+
+## Flow
+
+```
+Landing → Setup → Upload Notes → Triage → Study → Done
+                              critical → core → passive → test → confidence
+```
+
+## Environment
+
+Create `.env.local`:
+
+```
+EXPO_PUBLIC_BASE44_APP_ID=your_app_id
+EXPO_PUBLIC_BASE44_APP_BASE_URL=https://your-app.base44.app
+```
+
+AI triage and test grading need Base44. Copy values from your existing web app.
+
+## Troubleshooting
+
+**AsyncStorage error in Expo Go:**
 ```bash
-VITE_BASE44_APP_ID=your_app_id
-VITE_BASE44_APP_BASE_URL=https://your-app.base44.app
+npm run fix:storage
 ```
 
-Find these in your [Base44 app dashboard](https://app.base44.com) — use the deployed app URL for `VITE_BASE44_APP_BASE_URL`.
-
-4. Start the dev server:
-
+**Simulator timeout when pressing `i`:**
 ```bash
-npm run dev
+npm run ios
+```
+Or open Simulator manually, then open Expo Go → `exp://127.0.0.1:8081`
+
+## Project layout
+
+```
+app/           screens (expo-router)
+src/core/      study algorithm (same as original web app)
+src/components study UI blocks
+src/services/  storage + Base44 AI
+src/engine/    Smart Cram engine (Step 2 — not wired yet)
+_archive/      old web + study app (reference only)
 ```
 
-Open the local URL Vite prints (usually `http://localhost:5173`).
+## Roadmap
 
-## GitHub repository
-
-This project is connected to [github.com/brodregoss/Last-Minute-Study](https://github.com/brodregoss/Last-Minute-Study).
-
-```bash
-git remote add origin https://github.com/brodregoss/Last-Minute-Study.git
-git push -u origin main
-```
-
-After that, use normal git workflow from Cursor: commit and push when you save changes.
-
-## What still uses Base44
-
-| Feature | Base44 dependency |
-|---------|-------------------|
-| Term triage (AI) | `InvokeLLM` |
-| Panic review notes (AI) | `InvokeLLM` |
-| Practice test grading (AI) | `InvokeLLM` |
-| Study sessions, settings, UI | Local only (`localStorage`) |
-
-The SDK client is in `src/api/base44Client.js`. AI calls are in `Triage.jsx`, `PanicReview.jsx`, and `PracticeTest.jsx`.
-
-## Migrating off Base44 AI later
-
-When your Base44 credits run out, replace `base44.integrations.Core.InvokeLLM` in those three files with your own LLM API (OpenAI, Anthropic, etc.), then remove `@base44/sdk`, `@base44/vite-plugin`, and the env vars.
-
-## Scripts
-
-```bash
-npm run dev      # Local development
-npm run build    # Production build → dist/
-npm run preview  # Preview production build
-npm run lint     # ESLint
-```
-
-## Deploying
-
-Build the static site with `npm run build` and deploy the `dist/` folder to any host (Vercel, Netlify, Cloudflare Pages, etc.). Set the same `VITE_BASE44_*` env vars in your host's dashboard so AI features keep working in production.
-
-## Mobile app (Expo)
-
-The native app lives in [`mobile/`](mobile/). See [mobile/README.md](mobile/README.md) for simulator workflow, env setup, and the `crypto.getRandomValues` fix for Triage.
-
-```bash
-cd mobile && npm install && cp .env.example .env
-npm start   # press i for iOS Simulator
-```
+1. **Now** — match web cram flow, test and polish
+2. **Smart Cram** — subject tailoring after session (`src/engine/`)
+3. **Later** — App Store build, web version
