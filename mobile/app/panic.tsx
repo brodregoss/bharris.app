@@ -2,8 +2,8 @@ import { useEffect, useState } from 'react';
 import { View, Text, StyleSheet, Pressable, ScrollView, ActivityIndicator } from 'react-native';
 import { useRouter } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import Markdown from 'react-native-markdown-display';
 import { X, FileText, RefreshCw, Loader2 } from 'lucide-react-native';
+import { PanicMarkdown } from '@/src/components/ui/PanicMarkdown';
 import { generatePanicNotes } from '@/src/services/aiService';
 import {
   loadSession,
@@ -125,7 +125,7 @@ export default function PanicScreen() {
 
         {hasSummary && !generating && (
           <View style={styles.article}>
-            <Markdown style={mdStyles}>{summary.text}</Markdown>
+            <PanicMarkdown text={summary.text} />
           </View>
         )}
 
@@ -136,16 +136,6 @@ export default function PanicScreen() {
     </SafeAreaView>
   );
 }
-
-const mdStyles = StyleSheet.create({
-  body: { color: colors.foreground, fontSize: 14, lineHeight: 22 },
-  heading2: { fontSize: 16, fontWeight: '700', marginTop: 16, marginBottom: 6 },
-  heading3: { fontSize: 14, fontWeight: '700', marginTop: 12, marginBottom: 4 },
-  paragraph: { marginBottom: 10 },
-  bullet_list: { marginBottom: 10 },
-  list_item: { marginBottom: 4 },
-  strong: { fontWeight: '600' },
-});
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.background },
