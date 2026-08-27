@@ -16,7 +16,6 @@ import PastSessions from './pages/PastSessions';
 import Settings from './pages/Settings';
 import { DebugProvider } from '@/lib/DebugContext';
 import DebugPanel from '@/components/dev/DebugPanel';
-import LaunchCountdown from '@/components/LaunchCountdown';
 
 
 function App() {
@@ -38,7 +37,6 @@ function App() {
               <Route path="*" element={<PageNotFound />} />
             </Routes>
             <DebugPanel />
-            <LaunchCountdown />
           </Router>
           <Toaster />
         </DebugProvider>

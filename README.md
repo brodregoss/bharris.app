@@ -64,6 +64,19 @@ After that, use normal git workflow from Cursor: commit and push when you save c
 
 The SDK client is in `src/api/base44Client.js`. AI calls are in `Triage.jsx`, `PanicReview.jsx`, and `PracticeTest.jsx`.
 
+## Native app (Expo)
+
+The phone app lives in `mobile/`. It is a React Native port of the live site at [enthusiastic-cram-genius-flow.base44.app](https://enthusiastic-cram-genius-flow.base44.app) — same screens, copy, colors, and cram flow. The intro 1:37 countdown is intentionally omitted.
+
+```bash
+cd mobile
+cp .env.example .env
+npm install
+npm start
+```
+
+Press `i` for the iOS Simulator. See `mobile/README.md` for the crypto polyfill and Expo Go notes.
+
 ## Migrating off Base44 AI later
 
 When your Base44 credits run out, replace `base44.integrations.Core.InvokeLLM` in those three files with your own LLM API (OpenAI, Anthropic, etc.), then remove `@base44/sdk`, `@base44/vite-plugin`, and the env vars.
