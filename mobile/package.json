@@ -36,6 +36,8 @@
   },
   "scripts": {
     "start": "expo start",
+    "postinstall": "node scripts/ensure-punycode.js",
+    "fix:punycode": "node scripts/ensure-punycode.js",
     "fix:crypto": "bash fix-crypto.sh",
     "android": "expo start --android",
     "ios": "expo start --ios",
