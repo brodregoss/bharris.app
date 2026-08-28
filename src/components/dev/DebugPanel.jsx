@@ -88,8 +88,8 @@ export default function DebugPanel() {
 
   return (
     <>
-      {/* Floating dev tools — always visible */}
-      {!isOpen && (
+      {/* Floating dev tools — only when ?dev / Ctrl+Shift+D is on */}
+      {!isOpen && enabled && (
         <div className="fixed z-[9998] bottom-4 right-4 flex items-center gap-2">
           <AutoAnswerButton />
           <button
