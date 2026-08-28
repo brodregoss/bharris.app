@@ -64,20 +64,15 @@ After that, use normal git workflow from Cursor: commit and push when you save c
 
 The SDK client is in `src/api/base44Client.js`. AI calls are in `Triage.jsx`, `PanicReview.jsx`, and `PracticeTest.jsx`.
 
-## Native iOS / TestFlight
+## Native iOS / Xcode
 
-The phone app is in `mobile/`. TestFlight builds run in Expo’s cloud — no Homebrew/CocoaPods on your Mac. See `mobile/README.md`.
+The Xcode app lives in `mobile/ios/`. After pulling this branch, double-click:
 
-```bash
-cd /Users/broderickharris/Last-Minute-Study
-git checkout -- mobile/package-lock.json
-git pull origin cursor/native-live-parity-d64c
-cd mobile
-npm install
-npx eas-cli login
-npx eas-cli build:configure
-npx eas-cli build --platform ios --profile production --auto-submit
-```
+`Open Last Minute Study in Xcode.command`
+
+That opens `mobile/ios/LastMinuteStudy.xcworkspace`. In Xcode: pick mom's Team under Signing, then **Product → Archive**.
+
+See `mobile/README.md` for TestFlight details.
 
 ## Migrating off Base44 AI later
 

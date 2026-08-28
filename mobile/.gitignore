@@ -37,6 +37,5 @@ yarn-error.*
 # typescript
 *.tsbuildinfo
 
-# generated native folders
-/ios
+# Android is still generated on demand. iOS is committed so Xcode can open it.
 /android
