@@ -1,0 +1,8 @@
+App/build
+App/Pods
+App/output
+DerivedData
+xcuserdata
+
+# Cordova plugins for Capacitor (unused; this app is Capacitor-only)
+capacitor-cordova-ios-plugins
