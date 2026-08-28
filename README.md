@@ -64,18 +64,25 @@ After that, use normal git workflow from Cursor: commit and push when you save c
 
 The SDK client is in `src/api/base44Client.js`. AI calls are in `Triage.jsx`, `PanicReview.jsx`, and `PracticeTest.jsx`.
 
-## Native app (Expo)
+## Native iOS / TestFlight
 
-The phone app lives in `mobile/`. It is a React Native port of the live site at [enthusiastic-cram-genius-flow.base44.app](https://enthusiastic-cram-genius-flow.base44.app) — same screens, copy, colors, and cram flow. The intro 1:37 countdown is intentionally omitted.
+The phone app is in `mobile/`. Do not use Expo Go. See `mobile/README.md`.
 
 ```bash
 cd mobile
-cp .env.example .env
+git checkout cursor/native-live-parity-d64c
 npm install
-npm start
+npx expo run:ios
 ```
 
-Press `i` for the iOS Simulator. See `mobile/README.md` for the crypto polyfill and Expo Go notes.
+TestFlight:
+
+```bash
+cd mobile
+eas login
+eas build:configure
+eas build --platform ios --profile production --auto-submit
+```
 
 ## Migrating off Base44 AI later
 

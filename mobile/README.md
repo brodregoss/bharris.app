@@ -1,68 +1,68 @@
-# Last Minute Study — Mobile (Expo)
+# Last Minute Study — iOS app
 
-Native iOS/Android app. AI features still use **Base44 InvokeLLM** via your hosted app backend.
+Standalone iPhone app. AI still uses Base44 InvokeLLM.
 
-## Prerequisites
+Do **not** use Expo Go. Local runs and TestFlight both use a real `Last Minute Study` binary.
 
-- Node.js 20+ (Node 22 recommended)
-- macOS + Xcode Command Line Tools for iOS Simulator (full Xcode only needed for App Store / dev builds)
-- [Expo Go](https://expo.dev/go) on a physical device is optional — **iOS Simulator is the default workflow**
-
-## Setup
+## One-time setup
 
 ```bash
+cd /Users/broderickharris/Last-Minute-Study
+git fetch origin
+git checkout cursor/native-live-parity-d64c
+git pull origin cursor/native-live-parity-d64c
 cd mobile
-npm install
 cp .env.example .env
+npm install
 ```
 
-Edit `.env` with the same Base44 credentials as the web app:
+You need:
+
+- A paid [Apple Developer](https://developer.apple.com/programs/) account ($99/year) for TestFlight
+- Xcode installed and opened once
+- An [Expo](https://expo.dev) account (free) for EAS cloud builds
+
+## Run on the Simulator like a normal app
+
+This compiles **Last Minute Study.app** and installs it on the Simulator (home screen icon, not Expo Go):
 
 ```bash
+cd /Users/broderickharris/Last-Minute-Study/mobile
+npx expo run:ios
+```
+
+First build takes several minutes. After that, launch **Last Minute Study** from the Simulator home screen.
+
+## TestFlight (today)
+
+From `mobile/`:
+
+```bash
+npm install -g eas-cli
+eas login
+eas build:configure
+eas build --platform ios --profile production --auto-submit
+```
+
+`eas build:configure` creates the Expo project and will ask you to log in with Apple. EAS then:
+
+1. Builds a store IPA in the cloud
+2. Uploads it to App Store Connect
+3. Puts it on **TestFlight Internal** for anyone on your Apple Developer team
+
+Watch the build at the URL EAS prints. Processing in App Store Connect is usually 10–30 minutes after the build finishes.
+
+Then open [App Store Connect](https://appstoreconnect.apple.com/) → **Last Minute Study** → **TestFlight** → install on your iPhone.
+
+Bundle ID is `com.brodregoss.lastminutestudy`. Create that App ID in the Apple Developer portal if EAS asks.
+
+## Base44 env (already set for EAS production)
+
+```
 EXPO_PUBLIC_BASE44_APP_ID=6a6155d14517fbb12343f754
 EXPO_PUBLIC_BASE44_APP_BASE_URL=https://enthusiastic-cram-genius-flow.base44.app
 ```
 
-## Run (recommended workflow)
+## Crypto polyfill
 
-```bash
-npm start
-```
-
-Press **`i`** in the Metro terminal to open the **iOS Simulator**.
-
-Do **not** use web preview (`w`) — AsyncStorage/SQLite paths differ and are not fully supported yet.
-
-## Fixing `crypto.getRandomValues()` on Triage
-
-React Native does not provide `crypto.getRandomValues()`, which the Base44 SDK needs (via `uuid`). This project loads `react-native-get-random-values` in `index.js` **before** any other imports. If you see this error on an older local copy, ensure:
-
-1. `npm install react-native-get-random-values`
-2. `"main": "index.js"` in `package.json`
-3. `index.js` starts with `import 'react-native-get-random-values';`
-
-## When you need Xcode
-
-| Task | Simulator + Expo | Xcode |
-|------|------------------|-------|
-| UI / JS changes | ✅ | Not needed |
-| Test on iPhone simulator | ✅ (`i` in Metro) | Not needed |
-| App Store / TestFlight | ❌ | ✅ (`eas build` or `expo run:ios`) |
-| Custom native modules | ❌ | ✅ |
-
-## Screens
-
-| Route | Status |
-|-------|--------|
-| `/` Landing | ✅ Matches web — continue/restart/practice, corner nav |
-| `/setup` | ✅ Gradient setup with steppers + selects |
-| `/upload-notes` | ✅ Photo picker + sample notes |
-| `/triage` | ✅ AI triage board with tier colors |
-| `/study` | ✅ Full phase flow: critical → core → passive → test → confidence |
-| `/panic` | ✅ AI markdown panic notes |
-| `/history` | ✅ Placeholder (same as web) |
-| `/settings` | ✅ Sleep-protection explainer (same as web) |
-
-## Base44 billing
-
-If AI fails with **401/403/billing/credits** messages, that is likely account cutoff — not the crypto error. The web app at repo root is the quickest way to test whether Base44 AI still responds.
+`index.js` must stay as the `"main"` entry and must import `react-native-get-random-values` first so Base44 AI works on device.

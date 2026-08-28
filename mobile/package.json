@@ -7,6 +7,7 @@
     "@react-native-async-storage/async-storage": "2.2.0",
     "expo": "~57.0.14",
     "expo-constants": "~57.0.12",
+    "expo-dev-client": "~57.0.16",
     "expo-font": "~57.0.1",
     "expo-image-picker": "^57.0.11",
     "expo-linear-gradient": "^57.0.1",
@@ -35,12 +36,12 @@
     "typescript": "~6.0.3"
   },
   "scripts": {
-    "start": "expo start",
+    "start": "expo start --dev-client",
+    "ios": "expo run:ios",
+    "android": "expo run:android",
     "postinstall": "node scripts/ensure-punycode.js",
     "fix:punycode": "node scripts/ensure-punycode.js",
     "fix:crypto": "bash fix-crypto.sh",
-    "android": "expo start --android",
-    "ios": "expo start --ios",
     "web": "expo start --web"
   },
   "private": true

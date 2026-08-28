@@ -1,5 +1,6 @@
 const path = require('path');
 const { getDefaultConfig } = require('expo/metro-config');
+const { resolve } = require('metro-resolver');
 
 const config = getDefaultConfig(__dirname);
 const punycodePath = path.resolve(__dirname, 'shims/punycode.js');
@@ -13,6 +14,8 @@ config.resolver.extraNodeModules = {
   'markdown-it': markdownItStub,
 };
 
+// Use metro-resolver.resolve (not context.resolveRequest) so this never recurses
+// and Expo Go / a stale markdown-it copy cannot crash the bundle.
 config.resolver.resolveRequest = (context, moduleName, platform) => {
   if (moduleName === 'punycode' || moduleName === 'punycode/') {
     return { type: 'sourceFile', filePath: punycodePath };
@@ -23,7 +26,7 @@ config.resolver.resolveRequest = (context, moduleName, platform) => {
   if (moduleName === 'markdown-it' || moduleName.startsWith('markdown-it/')) {
     return { type: 'sourceFile', filePath: markdownItStub };
   }
-  return context.resolveRequest(context, moduleName, platform);
+  return resolve(context, moduleName, platform);
 };
 
 module.exports = config;
