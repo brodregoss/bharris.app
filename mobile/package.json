@@ -33,6 +33,7 @@
   },
   "devDependencies": {
     "@types/react": "~19.2.2",
+    "eas-cli": "^22.6.0",
     "typescript": "~6.0.3"
   },
   "scripts": {
@@ -42,7 +43,9 @@
     "postinstall": "node scripts/ensure-punycode.js",
     "fix:punycode": "node scripts/ensure-punycode.js",
     "fix:crypto": "bash fix-crypto.sh",
-    "web": "expo start --web"
+    "web": "expo start --web",
+    "eas:configure": "eas build:configure",
+    "eas:testflight": "eas build --platform ios --profile production --auto-submit"
   },
   "private": true
 }

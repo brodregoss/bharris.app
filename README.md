@@ -66,22 +66,17 @@ The SDK client is in `src/api/base44Client.js`. AI calls are in `Triage.jsx`, `P
 
 ## Native iOS / TestFlight
 
-The phone app is in `mobile/`. Do not use Expo Go. See `mobile/README.md`.
+The phone app is in `mobile/`. TestFlight builds run in Expo’s cloud — no Homebrew/CocoaPods on your Mac. See `mobile/README.md`.
 
 ```bash
+cd /Users/broderickharris/Last-Minute-Study
+git checkout -- mobile/package-lock.json
+git pull origin cursor/native-live-parity-d64c
 cd mobile
-git checkout cursor/native-live-parity-d64c
 npm install
-npx expo run:ios
-```
-
-TestFlight:
-
-```bash
-cd mobile
-eas login
-eas build:configure
-eas build --platform ios --profile production --auto-submit
+npx eas-cli login
+npx eas-cli build:configure
+npx eas-cli build --platform ios --profile production --auto-submit
 ```
 
 ## Migrating off Base44 AI later
