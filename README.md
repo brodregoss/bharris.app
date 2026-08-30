@@ -14,9 +14,9 @@ The screens you see on the phone are the files in `src/`. Change those in Xcode 
    - Open the unzipped folder
 3. At the **top** of that folder, double-click:
 
-   **`Last Minute Study.xcworkspace`**
+   **`OPEN-IN-XCODE.xcworkspace`**
 
-   It has the blue Xcode icon. That is the file to open. Do not hunt for a `.command` helper.
+   Look for the white page with a **blue hammer** and the word **WORKSPACE** on the icon. In older downloads the same file was named `Last Minute Study.xcworkspace` (Finder may show it as `Last Minute Study.x...orkspace`). That is the file. Do not open `ios`, `src`, or `package.json`.
 
 4. If Mac says it was downloaded from the internet: right-click → **Open**.
 5. Xcode opens. In the left sidebar you will see:
