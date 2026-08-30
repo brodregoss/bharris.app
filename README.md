@@ -1,121 +1,76 @@
 # Last Minute Study
 
-A last-minute exam cram app. The iPhone app is this same React UI, wrapped in a native Xcode project with Capacitor. Change features in `src/`, then sync into Xcode.
+A last-minute exam cram app. Open it in **Xcode**, press Run, then later Archive for TestFlight.
 
-AI features (term generation, panic notes, answer grading) still use **Base44 InvokeLLM** via your hosted Base44 app backend. Everything else runs in the app (`localStorage` on web, the same store inside the iPhone wrapper).
+The screens you see on the phone are the files in `src/`. Change those in Xcode (or any editor). Pressing Run rebuilds them into the iPhone app.
 
-## Open in Xcode (Mac)
+## Open in Xcode (from the Mac desktop)
 
-1. Pull this branch.
-2. In Finder, double-click:
+1. Click **Finder** in the Dock (blue smiling face).
+2. Open the **Last-Minute-Study** folder. If you do not have it:
+   - Go to https://github.com/brodregoss/Last-Minute-Study/tree/cursor/ios-testflight-capacitor-0f3e
+   - Click the green **Code** button → **Download ZIP**
+   - Double-click the zip to unzip it
+   - Open the unzipped folder
+3. At the **top** of that folder, double-click:
 
-`Last-Minute-Study/Open Last Minute Study in Xcode.command`
+   **`Last Minute Study.xcworkspace`**
 
-If macOS blocks it: right-click → **Open**.
+   It has the blue Xcode icon. That is the file to open. Do not hunt for a `.command` helper.
 
-That installs npm packages if needed, builds the web app into the iPhone project, then opens:
+4. If Mac says it was downloaded from the internet: right-click → **Open**.
+5. Xcode opens. In the left sidebar you will see:
+   - **Edit the app here** → `src` (the screens)
+   - **App** (the iPhone wrapper)
+6. Click **App** in the sidebar → **Signing & Capabilities** → **Team** → pick the paid Apple Developer team.
+7. At the top, pick an iPhone simulator (or your plugged-in iPhone).
+8. Press the **Play** button.
 
-`Last-Minute-Study/ios/App/App.xcodeproj`
+The first Run can take a few minutes (it installs Node packages once, then builds). After that, Run is faster.
 
-## In Xcode → TestFlight
+You need [Node.js LTS](https://nodejs.org) installed on the Mac. Xcode itself comes from the Mac App Store.
 
-1. Left sidebar → **App**
-2. **Signing & Capabilities** → Team → the paid Apple Developer team
-3. Pick an iPhone simulator or a plugged-in iPhone, then press **Run** (▶)
-4. When it looks right: **Product → Archive** → **Distribute App** → **App Store Connect** → TestFlight
+## Edit and view from Xcode
+
+1. In the left sidebar, open **Edit the app here** → **src** → **pages**.
+2. Click a screen, for example `Landing.jsx` or `Home.jsx`.
+3. Change the text or layout.
+4. Press **Play** again. The iPhone simulator shows your change.
+
+| File | What it is |
+|------|------------|
+| `src/pages/Landing.jsx` | Home screen |
+| `src/pages/Home.jsx` | Setup (terms, hours, exam type) |
+| `src/pages/UploadNotes.jsx` | Photo / sample notes |
+| `src/pages/Triage.jsx` | Sort terms into Blank / Shaky / Know it |
+| `src/pages/StudyFlow.jsx` | The cram session |
+| `src/pages/PanicReview.jsx` | Panic notes |
+| `src/pages/PastSessions.jsx` | History |
+| `src/pages/Settings.jsx` | Settings |
+| `src/App.jsx` | Which screens exist (add or remove a route here) |
+
+## TestFlight
+
+In Xcode: **Product → Archive** → **Distribute App** → **App Store Connect**.
 
 Bundle ID: `com.brodregoss.lastminutestudy`
 
-Create that App ID / app record once in [App Store Connect](https://appstoreconnect.apple.com) if it does not exist yet. Internal TestFlight testers can install without App Review. External testers need a short Beta App Review.
+Create that app once in [App Store Connect](https://appstoreconnect.apple.com) if it is not there yet.
 
-The first upload asks about encryption. The project already sets **App Uses Non-Exempt Encryption** to **No** (HTTPS only).
+## What is still in this folder (and why)
 
-## Tinker (add or remove features)
+| Thing | Needed? |
+|-------|---------|
+| `Last Minute Study.xcworkspace` | Yes — this is what you double-click |
+| `src/` | Yes — the actual app screens |
+| `ios/` | Yes — the iPhone project Xcode builds |
+| `package.json` | Yes — lists the libraries the app uses |
+| Base44 bits (`src/api`, `.env.production`) | Yes — AI triage / panic notes / grading |
+| Extra login pages, Stripe, maps, leftover UI kit | Removed — they were unused Base44 leftovers |
 
-Edit the React app in `src/` — that is the product. Examples:
-
-- Add a screen: create `src/pages/YourPage.jsx` and a `<Route>` in `src/App.jsx`
-- Remove a screen: delete the route and its page file
-- Change copy, colors, cram flow: same files you would change for the website
-
-Then on the Mac:
-
-```bash
-npm run ios:sync
-```
-
-Xcode already has the project open — press **Run** again. You do not maintain a second mobile codebase.
-
-Web-only work (browser):
+## Web preview (optional)
 
 ```bash
 npm install
-cp .env.local.example .env.local   # optional; production Base44 values are in .env.production
 npm run dev
 ```
-
-## Prerequisites
-
-- Node.js 20+
-- A Mac with Xcode (26+ if you are submitting to App Store Connect after Apple's April 2026 SDK rule)
-- A paid Apple Developer account for TestFlight (a free Apple ID can run on Simulator only)
-- A Base44 app (for AI credits) — production builds already point at the hosted Last Minute Study backend
-
-## First-time setup
-
-1. Clone this repo.
-2. Install dependencies:
-
-```bash
-npm install
-```
-
-3. For local web AI calls, copy the environment template:
-
-```bash
-cp .env.local.example .env.local
-```
-
-iOS / production builds use `.env.production` automatically.
-
-4. Start the dev server:
-
-```bash
-npm run dev
-```
-
-Open the local URL Vite prints (usually `http://localhost:5173`).
-
-## GitHub repository
-
-This project is connected to [github.com/brodregoss/Last-Minute-Study](https://github.com/brodregoss/Last-Minute-Study).
-
-## What still uses Base44
-
-| Feature | Base44 dependency |
-|---------|-------------------|
-| Term triage (AI) | `InvokeLLM` |
-| Panic review notes (AI) | `InvokeLLM` |
-| Practice test grading (AI) | `InvokeLLM` |
-| Study sessions, settings, UI | Local only (`localStorage`) |
-
-The SDK client is in `src/api/base44Client.js`. AI calls are in `Triage.jsx`, `PanicReview.jsx`, and `PracticeTest.jsx`.
-
-## Migrating off Base44 AI later
-
-When your Base44 credits run out, replace `base44.integrations.Core.InvokeLLM` in those three files with your own LLM API (OpenAI, Anthropic, etc.), then remove `@base44/sdk`, `@base44/vite-plugin`, and the env vars.
-
-## Scripts
-
-```bash
-npm run dev        # Local web development
-npm run build      # Production web build → dist/
-npm run ios:sync   # Build web app and copy it into the Xcode project
-npm run ios:open   # Open ios/App/App.xcodeproj (Mac only)
-npm run preview    # Preview production build
-npm run lint       # ESLint
-```
-
-## Deploying the website
-
-Build the static site with `npm run build` and deploy the `dist/` folder to any host (Vercel, Netlify, Cloudflare Pages, etc.). Set the same `VITE_BASE44_*` env vars in your host's dashboard so AI features keep working in production.
