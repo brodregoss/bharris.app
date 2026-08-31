@@ -61,7 +61,7 @@ Create that app once in [App Store Connect](https://appstoreconnect.apple.com) i
 
 | Thing | Needed? |
 |-------|---------|
-| `Last Minute Study.xcworkspace` | Yes — this is what you double-click |
+| `OPEN-IN-XCODE.xcworkspace` | Yes — this is what you double-click |
 | `src/` | Yes — the actual app screens |
 | `ios/` | Yes — the iPhone project Xcode builds |
 | `package.json` | Yes — lists the libraries the app uses |

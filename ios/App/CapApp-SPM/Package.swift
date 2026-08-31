@@ -1,7 +1,8 @@
 // swift-tools-version: 5.9
 import PackageDescription
 
-// DO NOT MODIFY THIS FILE - managed by Capacitor CLI commands
+// Local copies of Capacitor plugins live in ../Packages so Xcode can
+// resolve CapApp-SPM without node_modules (ZIP downloads / first open).
 let package = Package(
     name: "CapApp-SPM",
     platforms: [.iOS(.v15)],
@@ -12,10 +13,10 @@ let package = Package(
     ],
     dependencies: [
         .package(url: "https://github.com/ionic-team/capacitor-swift-pm.git", exact: "8.5.0"),
-        .package(name: "CapacitorApp", path: "../../../node_modules/@capacitor/app"),
-        .package(name: "CapacitorKeyboard", path: "../../../node_modules/@capacitor/keyboard"),
-        .package(name: "CapacitorSplashScreen", path: "../../../node_modules/@capacitor/splash-screen"),
-        .package(name: "CapacitorStatusBar", path: "../../../node_modules/@capacitor/status-bar")
+        .package(name: "CapacitorApp", path: "../Packages/app"),
+        .package(name: "CapacitorKeyboard", path: "../Packages/keyboard"),
+        .package(name: "CapacitorSplashScreen", path: "../Packages/splash-screen"),
+        .package(name: "CapacitorStatusBar", path: "../Packages/status-bar")
     ],
     targets: [
         .target(
