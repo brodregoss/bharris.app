@@ -85,6 +85,16 @@ export default function PracticeTest({ terms, examType, budgetMs, priorMissed, o
 
   const record = (qid, payload) => setAnswers((a) => ({ ...a, [qid]: payload }));
 
+  const markIWasRight = () => {
+    if (!q) return;
+    record(q.id, { correct: true, overruled: true });
+    setGradeResult((g) => ({
+      correct: true,
+      feedback: g?.feedback || '',
+      overruled: true,
+    }));
+  };
+
   const next = () => {
     if (idx + 1 >= questions.length) {
       finish();
@@ -306,7 +316,9 @@ export default function PracticeTest({ terms, examType, budgetMs, priorMissed, o
                   value={shortAnswer}
                   onChange={(e) => setShortAnswer(e.target.value)}
                   placeholder="Type your answer — we'll grade it with AI…"
-                  className="w-full rounded-xl border border-border bg-card p-3 text-sm min-h-[80px] focus:outline-none focus:ring-2 focus:ring-ring"
+                  autoCapitalize="sentences"
+                  autoCorrect="on"
+                  className="w-full rounded-xl border border-border bg-card p-3 text-base leading-snug min-h-[80px] focus:outline-none focus:ring-2 focus:ring-ring"
                 />
               ) : (
                 <div className="space-y-2">
@@ -318,9 +330,20 @@ export default function PracticeTest({ terms, examType, budgetMs, priorMissed, o
                           : 'bg-rose-50 border border-rose-300'
                       }`}
                     >
-                      <p className={`font-semibold ${gradeResult.correct ? 'text-emerald-700' : 'text-rose-700'}`}>
-                        {gradeResult.correct ? 'Got it' : 'Missed'}
-                      </p>
+                      <div className="flex items-center justify-between gap-3">
+                        <p className={`font-semibold ${gradeResult.correct ? 'text-emerald-700' : 'text-rose-700'}`}>
+                          {gradeResult.overruled ? 'Counted as right' : gradeResult.correct ? 'Got it' : 'Missed'}
+                        </p>
+                        {!gradeResult.correct && (
+                          <button
+                            type="button"
+                            onClick={markIWasRight}
+                            className="shrink-0 rounded-full border border-slate-300 bg-white px-2.5 py-1 text-[11px] font-semibold text-slate-700 hover:bg-slate-50"
+                          >
+                            I was right
+                          </button>
+                        )}
+                      </div>
                       {gradeResult.feedback && (
                         <p className="mt-1 text-muted-foreground">{gradeResult.feedback}</p>
                       )}
