@@ -53,6 +53,7 @@ function Triage() {
   const source = location.state?.source;
   const setup = location.state?.setup;
   const sourceTitle = source?.title || 'Intro Psychology';
+  const canned = Array.isArray(source?.items) ? source.items : null;
 
   const lockIn = () => {
     const studyTerms = ranked.map((t) => ({
@@ -67,13 +68,42 @@ function Triage() {
     navigate('/study', { state: { terms: studyTerms, setup } });
   };
 
-  const [loading, setLoading] = React.useState(true);
-  const [ranked, setRanked] = React.useState([]);
+  const [loading, setLoading] = React.useState(!canned?.length);
+  const [ranked, setRanked] = React.useState(() => {
+    if (!canned?.length) return [];
+    return rankTerms(
+      canned.map((t, i) => ({
+        ...t,
+        id: `t${i}`,
+        depends_on: t.depends_on || [],
+      }))
+    );
+  });
   const [animating, setAnimating] = React.useState(true);
 
-  // AI ranking
+  // Rank canned sample decks locally; otherwise AI extracts terms from the source.
   React.useEffect(() => {
     let mounted = true;
+    const finish = (raw) => {
+      if (!mounted) return;
+      const withIds = raw.map((t, i) => ({
+        ...t,
+        id: `t${i}`,
+        depends_on: t.depends_on || [],
+      }));
+      const next = rankTerms(withIds);
+      setRanked(next);
+      setLoading(false);
+      const total = next.length * 0.06 + 0.6;
+      setTimeout(() => mounted && setAnimating(false), total * 1000);
+    };
+
+    if (canned?.length) {
+      const total = ranked.length * 0.06 + 0.6;
+      setTimeout(() => mounted && setAnimating(false), total * 1000);
+      return () => { mounted = false; };
+    }
+
     (async () => {
       const count = Math.min(source?.terms || 12, MAX_TERMS);
       const res = await base44.integrations.Core.InvokeLLM({
@@ -100,12 +130,7 @@ function Triage() {
       });
       if (!mounted) return;
       const raw = (res.terms || res.output?.terms || res || []).slice(0, count);
-      const withIds = raw.map((t, i) => ({ ...t, id: `t${i}`, depends_on: t.depends_on || [] }));
-      const ranked = rankTerms(withIds);
-      setRanked(ranked);
-      setLoading(false);
-      const total = ranked.length * 0.06 + 0.6;
-      setTimeout(() => mounted && setAnimating(false), total * 1000);
+      finish(raw);
     })();
     return () => { mounted = false; };
   }, []);
@@ -152,7 +177,11 @@ function Triage() {
           {/* Subtitle */}
           <div className="px-6 pb-2">
             <h2 className="text-lg font-bold tracking-tight">Triage your terms</h2>
-            <p className="text-xs text-muted-foreground">AI ranked them — drag any card to move it between tiers.</p>
+            <p className="text-xs text-muted-foreground">
+              {canned?.length
+                ? 'Ranked by difficulty — drag any card to move it between tiers.'
+                : 'AI ranked them — drag any card to move it between tiers.'}
+            </p>
           </div>
 
           {/* Board */}
@@ -220,7 +249,9 @@ function Triage() {
           >
             <div className="flex items-center gap-2 bg-primary text-primary-foreground text-xs font-medium px-4 py-2.5 rounded-full shadow-lg">
               <Sparkles className="w-3.5 h-3.5 animate-pulse" />
-              AI ranking based on difficulty and card relations
+              {canned?.length
+                ? 'Ranked by difficulty and card relations'
+                : 'AI ranking based on difficulty and card relations'}
             </div>
           </motion.div>
         )}
