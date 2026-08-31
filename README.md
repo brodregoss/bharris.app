@@ -26,7 +26,15 @@ The screens you see on the phone are the files in `src/`. Change those in Xcode 
 7. At the top, pick an iPhone simulator (or your plugged-in iPhone).
 8. Press the **Play** button.
 
-The first Run can take a few minutes (it installs Node packages once, then builds). After that, Run is faster.
+The first Run can take a few minutes. Xcode may download a small Apple/Ionic package the first time (needs internet). After that, Run is faster.
+
+If Xcode says **Missing package product 'CapApp-SPM'**:
+
+1. Make sure you opened **OPEN-IN-XCODE.xcworkspace** (or the hammer **WORKSPACE** file), not a random file inside `ios`.
+2. Connect to Wi‑Fi.
+3. In Xcode’s menu bar: **File → Packages → Reset Package Caches**.
+4. Then **File → Packages → Resolve Package Versions**.
+5. Wait until the top bar finishes spinning, then **Product → Clean Build Folder**, then press **Play**.
 
 You need [Node.js LTS](https://nodejs.org) installed on the Mac. Xcode itself comes from the Mac App Store.
 
