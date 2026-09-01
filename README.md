@@ -49,24 +49,34 @@ If Xcode says **Missing package product 'CapApp-SPM'**:
 
 You need [Node.js LTS](https://nodejs.org) installed on the Mac. Xcode itself comes from the Mac App Store.
 
-## Edit and view from Xcode
+## Tweak the look or add a page (no new ZIP)
 
-1. In the left sidebar, open **Edit the app here** → **src** → **pages**.
-2. Click a screen, for example `Landing.jsx` or `Home.jsx`.
-3. Change the text or layout.
-4. Press **Play** again. The iPhone simulator shows your change.
+Keep **this same unzipped folder**. Pressing Play rebuilds whatever is in `src/` onto the phone. Re-downloading is only for grabbing files from GitHub, not for your own edits.
 
-| File | What it is |
-|------|------------|
-| `src/pages/Landing.jsx` | Home screen |
-| `src/pages/Home.jsx` | Setup (terms, hours, exam type) |
-| `src/pages/UploadNotes.jsx` | Photo / sample notes |
-| `src/pages/Triage.jsx` | Sort terms into Blank / Shaky / Know it |
-| `src/pages/StudyFlow.jsx` | The cram session |
-| `src/pages/PanicReview.jsx` | Panic notes |
-| `src/pages/PastSessions.jsx` | History |
-| `src/pages/Settings.jsx` | Settings |
-| `src/App.jsx` | Which screens exist (add or remove a route here) |
+1. In Xcode’s left sidebar: **Edit the app here** → `src`.
+2. Change a file (see the table below).
+3. Press **Play**. Wait until the app reopens on the phone.
+
+| What you want | File to open |
+|---------------|--------------|
+| Colors / overall look | `src/index.css` (the `--background`, `--primary`, etc. lines at the top) |
+| Home screen text | `src/pages/Landing.jsx` |
+| Setup screen | `src/pages/Home.jsx` |
+| Upload / sample notes | `src/pages/UploadNotes.jsx` |
+| Settings | `src/pages/Settings.jsx` |
+| Add or remove a page | `src/App.jsx` plus a new file in `src/pages/` |
+
+To add a page: duplicate a file in `src/pages`, change the text, import it in `src/App.jsx`, and add a `<Route path="/your-page" element={<YourPage />} />` next to the other routes.
+
+## Get GitHub updates without a new ZIP
+
+When Cursor (or GitHub) has newer files and you want them in this same folder:
+
+1. In Finder, open this Last-Minute-Study folder.
+2. Double-click **`PULL-LATEST.command`**. If Mac blocks it: right-click → **Open**.
+3. Press **Play** in Xcode.
+
+That replaces files with the GitHub copy. Do not run it if you still need edits you only made locally.
 
 ## TestFlight
 
@@ -81,6 +91,7 @@ Create that app once in [App Store Connect](https://appstoreconnect.apple.com) i
 | Thing | Needed? |
 |-------|---------|
 | `OPEN-IN-XCODE.xcworkspace` | Yes — this is what you double-click |
+| `PULL-LATEST.command` | Yes — double-click to get GitHub updates without a new ZIP |
 | `src/` | Yes — the actual app screens |
 | `ios/` | Yes — the iPhone project Xcode builds |
 | `package.json` | Yes — lists the libraries the app uses |

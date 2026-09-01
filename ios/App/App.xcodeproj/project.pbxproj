@@ -57,6 +57,8 @@
 		A11CE560FED796500168BB01 /* src */ = {isa = PBXFileReference; lastKnownFileType = folder; name = src; path = ../../src; sourceTree = SOURCE_ROOT; };
 		A11CE561FED796500168BB02 /* index.html */ = {isa = PBXFileReference; lastKnownFileType = text.html; name = index.html; path = ../../index.html; sourceTree = SOURCE_ROOT; };
 		A11CE562FED796500168BB03 /* README.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; name = README.md; path = ../../README.md; sourceTree = SOURCE_ROOT; };
+		A11CE565FED796500168BB06 /* index.css */ = {isa = PBXFileReference; lastKnownFileType = text.css; name = "index.css (look)"; path = ../../src/index.css; sourceTree = SOURCE_ROOT; };
+		A11CE566FED796500168BB07 /* App.jsx */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.javascript; name = "App.jsx (pages)"; path = ../../src/App.jsx; sourceTree = SOURCE_ROOT; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -74,6 +76,8 @@
 		A11CE563FED796500168BB04 /* Edit the app here */ = {
 			isa = PBXGroup;
 			children = (
+				A11CE565FED796500168BB06 /* index.css */,
+				A11CE566FED796500168BB07 /* App.jsx */,
 				A11CE560FED796500168BB01 /* src */,
 				A11CE561FED796500168BB02 /* index.html */,
 				A11CE562FED796500168BB03 /* README.md */,

@@ -6,7 +6,7 @@ import { isNativeApp } from '@/lib/native';
 import PageNotFound from './lib/PageNotFound';
 import { AuthProvider } from '@/lib/AuthContext';
 import ScrollToTop from './components/ScrollToTop';
-// Add page imports here
+// PAGES — add a file in src/pages, import it here, then add a <Route> below.
 import Landing from './pages/Landing';
 import Home from './pages/Home';
 import UploadNotes from './pages/UploadNotes';

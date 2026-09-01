@@ -2,6 +2,7 @@
 @tailwind components;
 @tailwind utilities;
 
+/* LOOK — change these HSL colors, then press Play in Xcode. No new ZIP. */
 @layer base {
   :root {
     --background: 0 0% 100%;
