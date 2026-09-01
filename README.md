@@ -28,6 +28,17 @@ The screens you see on the phone are the files in `src/`. Change those in Xcode 
 
 The first Run can take a few minutes. Xcode may download a small Apple/Ionic package the first time (needs internet). After that, Run is faster.
 
+If the phone still shows the **old** app (no **History Civil Rights** sample, Settings does not say **Version 1.0.1**):
+
+1. On the iPhone: long-press the Last Minute Study icon → **Remove App** → **Delete App**.
+2. On the Mac: throw the old unzipped **Last-Minute-Study** folder in the Trash. Xcode keeps using that old folder even if GitHub has newer files.
+3. Download a **new** ZIP from this branch (not the green Code button on the main repo page):
+   https://github.com/brodregoss/Last-Minute-Study/archive/refs/heads/cursor/ios-testflight-capacitor-0f3e.zip
+4. Double-click the zip, then double-click **`OPEN-IN-XCODE.xcworkspace`**.
+5. In Xcode: **Product → Clean Build Folder**, then press **Play** again.
+
+You should now see **History Civil Rights** as the third sample on Upload notes, and **Version 1.0.1** in Settings.
+
 If Xcode says **Missing package product 'CapApp-SPM'**:
 
 1. Make sure you opened **OPEN-IN-XCODE.xcworkspace** (or the hammer **WORKSPACE** file), not a random file inside `ios`.

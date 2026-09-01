@@ -25,4 +25,11 @@ fi
 echo "Building Last Minute Study..."
 npm run build
 npx cap copy ios
+
+# Xcode treats `public` as one folder. Touch it so Copy Bundle Resources
+# actually picks up the files we just wrote, instead of keeping the old copy.
+PUBLIC="$ROOT/ios/App/App/public"
+touch "$PUBLIC"
+find "$PUBLIC" -exec touch {} +
+
 echo "Web app copied into the Xcode project."

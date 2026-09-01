@@ -1,4 +1,5 @@
 import UIKit
+import WebKit
 import Capacitor
 
 @UIApplicationMain
@@ -7,7 +8,14 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
     var window: UIWindow?
 
     func application(_ application: UIApplication, didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]?) -> Bool {
-        // Override point for customization after application launch.
+        // WKWebView otherwise keeps a cached copy of the last JS bundle, so a
+        // new Xcode Run can still show the old screens. Drop only HTTP caches;
+        // localStorage (saved sessions) stays.
+        let caches: Set<String> = [
+            WKWebsiteDataTypeDiskCache,
+            WKWebsiteDataTypeMemoryCache,
+        ]
+        WKWebsiteDataStore.default().removeData(ofTypes: caches, modifiedSince: .distantPast) {}
         return true
     }
 
