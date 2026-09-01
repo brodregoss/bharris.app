@@ -135,6 +135,10 @@ function Triage() {
     return () => { mounted = false; };
   }, []);
 
+  const moveAllToBlank = () => {
+    setRanked((prev) => prev.map((t) => ({ ...t, tier: 'blank' })));
+  };
+
   const onDragEnd = (result) => {
     const { destination, source: src, draggableId } = result;
     if (!destination) return;
@@ -218,6 +222,18 @@ function Triage() {
                         </div>
                       )}
                     </Droppable>
+                    {tier.id === 'blank' && (
+                      <div className="bg-muted px-2 pb-2 shrink-0 rounded-b-lg">
+                        <button
+                          type="button"
+                          onClick={moveAllToBlank}
+                          disabled={ranked.length > 0 && ranked.every((t) => t.tier === 'blank')}
+                          className="w-full rounded-lg border border-rose-300 bg-white px-2 py-1.5 text-[11px] font-semibold text-rose-700 hover:bg-rose-50 disabled:opacity-40 disabled:pointer-events-none"
+                        >
+                          Move all
+                        </button>
+                      </div>
+                    )}
                   </div>
                 );
               })}
