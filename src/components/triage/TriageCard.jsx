@@ -21,7 +21,7 @@ export default function TriageCard({ item, tier, index, animationDelay }) {
             {...provided.draggableProps}
             {...provided.dragHandleProps}
             className={cn(
-              'group rounded-lg border-l-4 bg-card p-2.5 shadow-sm flex items-center justify-between gap-2 select-none transition-shadow',
+              'group rounded-lg border-l-4 bg-card p-2.5 shadow-sm flex items-center justify-between gap-2 select-none transition-shadow min-w-0 overflow-hidden',
               snapshot.isDragging ? 'w-72 max-w-[80vw]' : 'w-full',
               TIER_BORDER[tier],
               snapshot.isDragging && 'shadow-xl ring-2 ring-ring/40 z-[9999]'
@@ -29,7 +29,7 @@ export default function TriageCard({ item, tier, index, animationDelay }) {
           >
             <p
               className={cn(
-                'text-sm font-semibold leading-tight text-card-foreground',
+                'text-sm font-semibold leading-tight text-card-foreground min-w-0 break-words',
                 snapshot.isDragging ? 'line-clamp-none whitespace-normal' : 'line-clamp-2'
               )}
             >

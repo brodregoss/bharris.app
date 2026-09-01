@@ -194,7 +194,7 @@ function Triage() {
               {TIERS.map((tier) => {
                 const items = ranked.filter((t) => t.tier === tier.id);
                 return (
-                  <div key={tier.id} className="flex-1 flex flex-col min-w-0">
+                  <div key={tier.id} className="flex-1 basis-0 min-w-0 flex flex-col overflow-hidden">
                     <div
                       style={{ background: tier.bg }}
                       className="rounded-t-lg px-3 py-2 flex items-center justify-between"
