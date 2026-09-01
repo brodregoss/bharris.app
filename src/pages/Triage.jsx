@@ -140,13 +140,26 @@ function Triage() {
   };
 
   const onDragEnd = (result) => {
-    const { destination, source: src, draggableId } = result;
+    const { destination, source, draggableId } = result;
     if (!destination) return;
-    if (destination.droppableId === src.droppableId && destination.index === src.index) return;
+    if (destination.droppableId === source.droppableId && destination.index === source.index) return;
+
     setRanked((prev) => {
-      const item = prev.find((t) => t.id === draggableId);
-      if (!item) return prev;
-      return prev.map((t) => (t.id === draggableId ? { ...t, tier: destination.droppableId } : t));
+      const columns = {
+        blank: prev.filter((t) => t.tier === 'blank'),
+        shaky: prev.filter((t) => t.tier === 'shaky'),
+        know_it: prev.filter((t) => t.tier === 'know_it'),
+      };
+      const from = columns[source.droppableId];
+      const to = columns[destination.droppableId];
+      if (!from || !to) return prev;
+      const fromIdx = from.findIndex((t) => t.id === draggableId);
+      if (fromIdx < 0) return prev;
+      const [moved] = from.splice(fromIdx, 1);
+      const next = { ...moved, tier: destination.droppableId };
+      const insertAt = Math.min(destination.index, to.length);
+      to.splice(insertAt, 0, next);
+      return [...columns.blank, ...columns.shaky, ...columns.know_it];
     });
   };
 
@@ -194,20 +207,31 @@ function Triage() {
               {TIERS.map((tier) => {
                 const items = ranked.filter((t) => t.tier === tier.id);
                 return (
-                  <div key={tier.id} className="flex-1 basis-0 min-w-0 flex flex-col overflow-hidden">
-                    <div
-                      style={{ background: tier.bg }}
-                      className="rounded-t-lg px-3 py-2 flex items-center justify-between"
-                    >
-                      <span className="font-bold text-black text-sm leading-none">{tier.label}</span>
-                      <span className="text-[10px] text-black/60 leading-none">{items.length}</span>
-                    </div>
-                    <Droppable droppableId={tier.id} direction="vertical">
-                      {(provided) => (
+                  <Droppable
+                    key={tier.id}
+                    droppableId={tier.id}
+                    direction="vertical"
+                    ignoreContainerClipping
+                  >
+                    {(provided, snapshot) => (
+                      <div
+                        ref={provided.innerRef}
+                        {...provided.droppableProps}
+                        className={`flex-1 basis-0 min-w-0 flex flex-col rounded-lg ${
+                          snapshot.isDraggingOver ? 'ring-2 ring-slate-900/40' : ''
+                        }`}
+                      >
                         <div
-                          ref={provided.innerRef}
-                          {...provided.droppableProps}
-                          className="flex-1 min-h-0 overflow-y-auto bg-muted p-2 flex flex-col gap-2"
+                          style={{ background: tier.bg }}
+                          className="rounded-t-lg px-3 py-2 flex items-center justify-between shrink-0"
+                        >
+                          <span className="font-bold text-black text-sm leading-none">{tier.label}</span>
+                          <span className="text-[10px] text-black/60 leading-none">{items.length}</span>
+                        </div>
+                        <div
+                          className={`flex-1 min-h-[8rem] overflow-y-auto p-2 flex flex-col gap-2 ${
+                            snapshot.isDraggingOver ? 'bg-slate-200' : 'bg-muted'
+                          }`}
                         >
                           {items.map((item, idx) => (
                             <TriageCard
@@ -215,26 +239,30 @@ function Triage() {
                               item={item}
                               tier={tier.id}
                               index={idx}
-                              animationDelay={idx * 0.06}
                             />
                           ))}
+                          {items.length === 0 && (
+                            <p className="text-[11px] text-muted-foreground text-center py-8">
+                              Drop here
+                            </p>
+                          )}
                           {provided.placeholder}
                         </div>
-                      )}
-                    </Droppable>
-                    {tier.id === 'blank' && (
-                      <div className="bg-muted px-2 pb-2 shrink-0 rounded-b-lg">
-                        <button
-                          type="button"
-                          onClick={moveAllToBlank}
-                          disabled={ranked.length > 0 && ranked.every((t) => t.tier === 'blank')}
-                          className="w-full rounded-lg border border-rose-300 bg-white px-2 py-1.5 text-[11px] font-semibold text-rose-700 hover:bg-rose-50 disabled:opacity-40 disabled:pointer-events-none"
-                        >
-                          Move all
-                        </button>
+                        {tier.id === 'blank' && (
+                          <div className="bg-muted px-2 pb-2 shrink-0 rounded-b-lg">
+                            <button
+                              type="button"
+                              onClick={moveAllToBlank}
+                              disabled={ranked.length > 0 && ranked.every((t) => t.tier === 'blank')}
+                              className="w-full rounded-lg border border-rose-300 bg-white px-2 py-1.5 text-[11px] font-semibold text-rose-700 hover:bg-rose-50 disabled:opacity-40 disabled:pointer-events-none"
+                            >
+                              Move all
+                            </button>
+                          </div>
+                        )}
                       </div>
                     )}
-                  </div>
+                  </Droppable>
                 );
               })}
             </DragDropContext>
