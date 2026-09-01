@@ -82,6 +82,9 @@ function Triage() {
   });
   const [animating, setAnimating] = React.useState(true);
   const [activeDrag, setActiveDrag] = React.useState(null);
+  const [hoverCol, setHoverCol] = React.useState(null);
+  const pointerRef = React.useRef({ x: 0, y: 0 });
+  const draggingRef = React.useRef(false);
 
   // Rank canned sample decks locally; otherwise AI extracts terms from the source.
   React.useEffect(() => {
@@ -141,17 +144,54 @@ function Triage() {
     setRanked((prev) => prev.map((t) => ({ ...t, tier: 'blank' })));
   };
 
+  const columnAtPointer = () => {
+    const { x, y } = pointerRef.current;
+    const hits = TIERS.map((tier) => {
+      const el = document.querySelector(`[data-rbd-droppable-id="${tier.id}"]`);
+      if (!el) return null;
+      const r = el.getBoundingClientRect();
+      return { id: tier.id, r };
+    }).filter(Boolean);
+
+    const inside = hits.find((h) => x >= h.r.left && x <= h.r.right && y >= h.r.top && y <= h.r.bottom);
+    if (inside) return inside.id;
+
+    // Finger is often on the card, which can sit outside a column. Use the
+    // column band the pointer is horizontally over so Blank → Shaky works.
+    const band = hits.find((h) => x >= h.r.left && x <= h.r.right);
+    return band?.id || null;
+  };
+
   const onBeforeCapture = (before) => {
-    // Expand the card BEFORE the library locks width/height, so the held box
-    // is measured around the full term instead of the clipped column size.
-    flushSync(() => setActiveDrag(before.draggableId));
+    const el = document.querySelector(`[data-rbd-draggable-id="${before.draggableId}"]`);
+    const col = el?.closest('[data-rbd-droppable-id]');
+    const maxWidth = col ? Math.max(col.clientWidth - 12, 96) : 140;
+    // Hug the term before size is locked so the box is not phone-wide (that
+    // used to slide the drop center from Blank over Shaky into Know it).
+    flushSync(() => setActiveDrag({ id: before.draggableId, maxWidth }));
+  };
+
+  const onDragStart = () => {
+    draggingRef.current = true;
+    setHoverCol(columnAtPointer());
+  };
+
+  const onDragUpdate = () => {
+    if (draggingRef.current) setHoverCol(columnAtPointer());
   };
 
   const onDragEnd = (result) => {
+    draggingRef.current = false;
+    const pointerCol = columnAtPointer();
     setActiveDrag(null);
-    const { destination, source, draggableId } = result;
-    if (!destination) return;
-    if (destination.droppableId === source.droppableId && destination.index === source.index) return;
+    setHoverCol(null);
+
+    const source = result.source;
+    const destId = pointerCol || result.destination?.droppableId;
+    if (!destId) return;
+    const destIndex =
+      destId === result.destination?.droppableId ? result.destination.index : 0;
+    if (destId === source.droppableId && destIndex === source.index) return;
 
     setRanked((prev) => {
       const columns = {
@@ -160,17 +200,36 @@ function Triage() {
         know_it: prev.filter((t) => t.tier === 'know_it'),
       };
       const from = columns[source.droppableId];
-      const to = columns[destination.droppableId];
+      const to = columns[destId];
       if (!from || !to) return prev;
-      const fromIdx = from.findIndex((t) => t.id === draggableId);
+      const fromIdx = from.findIndex((t) => t.id === result.draggableId);
       if (fromIdx < 0) return prev;
       const [moved] = from.splice(fromIdx, 1);
-      const next = { ...moved, tier: destination.droppableId };
-      const insertAt = Math.min(destination.index, to.length);
+      const next = { ...moved, tier: destId };
+      const insertAt = Math.min(destIndex, to.length);
       to.splice(insertAt, 0, next);
       return [...columns.blank, ...columns.shaky, ...columns.know_it];
     });
   };
+
+  React.useEffect(() => {
+    const track = (e) => {
+      const t = e.touches?.[0] || e;
+      if (t?.clientX == null) return;
+      pointerRef.current = { x: t.clientX, y: t.clientY };
+      if (draggingRef.current) setHoverCol(columnAtPointer());
+    };
+    window.addEventListener('pointerdown', track, { passive: true });
+    window.addEventListener('pointermove', track, { passive: true });
+    window.addEventListener('touchstart', track, { passive: true });
+    window.addEventListener('touchmove', track, { passive: true });
+    return () => {
+      window.removeEventListener('pointerdown', track);
+      window.removeEventListener('pointermove', track);
+      window.removeEventListener('touchstart', track);
+      window.removeEventListener('touchmove', track);
+    };
+  }, []);
 
   const termCount = ranked.length;
   const totalDone = ranked.filter((t) => t.tier === 'know_it').length;
@@ -212,7 +271,12 @@ function Triage() {
 
           {/* Board */}
           <main className="flex-1 px-3 pb-4 flex flex-row gap-2 overflow-hidden">
-            <DragDropContext onBeforeCapture={onBeforeCapture} onDragEnd={onDragEnd}>
+            <DragDropContext
+              onBeforeCapture={onBeforeCapture}
+              onDragStart={onDragStart}
+              onDragUpdate={onDragUpdate}
+              onDragEnd={onDragEnd}
+            >
               {TIERS.map((tier) => {
                 const items = ranked.filter((t) => t.tier === tier.id);
                 return (
@@ -227,7 +291,7 @@ function Triage() {
                         ref={provided.innerRef}
                         {...provided.droppableProps}
                         className={`flex-1 basis-0 min-w-0 flex flex-col rounded-lg ${
-                          snapshot.isDraggingOver ? 'ring-2 ring-slate-900/40' : ''
+                          hoverCol === tier.id ? 'ring-2 ring-slate-900/40' : ''
                         }`}
                       >
                         <div
@@ -239,7 +303,7 @@ function Triage() {
                         </div>
                         <div
                           className={`flex-1 min-h-[8rem] overflow-y-auto p-2 flex flex-col gap-2 ${
-                            snapshot.isDraggingOver ? 'bg-slate-200' : 'bg-muted'
+                            hoverCol === tier.id ? 'bg-slate-200' : 'bg-muted'
                           }`}
                         >
                           {items.map((item, idx) => (
@@ -248,7 +312,8 @@ function Triage() {
                               item={item}
                               tier={tier.id}
                               index={idx}
-                              expanded={activeDrag === item.id}
+                              expanded={activeDrag?.id === item.id}
+                              maxWidth={activeDrag?.id === item.id ? activeDrag.maxWidth : undefined}
                             />
                           ))}
                           {items.length === 0 && (

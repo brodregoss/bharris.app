@@ -9,36 +9,47 @@ const TIER_BORDER = {
   know_it: 'border-l-emerald-400',
 };
 
-export default function TriageCard({ item, tier, index, expanded = false }) {
-  const showFull = expanded;
-
+export default function TriageCard({ item, tier, index, expanded = false, maxWidth }) {
   return (
     <Draggable draggableId={item.id} index={index}>
       {(provided, snapshot) => {
-        const open = showFull || snapshot.isDragging;
+        const open = expanded || snapshot.isDragging;
         return (
           <div
             ref={provided.innerRef}
             {...provided.draggableProps}
             {...provided.dragHandleProps}
-            style={provided.draggableProps.style}
+            style={{
+              ...provided.draggableProps.style,
+              ...(open
+                ? {
+                    width: 'max-content',
+                    maxWidth: maxWidth || '11rem',
+                    boxSizing: 'border-box',
+                  }
+                : null),
+            }}
             className={cn(
-              'rounded-lg border-l-4 bg-card p-2.5 shadow-sm flex items-start justify-between gap-2 select-none touch-none',
+              'rounded-lg border-l-4 bg-card shadow-sm select-none touch-none',
               open
-                ? 'shadow-xl ring-2 ring-ring/40 p-3 w-[min(22rem,calc(100vw-1.5rem))]'
-                : 'w-full min-w-0 overflow-hidden',
+                ? 'shadow-xl ring-2 ring-ring/40 px-3 py-2.5'
+                : 'w-full min-w-0 overflow-hidden p-2.5 flex items-start justify-between gap-2',
               TIER_BORDER[tier]
             )}
           >
             <p
               className={cn(
-                'text-sm font-semibold leading-snug text-card-foreground min-w-0',
-                open ? 'whitespace-normal break-words flex-1' : 'line-clamp-2 break-words'
+                'text-sm font-semibold leading-snug text-card-foreground',
+                open
+                  ? 'whitespace-normal break-words text-center'
+                  : 'min-w-0 line-clamp-2 break-words'
               )}
             >
               {item.term}
             </p>
-            <GripVertical className="w-4 h-4 text-muted-foreground/50 shrink-0 mt-0.5" />
+            {!open && (
+              <GripVertical className="w-4 h-4 text-muted-foreground/50 shrink-0 mt-0.5" />
+            )}
           </div>
         );
       }}
