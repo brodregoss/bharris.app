@@ -4,8 +4,8 @@ cd "$(dirname "$0")" || exit 1
 
 export PATH="/usr/local/bin:/opt/homebrew/bin:$PATH"
 
-confirm="$(osascript -e 'display dialog "Download the latest Last Minute Study files into this same folder?\n\nAfter it finishes, press Play in Xcode. You do not need a new ZIP.\n\nYour own unsaved edits in this folder will be replaced." buttons {"Cancel", "Update"} default button "Update" with title "Last Minute Study"' 2>/dev/null || true)"
-if [[ "$confirm" != *"Update"* ]]; then
+confirm="$(osascript -e 'display dialog "Connect this folder to GitHub and take the latest files?\n\nAfter this, you do not need a new ZIP. When Cursor finishes a task, just press Play in Xcode.\n\nUnsaved edits in this folder will be replaced." buttons {"Cancel", "Connect"} default button "Connect" with title "Last Minute Study"' 2>/dev/null || true)"
+if [[ "$confirm" != *"Connect"* ]]; then
   exit 0
 fi
 
@@ -14,4 +14,4 @@ if ! ./scripts/pull-latest.sh; then
   exit 1
 fi
 
-osascript -e 'display dialog "Updated.\n\nGo back to Xcode and press Play. Keep this same folder — do not download a new ZIP for your own tweaks." buttons {"OK"} default button "OK" with title "Last Minute Study"' >/dev/null
+osascript -e 'display dialog "This folder is connected to GitHub.\n\nFrom now on: when Cursor finishes a task, press Play in Xcode. No new ZIP." buttons {"OK"} default button "OK" with title "Last Minute Study"' >/dev/null

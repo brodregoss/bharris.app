@@ -32,3 +32,8 @@ dist-ssr
 .env
 .vite
 base44/.app.jsonc
+
+# Xcode user/signing state — keep on this Mac, do not overwrite from GitHub
+xcuserdata/
+*.xcuserstate
+

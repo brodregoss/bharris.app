@@ -4,6 +4,35 @@ A last-minute exam cram app. Open it in **Xcode**, press Run, then later Archive
 
 The screens you see on the phone are the files in `src/`. Change those in Xcode (or any editor). Pressing Run rebuilds them into the iPhone app.
 
+## How you and Cursor work together
+
+I cannot type on your Mac. I save finished work to GitHub. This same folder then picks it up — **no new ZIP**.
+
+**One time** (connect this folder to GitHub):
+
+1. Quit Xcode.
+2. Open **Terminal**.
+3. Type `cd ` (that is c-d-space) and **drag this Last-Minute-Study folder** into the Terminal window, then press Return.
+4. Paste this and press Return:
+
+```bash
+git init
+git remote add origin https://github.com/brodregoss/Last-Minute-Study.git
+git fetch origin cursor/ios-testflight-capacitor-0f3e
+git checkout -f -B cursor/ios-testflight-capacitor-0f3e origin/cursor/ios-testflight-capacitor-0f3e
+```
+
+If it says `git: command not found`, run `xcode-select --install` first, then try again.
+
+5. Double-click **`OPEN-IN-XCODE.xcworkspace`** and press **Play**.
+
+**Every task after that:**
+
+1. You ask Cursor to tweak something.
+2. When the task is done, Cursor saves it to GitHub.
+3. You press **Play** in Xcode (Wi‑Fi on). Xcode pulls those files, then puts them on the phone.
+
+If you edited files yourself in Xcode, Play keeps **your** files and does not overwrite them. To throw those away and take GitHub’s copy, double-click **`PULL-LATEST.command`**.
 ## Open in Xcode (from the Mac desktop)
 
 1. Click **Finder** in the Dock (blue smiling face).
@@ -70,13 +99,9 @@ To add a page: duplicate a file in `src/pages`, change the text, import it in `s
 
 ## Get GitHub updates without a new ZIP
 
-When Cursor (or GitHub) has newer files and you want them in this same folder:
+After the one-time connect above, **Play is enough**.
 
-1. In Finder, open this Last-Minute-Study folder.
-2. Double-click **`PULL-LATEST.command`**. If Mac blocks it: right-click → **Open**.
-3. Press **Play** in Xcode.
-
-That replaces files with the GitHub copy. Do not run it if you still need edits you only made locally.
+To force GitHub’s copy over local edits: double-click **`PULL-LATEST.command`**. If Mac blocks it: right-click → **Open**.
 
 ## TestFlight
 
@@ -91,7 +116,7 @@ Create that app once in [App Store Connect](https://appstoreconnect.apple.com) i
 | Thing | Needed? |
 |-------|---------|
 | `OPEN-IN-XCODE.xcworkspace` | Yes — this is what you double-click |
-| `PULL-LATEST.command` | Yes — double-click to get GitHub updates without a new ZIP |
+| `PULL-LATEST.command` | Yes — force GitHub’s copy if you want to overwrite local edits |
 | `src/` | Yes — the actual app screens |
 | `ios/` | Yes — the iPhone project Xcode builds |
 | `package.json` | Yes — lists the libraries the app uses |

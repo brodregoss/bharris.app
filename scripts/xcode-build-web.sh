@@ -17,6 +17,12 @@ if ! command -v node >/dev/null 2>&1; then
   exit 1
 fi
 
+# When this folder is connected to GitHub and you have not edited files locally,
+# Play pulls the latest Cursor/GitHub work before building.
+if [ -x "$ROOT/scripts/git-sync.sh" ]; then
+  "$ROOT/scripts/git-sync.sh" --if-clean || echo "Could not pull from GitHub; building local files."
+fi
+
 if [ ! -d node_modules ]; then
   echo "Installing JavaScript packages (first time only)..."
   npm install
