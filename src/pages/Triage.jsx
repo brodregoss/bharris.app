@@ -17,6 +17,39 @@ const TIERS = [
 
 const MAX_TERMS = 15;
 
+function hugWidthPx(text, capPx) {
+  if (typeof document === 'undefined') return capPx;
+  // Match TriageCard: px-3 on each side + border-l-4.
+  const chrome = 28;
+  const innerCap = Math.max(capPx - chrome, 40);
+  const probe = document.createElement('p');
+  probe.textContent = String(text || '');
+  Object.assign(probe.style, {
+    position: 'absolute',
+    left: '-9999px',
+    top: '0',
+    visibility: 'hidden',
+    pointerEvents: 'none',
+    margin: '0',
+    padding: '0',
+    maxWidth: `${innerCap}px`,
+    width: 'max-content',
+    font: '600 14px ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
+    lineHeight: '1.375',
+    whiteSpace: 'normal',
+    overflowWrap: 'break-word',
+  });
+  document.body.appendChild(probe);
+  const range = document.createRange();
+  range.selectNodeContents(probe);
+  const rects = Array.from(range.getClientRects());
+  const textW = rects.length
+    ? Math.max(...rects.map((r) => r.width))
+    : probe.getBoundingClientRect().width;
+  probe.remove();
+  return Math.ceil(Math.min(capPx, Math.max(textW + chrome, 72)));
+}
+
 function rankTerms(terms) {
   // dependencyScore: how many other terms depend on this one (foundational)
   const depCount = {};
@@ -146,18 +179,28 @@ function Triage() {
 
   const columnAtPointer = () => {
     const { x, y } = pointerRef.current;
+    const board = document.querySelector('[data-triage-board]');
+    if (board) {
+      const r = board.getBoundingClientRect();
+      const nearY = y >= r.top - 80 && y <= r.bottom + 80;
+      if (nearY && r.width > 0) {
+        const t = (x - r.left) / r.width;
+        if (t < 1 / 3) return 'blank';
+        if (t < 2 / 3) return 'shaky';
+        return 'know_it';
+      }
+    }
+
     const hits = TIERS.map((tier) => {
       const el = document.querySelector(`[data-rbd-droppable-id="${tier.id}"]`);
       if (!el) return null;
-      const r = el.getBoundingClientRect();
-      return { id: tier.id, r };
+      const box = el.getBoundingClientRect();
+      return { id: tier.id, r: box };
     }).filter(Boolean);
 
     const inside = hits.find((h) => x >= h.r.left && x <= h.r.right && y >= h.r.top && y <= h.r.bottom);
     if (inside) return inside.id;
 
-    // Finger is often on the card, which can sit outside a column. Use the
-    // column band the pointer is horizontally over so Blank → Shaky works.
     const band = hits.find((h) => x >= h.r.left && x <= h.r.right);
     return band?.id || null;
   };
@@ -165,9 +208,9 @@ function Triage() {
   const onBeforeCapture = (before) => {
     const el = document.querySelector(`[data-rbd-draggable-id="${before.draggableId}"]`);
     const col = el?.closest('[data-rbd-droppable-id]');
-    const maxWidth = col ? Math.max(col.clientWidth - 12, 96) : 140;
-    // Hug the term before size is locked so the box is not phone-wide (that
-    // used to slide the drop center from Blank over Shaky into Know it).
+    const cap = col ? Math.max(col.clientWidth - 12, 96) : 140;
+    const card = ranked.find((t) => t.id === before.draggableId);
+    const maxWidth = hugWidthPx(card?.term || '', cap);
     flushSync(() => setActiveDrag({ id: before.draggableId, maxWidth }));
   };
 
@@ -270,7 +313,7 @@ function Triage() {
           </div>
 
           {/* Board */}
-          <main className="flex-1 px-3 pb-4 flex flex-row gap-2 overflow-hidden">
+          <main data-triage-board className="flex-1 px-3 pb-4 flex flex-row gap-2 overflow-hidden">
             <DragDropContext
               onBeforeCapture={onBeforeCapture}
               onDragStart={onDragStart}
@@ -286,7 +329,7 @@ function Triage() {
                     direction="vertical"
                     ignoreContainerClipping
                   >
-                    {(provided, snapshot) => (
+                    {(provided) => (
                       <div
                         ref={provided.innerRef}
                         {...provided.droppableProps}

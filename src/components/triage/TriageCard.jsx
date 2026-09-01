@@ -23,8 +23,9 @@ export default function TriageCard({ item, tier, index, expanded = false, maxWid
               ...provided.draggableProps.style,
               ...(open
                 ? {
-                    width: 'max-content',
+                    width: maxWidth || undefined,
                     maxWidth: maxWidth || '11rem',
+                    minWidth: 0,
                     boxSizing: 'border-box',
                   }
                 : null),
@@ -32,7 +33,7 @@ export default function TriageCard({ item, tier, index, expanded = false, maxWid
             className={cn(
               'rounded-lg border-l-4 bg-card shadow-sm select-none touch-none',
               open
-                ? 'shadow-xl ring-2 ring-ring/40 px-3 py-2.5'
+                ? 'shadow-xl ring-2 ring-ring/40 px-3 py-2.5 mx-auto'
                 : 'w-full min-w-0 overflow-hidden p-2.5 flex items-start justify-between gap-2',
               TIER_BORDER[tier]
             )}
