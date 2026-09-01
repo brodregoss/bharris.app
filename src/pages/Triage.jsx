@@ -1,4 +1,5 @@
 import React from 'react';
+import { flushSync } from 'react-dom';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { tierFromDifficulty, confidenceFromTriage, normalizeExamType } from '@/lib/studyUtils';
 import { DragDropContext, Droppable } from '@hello-pangea/dnd';
@@ -80,6 +81,7 @@ function Triage() {
     );
   });
   const [animating, setAnimating] = React.useState(true);
+  const [activeDrag, setActiveDrag] = React.useState(null);
 
   // Rank canned sample decks locally; otherwise AI extracts terms from the source.
   React.useEffect(() => {
@@ -139,7 +141,14 @@ function Triage() {
     setRanked((prev) => prev.map((t) => ({ ...t, tier: 'blank' })));
   };
 
+  const onBeforeCapture = (before) => {
+    // Expand the card BEFORE the library locks width/height, so the held box
+    // is measured around the full term instead of the clipped column size.
+    flushSync(() => setActiveDrag(before.draggableId));
+  };
+
   const onDragEnd = (result) => {
+    setActiveDrag(null);
     const { destination, source, draggableId } = result;
     if (!destination) return;
     if (destination.droppableId === source.droppableId && destination.index === source.index) return;
@@ -203,7 +212,7 @@ function Triage() {
 
           {/* Board */}
           <main className="flex-1 px-3 pb-4 flex flex-row gap-2 overflow-hidden">
-            <DragDropContext onDragEnd={onDragEnd}>
+            <DragDropContext onBeforeCapture={onBeforeCapture} onDragEnd={onDragEnd}>
               {TIERS.map((tier) => {
                 const items = ranked.filter((t) => t.tier === tier.id);
                 return (
@@ -239,6 +248,7 @@ function Triage() {
                               item={item}
                               tier={tier.id}
                               index={idx}
+                              expanded={activeDrag === item.id}
                             />
                           ))}
                           {items.length === 0 && (
