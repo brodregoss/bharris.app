@@ -42,6 +42,37 @@ npm run dev
 
 Open the local URL Vite prints (usually `http://localhost:5173`).
 
+## How to see new changes (do this — do not download a new zip)
+
+Download ZIP from GitHub every time will keep showing the old app, because the old `npm run dev` is still running in the previous folder.
+
+**Do this once** (clone, not zip):
+
+```bash
+git clone https://github.com/brodregoss/Last-Minute-Study.git
+cd Last-Minute-Study
+npm install
+npm run dev
+```
+
+**Then whenever there are new changes:**
+
+1. In Terminal, stop the running app (`Ctrl+C`)
+2. In the **same** folder:
+
+```bash
+git checkout main
+git pull origin main
+npm install
+npm run dev
+```
+
+3. Hard-refresh the browser (`Cmd+Shift+R`)
+
+To look over notes: Welcome → **use some of ours** → Bill of Rights → Continue → **Look over notes**. You should get a scroll-down list of cards.
+
+If you already downloaded a zip today: close the old Terminal, `cd` into the **new** unzipped folder (the one named `Last-Minute-Study-main`), then `npm install` and `npm run dev` again.
+
 ## GitHub repository
 
 This project is connected to [github.com/brodregoss/Last-Minute-Study](https://github.com/brodregoss/Last-Minute-Study).
