@@ -192,7 +192,9 @@ function Triage() {
     }
 
     const hits = TIERS.map((tier) => {
-      const el = document.querySelector(`[data-rbd-droppable-id="${tier.id}"]`);
+      const el = document.querySelector(
+        `[data-rfd-droppable-id="${tier.id}"], [data-rbd-droppable-id="${tier.id}"]`
+      );
       if (!el) return null;
       const box = el.getBoundingClientRect();
       return { id: tier.id, r: box };
@@ -206,8 +208,10 @@ function Triage() {
   };
 
   const onBeforeCapture = (before) => {
-    const el = document.querySelector(`[data-rbd-draggable-id="${before.draggableId}"]`);
-    const col = el?.closest('[data-rbd-droppable-id]');
+    const el = document.querySelector(
+      `[data-rfd-draggable-id="${before.draggableId}"], [data-rbd-draggable-id="${before.draggableId}"]`
+    );
+    const col = el?.closest('[data-rfd-droppable-id], [data-rbd-droppable-id]');
     const cap = col ? Math.max(col.clientWidth - 12, 96) : 140;
     const card = ranked.find((t) => t.id === before.draggableId);
     const maxWidth = hugWidthPx(card?.term || '', cap);
