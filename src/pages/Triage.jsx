@@ -22,32 +22,45 @@ function hugWidthPx(text, capPx) {
   // Match TriageCard: px-3 on each side + border-l-4.
   const chrome = 28;
   const innerCap = Math.max(capPx - chrome, 40);
-  const probe = document.createElement('p');
-  probe.textContent = String(text || '');
-  Object.assign(probe.style, {
-    position: 'absolute',
-    left: '-9999px',
-    top: '0',
-    visibility: 'hidden',
-    pointerEvents: 'none',
-    margin: '0',
-    padding: '0',
-    maxWidth: `${innerCap}px`,
-    width: 'max-content',
-    font: '600 14px ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
-    lineHeight: '1.375',
-    whiteSpace: 'normal',
-    overflowWrap: 'break-word',
-  });
-  document.body.appendChild(probe);
-  const range = document.createRange();
-  range.selectNodeContents(probe);
-  const rects = Array.from(range.getClientRects());
-  const textW = rects.length
-    ? Math.max(...rects.map((r) => r.width))
-    : probe.getBoundingClientRect().width;
-  probe.remove();
-  return Math.ceil(Math.min(capPx, Math.max(textW + chrome, 72)));
+  const measure = (value, maxInner) => {
+    const probe = document.createElement('p');
+    probe.textContent = String(value || '');
+    Object.assign(probe.style, {
+      position: 'absolute',
+      left: '-9999px',
+      top: '0',
+      visibility: 'hidden',
+      pointerEvents: 'none',
+      margin: '0',
+      padding: '0',
+      maxWidth: `${maxInner}px`,
+      width: 'max-content',
+      font: '600 14px ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
+      lineHeight: '1.375',
+      whiteSpace: 'normal',
+      overflowWrap: 'normal',
+      wordBreak: 'normal',
+    });
+    document.body.appendChild(probe);
+    const range = document.createRange();
+    range.selectNodeContents(probe);
+    const rects = Array.from(range.getClientRects());
+    const textW = rects.length
+      ? Math.max(...rects.map((r) => r.width))
+      : probe.getBoundingClientRect().width;
+    probe.remove();
+    return textW;
+  };
+
+  const oneLine = measure(text, 2000);
+  const longestWord = String(text || '')
+    .split(/\s+/)
+    .reduce((n, w) => Math.max(n, w ? measure(w, 2000) : 0), 0);
+  const inner = Math.max(innerCap, longestWord);
+  const textW = oneLine <= inner ? oneLine : measure(text, inner);
+  const raw = Math.max(textW, longestWord) + chrome;
+  // Never narrower than the longest word, so names wrap on spaces only.
+  return Math.ceil(Math.max(Math.min(raw, capPx), longestWord + chrome, 72));
 }
 
 function rankTerms(terms) {
@@ -212,9 +225,13 @@ function Triage() {
       `[data-rfd-draggable-id="${before.draggableId}"], [data-rbd-draggable-id="${before.draggableId}"]`
     );
     const col = el?.closest('[data-rfd-droppable-id], [data-rbd-droppable-id]');
-    const cap = col ? Math.max(col.clientWidth - 12, 96) : 140;
+    const colW = col ? col.clientWidth : 120;
+    const wrapCap = Math.min(
+      Math.max(window.innerWidth - 32, 160),
+      Math.max(colW + 24, 224)
+    );
     const card = ranked.find((t) => t.id === before.draggableId);
-    const maxWidth = hugWidthPx(card?.term || '', cap);
+    const maxWidth = hugWidthPx(card?.term || '', wrapCap);
     flushSync(() => setActiveDrag({ id: before.draggableId, maxWidth }));
   };
 

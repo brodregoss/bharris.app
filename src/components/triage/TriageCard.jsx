@@ -42,7 +42,7 @@ export default function TriageCard({ item, tier, index, expanded = false, maxWid
               className={cn(
                 'text-sm font-semibold leading-snug text-card-foreground',
                 open
-                  ? 'whitespace-normal break-words text-center'
+                  ? 'whitespace-normal break-normal text-center'
                   : 'min-w-0 line-clamp-2 break-words'
               )}
             >
