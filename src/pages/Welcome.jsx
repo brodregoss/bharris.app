@@ -4,8 +4,7 @@ import { ArrowLeft, Upload } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { makePhotoSource } from '@/lib/notesSource';
 import { loadSession } from '@/lib/sessionStore';
-
-const ONBOARDING_FLAG = 'lms_onboarded';
+import { ONBOARDING_FLAG } from '@/lib/onboarding';
 
 export default function Welcome() {
   const navigate = useNavigate();

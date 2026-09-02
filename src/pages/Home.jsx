@@ -12,6 +12,7 @@ import {
 } from '@/components/ui/select';
 import { cn } from '@/lib/utils';
 import { termCount, setupReturnPath } from '@/lib/notesSource';
+import { ONBOARDING_FLAG } from '@/lib/onboarding';
 
 const STEPPER = ({ value, onChange, min = 0, step = 1, suffix }) => {
   const clamp = (v) => Math.max(min, v);
@@ -188,7 +189,7 @@ export default function Home() {
             size="lg"
             disabled={!canStart}
             onClick={() => {
-              localStorage.setItem('lms_onboarded', '1');
+              localStorage.setItem(ONBOARDING_FLAG, '1');
               navigate('/triage', {
                 state: {
                   source,

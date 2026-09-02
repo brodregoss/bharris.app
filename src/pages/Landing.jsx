@@ -3,8 +3,7 @@ import { useNavigate, Navigate } from 'react-router-dom';
 import { Timer, History, Settings, ArrowRight, RotateCcw } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { loadSession, loadFinishedSession } from '@/lib/sessionStore';
-
-const ONBOARDING_FLAG = 'lms_onboarded';
+import { ONBOARDING_FLAG } from '@/lib/onboarding';
 
 // Persistent home base. The only job here is getting the user into a session
 // in one tap, with zero decisions to weigh. Everything informational lives one
