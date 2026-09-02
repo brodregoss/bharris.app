@@ -6,7 +6,7 @@ import { fmtTime } from '@/lib/studyUtils';
 
 export default function StudyHeader({ readiness, timeRemainingMs, blockLabel }) {
   return (
-    <header className="px-5 pt-6 pb-3 flex items-center gap-3 border-b border-border bg-card/90 backdrop-blur sticky top-0 z-20">
+    <header className="px-5 pt-[max(1.5rem,env(safe-area-inset-top))] pb-3 flex items-center gap-3 border-b border-border bg-card/90 backdrop-blur sticky top-0 z-20">
       <Link
         to="/"
         aria-label="Home"
