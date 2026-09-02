@@ -33,7 +33,7 @@ export default function TriageCard({ item, tier, index, expanded = false, maxWid
             className={cn(
               'rounded-lg border-l-4 bg-card shadow-sm select-none touch-none',
               open
-                ? 'shadow-xl ring-2 ring-ring/40 px-3 py-2.5 mx-auto'
+                ? 'shadow-xl ring-2 ring-ring/40 px-3 py-2.5 mx-auto text-center'
                 : 'w-full min-w-0 overflow-hidden p-2.5 flex items-start justify-between gap-2',
               TIER_BORDER[tier]
             )}
@@ -42,7 +42,7 @@ export default function TriageCard({ item, tier, index, expanded = false, maxWid
               className={cn(
                 'text-sm font-semibold leading-snug text-card-foreground',
                 open
-                  ? 'whitespace-normal break-normal text-center'
+                  ? 'block w-full whitespace-normal break-normal text-center'
                   : 'min-w-0 line-clamp-2 break-words'
               )}
             >
