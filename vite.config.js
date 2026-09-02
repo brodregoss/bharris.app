@@ -4,6 +4,8 @@ import { defineConfig } from 'vite'
 
 // https://vite.dev/config/
 export default defineConfig({
+  // Relative asset URLs so the built app works inside the Xcode / Capacitor webview.
+  base: './',
   plugins: [
     // Keeps /api proxy to your Base44 backend for InvokeLLM only.
     // Builder-only features (visual edit, analytics) are disabled.

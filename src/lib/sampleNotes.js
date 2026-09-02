@@ -1,0 +1,112 @@
+export const SAMPLE_NOTES = [
+  {
+    id: 'bill-of-rights',
+    title: 'Bill of Rights',
+    meta: 'The first 10 amendments — speech, search, due process, reserved powers',
+    terms: 15,
+    items: [
+      {
+        term: 'Bill of Rights',
+        definition: 'The first ten amendments to the U.S. Constitution, listing core individual liberties and limits on federal power.',
+        difficulty: 3,
+        depends_on: [],
+      },
+      {
+        term: 'First Amendment',
+        definition: 'Protects freedom of religion, speech, press, assembly, and the right to petition the government.',
+        difficulty: 4,
+        depends_on: ['Bill of Rights'],
+      },
+      {
+        term: 'Establishment Clause',
+        definition: 'Part of the First Amendment that bars the government from creating or favoring an official religion.',
+        difficulty: 6,
+        depends_on: ['First Amendment'],
+      },
+      {
+        term: 'Free Exercise Clause',
+        definition: 'Part of the First Amendment that protects the right to practice a religion (or none) without government interference.',
+        difficulty: 6,
+        depends_on: ['First Amendment'],
+      },
+      {
+        term: 'Second Amendment',
+        definition: 'Protects the right of the people to keep and bear arms.',
+        difficulty: 4,
+        depends_on: ['Bill of Rights'],
+      },
+      {
+        term: 'Third Amendment',
+        definition: 'Bans the government from forcing people to quarter soldiers in their homes in peacetime.',
+        difficulty: 2,
+        depends_on: ['Bill of Rights'],
+      },
+      {
+        term: 'Fourth Amendment',
+        definition: 'Protects against unreasonable searches and seizures; warrants generally need probable cause.',
+        difficulty: 5,
+        depends_on: ['Bill of Rights'],
+      },
+      {
+        term: 'Probable cause',
+        definition: 'A reasonable basis to believe a crime has been committed or that evidence will be found — required for most warrants.',
+        difficulty: 6,
+        depends_on: ['Fourth Amendment'],
+      },
+      {
+        term: 'Fifth Amendment',
+        definition: 'Guarantees due process, bars double jeopardy and forced self-incrimination, and requires just compensation for taken property.',
+        difficulty: 7,
+        depends_on: ['Bill of Rights'],
+      },
+      {
+        term: 'Due process',
+        definition: 'The government must follow fair legal procedures before taking life, liberty, or property.',
+        difficulty: 7,
+        depends_on: ['Fifth Amendment'],
+      },
+      {
+        term: 'Sixth Amendment',
+        definition: 'Guarantees a speedy, public jury trial, the right to counsel, and the right to confront witnesses in criminal cases.',
+        difficulty: 6,
+        depends_on: ['Bill of Rights'],
+      },
+      {
+        term: 'Seventh Amendment',
+        definition: 'Preserves the right to a jury trial in many federal civil cases.',
+        difficulty: 4,
+        depends_on: ['Bill of Rights'],
+      },
+      {
+        term: 'Eighth Amendment',
+        definition: 'Bans excessive bail or fines and cruel and unusual punishment.',
+        difficulty: 5,
+        depends_on: ['Bill of Rights'],
+      },
+      {
+        term: 'Ninth Amendment',
+        definition: 'Says listing certain rights in the Constitution does not mean people do not have other rights.',
+        difficulty: 7,
+        depends_on: ['Bill of Rights'],
+      },
+      {
+        term: 'Tenth Amendment',
+        definition: 'Powers not given to the federal government, and not denied to the states, are reserved to the states or the people.',
+        difficulty: 6,
+        depends_on: ['Bill of Rights'],
+      },
+    ],
+  },
+  {
+    id: 'psych-101',
+    title: 'Psych 101 — Core Concepts',
+    meta: 'Classical & operant conditioning, memory, perception',
+    terms: 24,
+  },
+  {
+    id: 'test-sample',
+    title: 'Sample Test Notes',
+    meta: 'Mixed terms for demo: cognition, biology, stats',
+    terms: 18,
+  },
+];

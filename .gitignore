@@ -31,3 +31,8 @@ dist-ssr
 .env
 .vite
 base44/.app.jsonc
+
+# iOS / Xcode
+ios/App/Pods
+ios/DerivedData
+**/xcuserdata/
