@@ -2,6 +2,7 @@
 .env
 .env.*
 !.env.local.example
+!mobile/.env.example
 
 # Logs
 /logs
