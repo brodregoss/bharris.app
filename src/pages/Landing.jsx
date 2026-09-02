@@ -3,13 +3,12 @@ import { useNavigate, Navigate } from 'react-router-dom';
 import { Timer, History, Settings, ArrowRight, RotateCcw } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { loadSession, loadFinishedSession } from '@/lib/sessionStore';
-
-const ONBOARDING_FLAG = 'lms_onboarded';
+import { ONBOARDING_FLAG } from '@/lib/onboarding';
 
 // Persistent home base. The only job here is getting the user into a session
 // in one tap, with zero decisions to weigh. Everything informational lives one
-// tap deeper (Past sessions). The setup/onboarding screen is shown only the
-// first time the app is ever entered; afterwards this landing is the entry.
+// tap deeper (Past sessions). First visit goes to Welcome; afterwards this
+// landing is the entry. "Start new cram" returns to Welcome.
 export default function Landing() {
   const navigate = useNavigate();
   // Read fresh on every render so the first-time redirect and the Continue
@@ -42,10 +41,10 @@ export default function Landing() {
     });
   };
 
-  // First time ever entering the app → go through onboarding/setup once.
+  // First time ever entering the app → welcome / notes-first setup.
   // An existing saved session also counts as having been onboarded.
   if (!onboarded && !hasSession) {
-    return <Navigate to="/setup" replace />;
+    return <Navigate to="/welcome" replace />;
   }
 
   return (
@@ -101,7 +100,7 @@ export default function Landing() {
               </Button>
               <button
                 type="button"
-                onClick={() => navigate('/setup')}
+                onClick={() => navigate('/welcome')}
                 className="text-sm text-muted-foreground hover:text-foreground underline-offset-4 hover:underline self-center mt-1"
               >
                 Start new cram
@@ -110,7 +109,7 @@ export default function Landing() {
           ) : (
             <>
               <Button
-                onClick={() => navigate('/setup')}
+                onClick={() => navigate('/welcome')}
                 className="h-16 rounded-2xl bg-slate-900 hover:bg-slate-800 text-white text-lg font-bold shadow-lg shadow-slate-900/20"
               >
                 Start new cram
