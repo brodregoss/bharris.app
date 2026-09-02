@@ -1,4 +1,5 @@
 import React from 'react';
+import { flushSync } from 'react-dom';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { tierFromDifficulty, confidenceFromTriage, normalizeExamType } from '@/lib/studyUtils';
 import { DragDropContext, Droppable } from '@hello-pangea/dnd';
@@ -15,6 +16,52 @@ const TIERS = [
 ];
 
 const MAX_TERMS = 15;
+
+function hugWidthPx(text, capPx) {
+  if (typeof document === 'undefined') return capPx;
+  // Match TriageCard: px-3 on each side + border-l-4.
+  const chrome = 28;
+  const innerCap = Math.max(capPx - chrome, 40);
+  const measure = (value, maxInner) => {
+    const probe = document.createElement('p');
+    probe.textContent = String(value || '');
+    Object.assign(probe.style, {
+      position: 'absolute',
+      left: '-9999px',
+      top: '0',
+      visibility: 'hidden',
+      pointerEvents: 'none',
+      margin: '0',
+      padding: '0',
+      maxWidth: `${maxInner}px`,
+      width: 'max-content',
+      font: '600 14px ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
+      lineHeight: '1.375',
+      whiteSpace: 'normal',
+      overflowWrap: 'normal',
+      wordBreak: 'normal',
+    });
+    document.body.appendChild(probe);
+    const range = document.createRange();
+    range.selectNodeContents(probe);
+    const rects = Array.from(range.getClientRects());
+    const textW = rects.length
+      ? Math.max(...rects.map((r) => r.width))
+      : probe.getBoundingClientRect().width;
+    probe.remove();
+    return textW;
+  };
+
+  const oneLine = measure(text, 2000);
+  const longestWord = String(text || '')
+    .split(/\s+/)
+    .reduce((n, w) => Math.max(n, w ? measure(w, 2000) : 0), 0);
+  const inner = Math.max(innerCap, longestWord);
+  const textW = oneLine <= inner ? oneLine : measure(text, inner);
+  const raw = Math.max(textW, longestWord) + chrome;
+  // Never narrower than the longest word, so names wrap on spaces only.
+  return Math.ceil(Math.max(Math.min(raw, capPx), longestWord + chrome, 72));
+}
 
 function rankTerms(terms) {
   // dependencyScore: how many other terms depend on this one (foundational)
@@ -53,6 +100,7 @@ function Triage() {
   const source = location.state?.source;
   const setup = location.state?.setup;
   const sourceTitle = source?.title || 'Intro Psychology';
+  const canned = Array.isArray(source?.items) ? source.items : null;
 
   const lockIn = () => {
     const studyTerms = ranked.map((t) => ({
@@ -67,13 +115,46 @@ function Triage() {
     navigate('/study', { state: { terms: studyTerms, setup } });
   };
 
-  const [loading, setLoading] = React.useState(true);
-  const [ranked, setRanked] = React.useState([]);
+  const [loading, setLoading] = React.useState(!canned?.length);
+  const [ranked, setRanked] = React.useState(() => {
+    if (!canned?.length) return [];
+    return rankTerms(
+      canned.map((t, i) => ({
+        ...t,
+        id: `t${i}`,
+        depends_on: t.depends_on || [],
+      }))
+    );
+  });
   const [animating, setAnimating] = React.useState(true);
+  const [activeDrag, setActiveDrag] = React.useState(null);
+  const [hoverCol, setHoverCol] = React.useState(null);
+  const pointerRef = React.useRef({ x: 0, y: 0 });
+  const draggingRef = React.useRef(false);
 
-  // AI ranking
+  // Rank canned sample decks locally; otherwise AI extracts terms from the source.
   React.useEffect(() => {
     let mounted = true;
+    const finish = (raw) => {
+      if (!mounted) return;
+      const withIds = raw.map((t, i) => ({
+        ...t,
+        id: `t${i}`,
+        depends_on: t.depends_on || [],
+      }));
+      const next = rankTerms(withIds);
+      setRanked(next);
+      setLoading(false);
+      const total = next.length * 0.06 + 0.6;
+      setTimeout(() => mounted && setAnimating(false), total * 1000);
+    };
+
+    if (canned?.length) {
+      const total = ranked.length * 0.06 + 0.6;
+      setTimeout(() => mounted && setAnimating(false), total * 1000);
+      return () => { mounted = false; };
+    }
+
     (async () => {
       const count = Math.min(source?.terms || 12, MAX_TERMS);
       const res = await base44.integrations.Core.InvokeLLM({
@@ -100,26 +181,119 @@ function Triage() {
       });
       if (!mounted) return;
       const raw = (res.terms || res.output?.terms || res || []).slice(0, count);
-      const withIds = raw.map((t, i) => ({ ...t, id: `t${i}`, depends_on: t.depends_on || [] }));
-      const ranked = rankTerms(withIds);
-      setRanked(ranked);
-      setLoading(false);
-      const total = ranked.length * 0.06 + 0.6;
-      setTimeout(() => mounted && setAnimating(false), total * 1000);
+      finish(raw);
     })();
     return () => { mounted = false; };
   }, []);
 
+  const moveAllToBlank = () => {
+    setRanked((prev) => prev.map((t) => ({ ...t, tier: 'blank' })));
+  };
+
+  const columnAtPointer = () => {
+    const { x, y } = pointerRef.current;
+    const board = document.querySelector('[data-triage-board]');
+    if (board) {
+      const r = board.getBoundingClientRect();
+      const nearY = y >= r.top - 80 && y <= r.bottom + 80;
+      if (nearY && r.width > 0) {
+        const t = (x - r.left) / r.width;
+        if (t < 1 / 3) return 'blank';
+        if (t < 2 / 3) return 'shaky';
+        return 'know_it';
+      }
+    }
+
+    const hits = TIERS.map((tier) => {
+      const el = document.querySelector(
+        `[data-rfd-droppable-id="${tier.id}"], [data-rbd-droppable-id="${tier.id}"]`
+      );
+      if (!el) return null;
+      const box = el.getBoundingClientRect();
+      return { id: tier.id, r: box };
+    }).filter(Boolean);
+
+    const inside = hits.find((h) => x >= h.r.left && x <= h.r.right && y >= h.r.top && y <= h.r.bottom);
+    if (inside) return inside.id;
+
+    const band = hits.find((h) => x >= h.r.left && x <= h.r.right);
+    return band?.id || null;
+  };
+
+  const onBeforeCapture = (before) => {
+    const el = document.querySelector(
+      `[data-rfd-draggable-id="${before.draggableId}"], [data-rbd-draggable-id="${before.draggableId}"]`
+    );
+    const col = el?.closest('[data-rfd-droppable-id], [data-rbd-droppable-id]');
+    const colW = col ? col.clientWidth : 120;
+    const wrapCap = Math.min(
+      Math.max(window.innerWidth - 32, 160),
+      Math.max(colW + 24, 224)
+    );
+    const card = ranked.find((t) => t.id === before.draggableId);
+    const maxWidth = hugWidthPx(card?.term || '', wrapCap);
+    flushSync(() => setActiveDrag({ id: before.draggableId, maxWidth }));
+  };
+
+  const onDragStart = () => {
+    draggingRef.current = true;
+    setHoverCol(columnAtPointer());
+  };
+
+  const onDragUpdate = () => {
+    if (draggingRef.current) setHoverCol(columnAtPointer());
+  };
+
   const onDragEnd = (result) => {
-    const { destination, source: src, draggableId } = result;
-    if (!destination) return;
-    if (destination.droppableId === src.droppableId && destination.index === src.index) return;
+    draggingRef.current = false;
+    const pointerCol = columnAtPointer();
+    setActiveDrag(null);
+    setHoverCol(null);
+
+    const source = result.source;
+    const destId = pointerCol || result.destination?.droppableId;
+    if (!destId) return;
+    const destIndex =
+      destId === result.destination?.droppableId ? result.destination.index : 0;
+    if (destId === source.droppableId && destIndex === source.index) return;
+
     setRanked((prev) => {
-      const item = prev.find((t) => t.id === draggableId);
-      if (!item) return prev;
-      return prev.map((t) => (t.id === draggableId ? { ...t, tier: destination.droppableId } : t));
+      const columns = {
+        blank: prev.filter((t) => t.tier === 'blank'),
+        shaky: prev.filter((t) => t.tier === 'shaky'),
+        know_it: prev.filter((t) => t.tier === 'know_it'),
+      };
+      const from = columns[source.droppableId];
+      const to = columns[destId];
+      if (!from || !to) return prev;
+      const fromIdx = from.findIndex((t) => t.id === result.draggableId);
+      if (fromIdx < 0) return prev;
+      const [moved] = from.splice(fromIdx, 1);
+      const next = { ...moved, tier: destId };
+      const insertAt = Math.min(destIndex, to.length);
+      to.splice(insertAt, 0, next);
+      return [...columns.blank, ...columns.shaky, ...columns.know_it];
     });
   };
+
+  React.useEffect(() => {
+    const track = (e) => {
+      const t = e.touches?.[0] || e;
+      if (t?.clientX == null) return;
+      pointerRef.current = { x: t.clientX, y: t.clientY };
+      if (draggingRef.current) setHoverCol(columnAtPointer());
+    };
+    window.addEventListener('pointerdown', track, { passive: true });
+    window.addEventListener('pointermove', track, { passive: true });
+    window.addEventListener('touchstart', track, { passive: true });
+    window.addEventListener('touchmove', track, { passive: true });
+    return () => {
+      window.removeEventListener('pointerdown', track);
+      window.removeEventListener('pointermove', track);
+      window.removeEventListener('touchstart', track);
+      window.removeEventListener('touchmove', track);
+    };
+  }, []);
 
   const termCount = ranked.length;
   const totalDone = ranked.filter((t) => t.tier === 'know_it').length;
@@ -127,7 +301,7 @@ function Triage() {
   return (
     <div className="min-h-[100dvh] bg-background text-foreground flex flex-col">
       {/* Header */}
-      <header className="px-6 pt-8 pb-2 flex items-center gap-2.5">
+      <header className="px-6 pt-safe pb-2 flex items-center gap-2.5">
         <div className="flex items-center justify-center w-9 h-9 rounded-xl bg-primary text-primary-foreground">
           <Moon className="w-5 h-5" />
         </div>
@@ -152,29 +326,49 @@ function Triage() {
           {/* Subtitle */}
           <div className="px-6 pb-2">
             <h2 className="text-lg font-bold tracking-tight">Triage your terms</h2>
-            <p className="text-xs text-muted-foreground">AI ranked them — drag any card to move it between tiers.</p>
+            <p className="text-xs text-muted-foreground">
+              {canned?.length
+                ? 'Ranked by difficulty — drag any card to move it between tiers.'
+                : 'AI ranked them — drag any card to move it between tiers.'}
+            </p>
           </div>
 
           {/* Board */}
-          <main className="flex-1 px-3 pb-4 flex flex-row gap-2 overflow-hidden">
-            <DragDropContext onDragEnd={onDragEnd}>
+          <main data-triage-board className="flex-1 px-3 pb-4 flex flex-row gap-2 overflow-hidden">
+            <DragDropContext
+              onBeforeCapture={onBeforeCapture}
+              onDragStart={onDragStart}
+              onDragUpdate={onDragUpdate}
+              onDragEnd={onDragEnd}
+            >
               {TIERS.map((tier) => {
                 const items = ranked.filter((t) => t.tier === tier.id);
                 return (
-                  <div key={tier.id} className="flex-1 flex flex-col min-w-0">
-                    <div
-                      style={{ background: tier.bg }}
-                      className="rounded-t-lg px-3 py-2 flex items-center justify-between"
-                    >
-                      <span className="font-bold text-black text-sm leading-none">{tier.label}</span>
-                      <span className="text-[10px] text-black/60 leading-none">{items.length}</span>
-                    </div>
-                    <Droppable droppableId={tier.id} direction="vertical">
-                      {(provided) => (
+                  <Droppable
+                    key={tier.id}
+                    droppableId={tier.id}
+                    direction="vertical"
+                    ignoreContainerClipping
+                  >
+                    {(provided) => (
+                      <div
+                        ref={provided.innerRef}
+                        {...provided.droppableProps}
+                        className={`flex-1 basis-0 min-w-0 flex flex-col rounded-lg ${
+                          hoverCol === tier.id ? 'ring-2 ring-slate-900/40' : ''
+                        }`}
+                      >
                         <div
-                          ref={provided.innerRef}
-                          {...provided.droppableProps}
-                          className="flex-1 min-h-0 overflow-y-auto bg-muted p-2 flex flex-col gap-2"
+                          style={{ background: tier.bg }}
+                          className="rounded-t-lg px-3 py-2 flex items-center justify-between shrink-0"
+                        >
+                          <span className="font-bold text-black text-sm leading-none">{tier.label}</span>
+                          <span className="text-[10px] text-black/60 leading-none">{items.length}</span>
+                        </div>
+                        <div
+                          className={`flex-1 min-h-[8rem] overflow-y-auto p-2 flex flex-col gap-2 ${
+                            hoverCol === tier.id ? 'bg-slate-200' : 'bg-muted'
+                          }`}
                         >
                           {items.map((item, idx) => (
                             <TriageCard
@@ -182,14 +376,32 @@ function Triage() {
                               item={item}
                               tier={tier.id}
                               index={idx}
-                              animationDelay={idx * 0.06}
+                              expanded={activeDrag?.id === item.id}
+                              maxWidth={activeDrag?.id === item.id ? activeDrag.maxWidth : undefined}
                             />
                           ))}
+                          {items.length === 0 && (
+                            <p className="text-[11px] text-muted-foreground text-center py-8">
+                              Drop here
+                            </p>
+                          )}
                           {provided.placeholder}
                         </div>
-                      )}
-                    </Droppable>
-                  </div>
+                        {tier.id === 'blank' && (
+                          <div className="bg-muted px-2 pb-2 shrink-0 rounded-b-lg">
+                            <button
+                              type="button"
+                              onClick={moveAllToBlank}
+                              disabled={ranked.length > 0 && ranked.every((t) => t.tier === 'blank')}
+                              className="w-full rounded-lg border border-rose-300 bg-white px-2 py-1.5 text-[11px] font-semibold text-rose-700 hover:bg-rose-50 disabled:opacity-40 disabled:pointer-events-none"
+                            >
+                              Move all
+                            </button>
+                          </div>
+                        )}
+                      </div>
+                    )}
+                  </Droppable>
                 );
               })}
             </DragDropContext>
@@ -220,7 +432,9 @@ function Triage() {
           >
             <div className="flex items-center gap-2 bg-primary text-primary-foreground text-xs font-medium px-4 py-2.5 rounded-full shadow-lg">
               <Sparkles className="w-3.5 h-3.5 animate-pulse" />
-              AI ranking based on difficulty and card relations
+              {canned?.length
+                ? 'Ranked by difficulty and card relations'
+                : 'AI ranking based on difficulty and card relations'}
             </div>
           </motion.div>
         )}

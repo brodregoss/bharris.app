@@ -66,7 +66,7 @@ export default function RoadMapDialog({ terms, phase }) {
       <DialogTrigger asChild>
         <button
           type="button"
-          className="text-xs text-muted-foreground hover:text-foreground underline-offset-4 hover:underline transition"
+          className="text-sm text-muted-foreground hover:text-foreground underline-offset-4 hover:underline transition py-2 px-3"
         >
           road map
         </button>

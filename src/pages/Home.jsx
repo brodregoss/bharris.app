@@ -82,7 +82,7 @@ export default function Home() {
   return (
     <div className="min-h-[100dvh] bg-gradient-to-b from-slate-50 to-slate-100 text-foreground flex flex-col">
       {/* Header */}
-      <header className="px-6 pt-10 pb-2 flex items-center gap-2.5">
+      <header className="px-6 pt-safe pb-2 flex items-center gap-2.5">
         <div className="flex items-center justify-center w-9 h-9 rounded-xl bg-slate-900 text-white">
           <Timer className="w-5 h-5" />
         </div>

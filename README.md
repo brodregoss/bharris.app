@@ -1,82 +1,131 @@
 # Last Minute Study
 
-A last-minute exam cram app. Develop locally in Cursor; source code lives on GitHub.
+A last-minute exam cram app. Open it in **Xcode**, press Run, then later Archive for TestFlight.
 
-AI features (term generation, panic notes, answer grading) still use **Base44 InvokeLLM** via your hosted Base44 app backend. Everything else runs as a normal Vite + React app.
+The screens you see on the phone are the files in `src/`. Change those in Xcode (or any editor). Pressing Run rebuilds them into the iPhone app.
 
-## Prerequisites
+## How you and Cursor work together
 
-- Node.js 20+
-- A GitHub account
-- A Base44 app (for AI credits only) — you need the app ID and backend URL
+I cannot type on your Mac. I save finished work to GitHub. This same folder then picks it up — **no new ZIP**.
 
-## First-time setup
+**One time** (connect this folder to GitHub):
 
-1. Clone this repo (or download and `cd` into the project folder).
-2. Install dependencies:
+1. Quit Xcode.
+2. Open **Terminal**.
+3. Type `cd ` (that is c-d-space) and **drag this Last-Minute-Study folder** into the Terminal window, then press Return.
+4. Paste this and press Return:
+
+```bash
+git init
+git remote add origin https://github.com/brodregoss/Last-Minute-Study.git
+git fetch origin cursor/ios-testflight-capacitor-0f3e
+git checkout -f -B cursor/ios-testflight-capacitor-0f3e origin/cursor/ios-testflight-capacitor-0f3e
+```
+
+If it says `git: command not found`, run `xcode-select --install` first, then try again.
+
+5. Double-click **`OPEN-IN-XCODE.xcworkspace`** and press **Play**.
+
+**Every task after that:**
+
+1. You ask Cursor to tweak something.
+2. When the task is done, Cursor saves it to GitHub.
+3. You press **Play** in Xcode (Wi‑Fi on). Xcode pulls those files, then puts them on the phone.
+
+If you edited files yourself in Xcode, Play keeps **your** files and does not overwrite them. To throw those away and take GitHub’s copy, double-click **`PULL-LATEST.command`**.
+## Open in Xcode (from the Mac desktop)
+
+1. Click **Finder** in the Dock (blue smiling face).
+2. Open the **Last-Minute-Study** folder. If you do not have it:
+   - Go to https://github.com/brodregoss/Last-Minute-Study/tree/cursor/ios-testflight-capacitor-0f3e
+   - Click the green **Code** button → **Download ZIP**
+   - Double-click the zip to unzip it
+   - Open the unzipped folder
+3. At the **top** of that folder, double-click:
+
+   **`OPEN-IN-XCODE.xcworkspace`**
+
+   Look for the white page with a **blue hammer** and the word **WORKSPACE** on the icon. In older downloads the same file was named `Last Minute Study.xcworkspace` (Finder may show it as `Last Minute Study.x...orkspace`). That is the file. Do not open `ios`, `src`, or `package.json`.
+
+4. If Mac says it was downloaded from the internet: right-click → **Open**.
+5. Xcode opens. In the left sidebar you will see:
+   - **Edit the app here** → `src` (the screens)
+   - **App** (the iPhone wrapper)
+6. Click **App** in the sidebar → **Signing & Capabilities** → **Team** → pick the paid Apple Developer team.
+7. At the top, pick an iPhone simulator (or your plugged-in iPhone).
+8. Press the **Play** button.
+
+The first Run can take a few minutes. Xcode may download a small Apple/Ionic package the first time (needs internet). After that, Run is faster.
+
+If the phone still shows the **old** app (no **History Civil Rights** sample, Settings does not say **Version 1.0.1**):
+
+1. On the iPhone: long-press the Last Minute Study icon → **Remove App** → **Delete App**.
+2. On the Mac: throw the old unzipped **Last-Minute-Study** folder in the Trash. Xcode keeps using that old folder even if GitHub has newer files.
+3. Download a **new** ZIP from this branch (not the green Code button on the main repo page):
+   https://github.com/brodregoss/Last-Minute-Study/archive/refs/heads/cursor/ios-testflight-capacitor-0f3e.zip
+4. Double-click the zip, then double-click **`OPEN-IN-XCODE.xcworkspace`**.
+5. In Xcode: **Product → Clean Build Folder**, then press **Play** again.
+
+You should now see **History Civil Rights** as the third sample on Upload notes, and **Version 1.0.1** in Settings.
+
+If Xcode says **Missing package product 'CapApp-SPM'**:
+
+1. Make sure you opened **OPEN-IN-XCODE.xcworkspace** (or the hammer **WORKSPACE** file), not a random file inside `ios`.
+2. Connect to Wi‑Fi.
+3. In Xcode’s menu bar: **File → Packages → Reset Package Caches**.
+4. Then **File → Packages → Resolve Package Versions**.
+5. Wait until the top bar finishes spinning, then **Product → Clean Build Folder**, then press **Play**.
+
+You need [Node.js LTS](https://nodejs.org) installed on the Mac. Xcode itself comes from the Mac App Store.
+
+## Tweak the look or add a page (no new ZIP)
+
+Keep **this same unzipped folder**. Pressing Play rebuilds whatever is in `src/` onto the phone. Re-downloading is only for grabbing files from GitHub, not for your own edits.
+
+1. In Xcode’s left sidebar: **Edit the app here** → `src`.
+2. Change a file (see the table below).
+3. Press **Play**. Wait until the app reopens on the phone.
+
+| What you want | File to open |
+|---------------|--------------|
+| Colors / overall look | `src/index.css` (the `--background`, `--primary`, etc. lines at the top) |
+| Home screen text | `src/pages/Landing.jsx` |
+| Setup screen | `src/pages/Home.jsx` |
+| Upload / sample notes | `src/pages/UploadNotes.jsx` |
+| Settings | `src/pages/Settings.jsx` |
+| Add or remove a page | `src/App.jsx` plus a new file in `src/pages/` |
+
+To add a page: duplicate a file in `src/pages`, change the text, import it in `src/App.jsx`, and add a `<Route path="/your-page" element={<YourPage />} />` next to the other routes.
+
+## Get GitHub updates without a new ZIP
+
+After the one-time connect above, **Play is enough**.
+
+To force GitHub’s copy over local edits: double-click **`PULL-LATEST.command`**. If Mac blocks it: right-click → **Open**.
+
+## TestFlight
+
+In Xcode: **Product → Archive** → **Distribute App** → **App Store Connect**.
+
+Bundle ID: `com.brodregoss.lastminutestudy`
+
+Create that app once in [App Store Connect](https://appstoreconnect.apple.com) if it is not there yet.
+
+## What is still in this folder (and why)
+
+| Thing | Needed? |
+|-------|---------|
+| `OPEN-IN-XCODE.xcworkspace` | Yes — this is what you double-click |
+| `PULL-LATEST.command` | Yes — force GitHub’s copy if you want to overwrite local edits |
+| `src/` | Yes — the actual app screens |
+| `ios/` | Yes — the iPhone project Xcode builds |
+| `package.json` | Yes — lists the libraries the app uses |
+| Base44 bits (`src/api`, `.env.production`) | Yes — AI triage / panic notes / grading |
+| Extra login pages, Stripe, maps, leftover UI kit | Removed — they were unused Base44 leftovers |
+
+## Web preview (optional)
 
 ```bash
 npm install
-```
-
-3. Copy the environment template and add your Base44 app credentials:
-
-```bash
-cp .env.local.example .env.local
-```
-
-Edit `.env.local`:
-
-```bash
-VITE_BASE44_APP_ID=your_app_id
-VITE_BASE44_APP_BASE_URL=https://your-app.base44.app
-```
-
-Find these in your [Base44 app dashboard](https://app.base44.com) — use the deployed app URL for `VITE_BASE44_APP_BASE_URL`.
-
-4. Start the dev server:
-
-```bash
 npm run dev
 ```
-
-Open the local URL Vite prints (usually `http://localhost:5173`).
-
-## GitHub repository
-
-This project is connected to [github.com/brodregoss/Last-Minute-Study](https://github.com/brodregoss/Last-Minute-Study).
-
-```bash
-git remote add origin https://github.com/brodregoss/Last-Minute-Study.git
-git push -u origin main
-```
-
-After that, use normal git workflow from Cursor: commit and push when you save changes.
-
-## What still uses Base44
-
-| Feature | Base44 dependency |
-|---------|-------------------|
-| Term triage (AI) | `InvokeLLM` |
-| Panic review notes (AI) | `InvokeLLM` |
-| Practice test grading (AI) | `InvokeLLM` |
-| Study sessions, settings, UI | Local only (`localStorage`) |
-
-The SDK client is in `src/api/base44Client.js`. AI calls are in `Triage.jsx`, `PanicReview.jsx`, and `PracticeTest.jsx`.
-
-## Migrating off Base44 AI later
-
-When your Base44 credits run out, replace `base44.integrations.Core.InvokeLLM` in those three files with your own LLM API (OpenAI, Anthropic, etc.), then remove `@base44/sdk`, `@base44/vite-plugin`, and the env vars.
-
-## Scripts
-
-```bash
-npm run dev      # Local development
-npm run build    # Production build → dist/
-npm run preview  # Preview production build
-npm run lint     # ESLint
-```
-
-## Deploying
-
-Build the static site with `npm run build` and deploy the `dist/` folder to any host (Vercel, Netlify, Cloudflare Pages, etc.). Set the same `VITE_BASE44_*` env vars in your host's dashboard so AI features keep working in production.

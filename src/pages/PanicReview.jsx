@@ -89,7 +89,7 @@ export default function PanicReview() {
   return (
     <div className="min-h-[100dvh] bg-background text-foreground flex flex-col">
       {/* Exam-type reminder strip */}
-      <header className="sticky top-0 z-20 bg-background px-4 pt-2 pb-1 flex justify-start">
+      <header className="sticky top-0 z-20 bg-background px-4 pt-safe pb-1 flex justify-start">
         <button
           type="button"
           onClick={() => navigate(-1)}

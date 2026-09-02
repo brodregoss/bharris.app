@@ -413,7 +413,7 @@ export default function StudyFlow() {
         </div>
       )}
       {content}
-      <footer className="px-5 py-3 flex items-center justify-center bg-card/90 backdrop-blur">
+      <footer className="px-5 pt-6 pb-8 flex items-center justify-center">
         <RoadMapDialog terms={terms} phase={phase} />
       </footer>
     </div>

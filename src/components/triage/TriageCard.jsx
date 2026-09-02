@@ -1,7 +1,5 @@
 import React from 'react';
-import { createPortal } from 'react-dom';
 import { Draggable } from '@hello-pangea/dnd';
-import { motion } from 'framer-motion';
 import { GripVertical } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
@@ -11,42 +9,49 @@ const TIER_BORDER = {
   know_it: 'border-l-emerald-400',
 };
 
-export default function TriageCard({ item, tier, index, animationDelay }) {
+export default function TriageCard({ item, tier, index, expanded = false, maxWidth }) {
   return (
     <Draggable draggableId={item.id} index={index}>
       {(provided, snapshot) => {
-        const card = (
+        const open = expanded || snapshot.isDragging;
+        return (
           <div
             ref={provided.innerRef}
             {...provided.draggableProps}
             {...provided.dragHandleProps}
+            style={{
+              ...provided.draggableProps.style,
+              ...(open
+                ? {
+                    width: maxWidth || undefined,
+                    maxWidth: maxWidth || '11rem',
+                    minWidth: 0,
+                    boxSizing: 'border-box',
+                  }
+                : null),
+            }}
             className={cn(
-              'group rounded-lg border-l-4 bg-card p-2.5 shadow-sm flex items-center justify-between gap-2 select-none transition-shadow',
-              snapshot.isDragging ? 'w-72 max-w-[80vw]' : 'w-full',
-              TIER_BORDER[tier],
-              snapshot.isDragging && 'shadow-xl ring-2 ring-ring/40 z-[9999]'
+              'rounded-lg border-l-4 bg-card shadow-sm select-none touch-none',
+              open
+                ? 'shadow-xl ring-2 ring-ring/40 px-3 py-2.5 mx-auto text-center'
+                : 'w-full min-w-0 overflow-hidden p-2.5 flex items-start justify-between gap-2',
+              TIER_BORDER[tier]
             )}
           >
             <p
               className={cn(
-                'text-sm font-semibold leading-tight text-card-foreground',
-                snapshot.isDragging ? 'line-clamp-none whitespace-normal' : 'line-clamp-2'
+                'text-sm font-semibold leading-snug text-card-foreground',
+                open
+                  ? 'block w-full whitespace-normal break-normal text-center'
+                  : 'min-w-0 line-clamp-2 break-words'
               )}
             >
               {item.term}
             </p>
-            <GripVertical className="w-4 h-4 text-muted-foreground/50 shrink-0 cursor-grab" />
+            {!open && (
+              <GripVertical className="w-4 h-4 text-muted-foreground/50 shrink-0 mt-0.5" />
+            )}
           </div>
-        );
-        return (
-          <motion.div
-            initial={{ opacity: 0, y: -20, scale: 0.94 }}
-            animate={{ opacity: 1, y: 0, scale: 1 }}
-            transition={{ delay: animationDelay, duration: 0.35, ease: 'easeOut' }}
-            className="w-full"
-          >
-            {snapshot.isDragging ? createPortal(card, document.body) : card}
-          </motion.div>
         );
       }}
     </Draggable>

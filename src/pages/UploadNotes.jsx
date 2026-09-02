@@ -3,21 +3,7 @@ import { useNavigate, useLocation } from 'react-router-dom';
 import { Moon, Camera, FileText, Check, ArrowRight, X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
-
-const SAMPLE_NOTES = [
-  {
-    id: 'psych-101',
-    title: 'Psych 101 — Core Concepts',
-    meta: 'Classical & operant conditioning, memory, perception',
-    terms: 24,
-  },
-  {
-    id: 'test-sample',
-    title: 'Sample Test Notes',
-    meta: 'Mixed terms for demo: cognition, biology, stats',
-    terms: 18,
-  },
-];
+import { SAMPLE_NOTES } from '@/lib/sampleNotes';
 
 function UploadNotes() {
   const navigate = useNavigate();
@@ -42,7 +28,7 @@ function UploadNotes() {
   return (
     <div className="min-h-[100dvh] bg-gradient-to-b from-slate-50 to-slate-100 text-foreground flex flex-col">
       {/* Header */}
-      <header className="px-6 pt-10 pb-2 flex items-center gap-2.5">
+      <header className="px-6 pt-safe pb-2 flex items-center gap-2.5">
         <div className="flex items-center justify-center w-9 h-9 rounded-xl bg-slate-900 text-white">
           <Moon className="w-5 h-5" />
         </div>

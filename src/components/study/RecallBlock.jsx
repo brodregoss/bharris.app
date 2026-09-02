@@ -182,14 +182,14 @@ export default function RecallBlock({
       : 'Term';
 
   return (
-    <div className="flex-1 flex flex-col px-5 pt-4">
+    <div className="flex flex-col px-5 pt-4">
       <div className="flex items-center justify-between mb-3 text-xs text-muted-foreground">
         <span>{blockLabel}</span>
         <span>
           {fmtTime(timeLeftMs)} left · round {st.round}
         </span>
       </div>
-      <div className="flex-1 flex flex-col items-center justify-center">
+      <div className="flex flex-col items-center">
         <div className="w-full max-w-md rounded-3xl border border-border bg-card p-8 shadow-sm text-center min-h-[280px] flex flex-col items-center justify-center">
           <p className="text-[11px] uppercase tracking-wide text-muted-foreground mb-3">{promptLabel}</p>
           <p className="text-2xl font-bold tracking-tight">{current.term}</p>

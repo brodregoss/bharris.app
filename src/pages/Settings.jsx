@@ -31,6 +31,7 @@ export default function Settings() {
               You're always free to keep going — we just won't push new stuff on you that late.
             </p>
           </section>
+          <p className="text-[11px] text-muted-foreground text-center mt-8">Version 1.0.1</p>
         </div>
       </div>
     </div>

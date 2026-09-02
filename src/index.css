@@ -2,6 +2,7 @@
 @tailwind components;
 @tailwind utilities;
 
+/* LOOK — change these HSL colors, then press Play in Xcode. No new ZIP. */
 @layer base {
   :root {
     --background: 0 0% 100%;
@@ -86,7 +87,38 @@
     @apply border-border outline-ring/50;
   }
 
+  html,
+  body,
+  #root {
+    min-height: 100%;
+    min-height: 100dvh;
+  }
+
+  html,
+  body {
+    overscroll-behavior: none;
+  }
+
   body {
     @apply bg-background text-foreground font-body;
+    -webkit-tap-highlight-color: transparent;
+    -webkit-text-size-adjust: 100%;
+  }
+
+  /* iOS zooms the page if an input is under 16px. Keep fields at 16px. */
+  input,
+  textarea,
+  select {
+    font-size: 16px;
+  }
+}
+
+@layer utilities {
+  .pt-safe {
+    padding-top: max(1.5rem, env(safe-area-inset-top));
+  }
+
+  .pb-safe {
+    padding-bottom: max(1.25rem, env(safe-area-inset-bottom));
   }
 }
