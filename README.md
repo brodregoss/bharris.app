@@ -69,6 +69,18 @@ git pull origin main
 
 Then in Xcode: Product → Clean Build Folder, then Play again.
 
+**To run on your real iPhone** (required — a phone cannot run an unsigned app):
+
+1. Plug in the iPhone and unlock it. Trust the computer if asked.
+2. In Xcode, click the blue **App** icon at the top of the left file list.
+3. Click **Signing & Capabilities**.
+4. Check **Automatically manage signing**.
+5. Team → **Add an Account…** → sign in with your Apple ID → pick **Your Name (Personal Team)**.
+6. At the top of Xcode, choose **your iPhone** (not a simulator).
+7. Press Play. The first time, on the iPhone go to **Settings → General → VPN & Device Management** (or **Developer Mode**) and trust your Apple ID.
+
+A free Apple ID is enough. You do not need a paid Developer account for your own phone.
+
 Do not download a new zip each time. Do not keep an old Terminal `npm run dev` running — that is a different copy of the app.
 
 ## GitHub repository
