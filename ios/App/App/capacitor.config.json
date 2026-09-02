@@ -1,0 +1,13 @@
+{
+	"appId": "app.lastminutestudy.cram",
+	"appName": "Last Minute Study",
+	"webDir": "dist",
+	"bundledWebRuntime": false,
+	"backgroundColor": "#f8fafc",
+	"ios": {
+		"contentInset": "never",
+		"preferredContentMode": "mobile",
+		"backgroundColor": "#f8fafc"
+	},
+	"packageClassList": []
+}
