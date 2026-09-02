@@ -144,7 +144,7 @@ function Triage() {
   return (
     <div className="min-h-[100dvh] bg-background text-foreground flex flex-col">
       {/* Header */}
-      <header className="px-6 pt-8 pb-2 flex items-center gap-2.5">
+      <header className="px-6 pt-[max(2rem,env(safe-area-inset-top))] pb-2 flex items-center gap-2.5">
         <div className="flex items-center justify-center w-9 h-9 rounded-xl bg-primary text-primary-foreground">
           <Moon className="w-5 h-5" />
         </div>

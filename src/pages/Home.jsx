@@ -88,6 +88,16 @@ export default function Home() {
     navigate(setupReturnPath(source), { state: { source } });
   };
 
+  const lookOver = () => {
+    if (source.items?.length) {
+      navigate('/review-notes', {
+        state: { source, setup: { hours, examType, examTiming } },
+      });
+      return;
+    }
+    goBack();
+  };
+
   return (
     <div className="min-h-[100dvh] bg-gradient-to-b from-slate-50 to-slate-100 text-foreground flex flex-col">
       <header className="px-3 pt-[max(1.25rem,env(safe-area-inset-top))] pb-2 flex items-center gap-1">
@@ -130,10 +140,10 @@ export default function Home() {
               </div>
               <button
                 type="button"
-                onClick={goBack}
+                onClick={lookOver}
                 className="text-xs font-medium text-slate-700 underline underline-offset-4 hover:text-slate-900 shrink-0"
               >
-                {source.kind === 'manual' ? 'Edit terms' : 'Look over notes'}
+                Look over notes
               </button>
             </div>
           </div>

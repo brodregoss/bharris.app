@@ -3,8 +3,10 @@
   "appName": "Last Minute Study",
   "webDir": "dist",
   "bundledWebRuntime": false,
+  "backgroundColor": "#f8fafc",
   "ios": {
-    "contentInset": "automatic",
-    "preferredContentMode": "mobile"
+    "contentInset": "never",
+    "preferredContentMode": "mobile",
+    "backgroundColor": "#f8fafc"
   }
 }
