@@ -28,7 +28,9 @@ export default function LaunchCountdown() {
   const [now, setNow] = React.useState('');
 
   React.useEffect(() => {
-    if (sessionStorage.getItem(SESSION_KEY)) {
+    // First-time visitors go straight to the welcome screen — no countdown.
+    const firstVisit = !localStorage.getItem('lms_onboarded');
+    if (firstVisit || sessionStorage.getItem(SESSION_KEY)) {
       setPhase('done');
       return;
     }

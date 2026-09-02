@@ -71,10 +71,27 @@ function Triage() {
   const [ranked, setRanked] = React.useState([]);
   const [animating, setAnimating] = React.useState(true);
 
-  // AI ranking
+  // AI ranking — skip when the user already typed terms by hand.
   React.useEffect(() => {
     let mounted = true;
     (async () => {
+      const manualItems = source?.kind === 'manual' ? (source.items || []) : [];
+      if (manualItems.length) {
+        const withIds = manualItems.slice(0, MAX_TERMS).map((t, i) => ({
+          term: t.term,
+          definition: t.definition,
+          difficulty: t.difficulty || 5,
+          depends_on: t.depends_on || [],
+          id: t.id || `t${i}`,
+        }));
+        const rankedManual = rankTerms(withIds);
+        setRanked(rankedManual);
+        setLoading(false);
+        const total = rankedManual.length * 0.06 + 0.6;
+        setTimeout(() => mounted && setAnimating(false), total * 1000);
+        return;
+      }
+
       const count = Math.min(source?.terms || 12, MAX_TERMS);
       const res = await base44.integrations.Core.InvokeLLM({
         prompt: `You are building a last-minute study triage for a student about to cram "${sourceTitle}". Generate exactly ${count} key terms/concepts a student must know for this exam. For each term provide: term (short name), definition (one concise sentence), difficulty (integer 1-10, 10 = hardest), depends_on (array of OTHER term names from your list that this concept builds upon; foundational concepts others rely on should have empty or few dependencies, advanced concepts should reference foundational ones). Include a healthy mix of foundational and advanced concepts. Return exactly ${count} terms.`,

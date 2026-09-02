@@ -50,11 +50,13 @@ export default function AppFlowChart() {
   return (
     <div className="space-y-4">
       <Group label="1 · Setup">
-        <Node title="Landing" sub="First visit → Setup. Returning → Resume or start new." icon={<GitBranch className="w-3.5 h-3.5" />} />
+        <Node title="Landing" sub="First visit → Welcome. Returning → Continue session or start new cram." icon={<GitBranch className="w-3.5 h-3.5" />} />
         <Bar />
-        <Node title="Setup form" sub="# terms · hours · exam type · exam timing" icon={<ClipboardCheck className="w-3.5 h-3.5" />} />
+        <Node title="Welcome" sub="Drop notes · create manually · use some of ours" icon={<ClipboardCheck className="w-3.5 h-3.5" />} />
         <Bar />
-        <Node title="Upload notes → Triage (AI ranks terms)" sub="Difficulty score + depends_on per term" />
+        <Node title="Time & test type" sub="Hours · exam type · exam timing · term count · back to notes" />
+        <Bar />
+        <Node title="Triage (AI ranks terms, or uses manual terms)" sub="Difficulty score + depends_on per term" />
       </Group>
 
       <Group label="2 · Triage tiers (by exam type)">

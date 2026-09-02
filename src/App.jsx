@@ -7,7 +7,9 @@ import { AuthProvider } from '@/lib/AuthContext';
 import ScrollToTop from './components/ScrollToTop';
 // Add page imports here
 import Landing from './pages/Landing';
+import Welcome from './pages/Welcome';
 import Home from './pages/Home';
+import CreateNotes from './pages/CreateNotes';
 import UploadNotes from './pages/UploadNotes';
 import Triage from './pages/Triage';
 import StudyFlow from './pages/StudyFlow';
@@ -28,7 +30,9 @@ function App() {
             <ScrollToTop />
             <Routes>
               <Route path="/" element={<Landing />} />
+              <Route path="/welcome" element={<Welcome />} />
               <Route path="/setup" element={<Home />} />
+              <Route path="/create-notes" element={<CreateNotes />} />
               <Route path="/history" element={<PastSessions />} />
               <Route path="/settings" element={<Settings />} />
               <Route path="/upload-notes" element={<UploadNotes />} />
