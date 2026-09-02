@@ -3,21 +3,7 @@ import { useNavigate, useLocation } from 'react-router-dom';
 import { Moon, FileText, Check, ArrowRight, ArrowLeft } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
-
-const SAMPLE_NOTES = [
-  {
-    id: 'psych-101',
-    title: 'Psych 101 — Core Concepts',
-    meta: 'Classical & operant conditioning, memory, perception',
-    terms: 24,
-  },
-  {
-    id: 'test-sample',
-    title: 'Sample Test Notes',
-    meta: 'Mixed terms for demo: cognition, biology, stats',
-    terms: 18,
-  },
-];
+import { SAMPLE_NOTES } from '@/lib/sampleNotes';
 
 function UploadNotes() {
   const navigate = useNavigate();

@@ -1,0 +1,10 @@
+{
+  "appId": "app.lastminutestudy.cram",
+  "appName": "Last Minute Study",
+  "webDir": "dist",
+  "bundledWebRuntime": false,
+  "ios": {
+    "contentInset": "automatic",
+    "preferredContentMode": "mobile"
+  }
+}

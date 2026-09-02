@@ -75,7 +75,32 @@ npm run dev      # Local development
 npm run build    # Production build → dist/
 npm run preview  # Preview production build
 npm run lint     # ESLint
+npm run ios:sync # Build the web app and copy it into the Xcode project
+npm run ios:open # Open the iOS project in Xcode
 ```
+
+## Run in Xcode (iPhone Simulator)
+
+This repo is a website. Capacitor wraps that website in a native iOS app you can open in Xcode.
+
+On your Mac, in the unzipped project folder (or after `git pull`):
+
+```bash
+npm install
+npm run ios:sync
+npm run ios:open
+```
+
+Then in Xcode:
+
+1. Pick an iPhone simulator in the top toolbar.
+2. Press the Play button (or **Product → Run**).
+
+Do not open the folder as a generic Xcode project. Use `npm run ios:open`, which opens `ios/App/App.xcworkspace` / `App.xcodeproj`.
+
+After you change the web app, run `npm run ios:sync` again, then Run in Xcode.
+
+The built-in **Bill of Rights** notes are under **use some of ours** on the welcome screen. They do not need AI to load.
 
 ## Deploying
 

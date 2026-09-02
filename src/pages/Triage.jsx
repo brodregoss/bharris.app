@@ -75,9 +75,9 @@ function Triage() {
   React.useEffect(() => {
     let mounted = true;
     (async () => {
-      const manualItems = source?.kind === 'manual' ? (source.items || []) : [];
-      if (manualItems.length) {
-        const withIds = manualItems.slice(0, MAX_TERMS).map((t, i) => ({
+      const cannedItems = source?.items || [];
+      if (cannedItems.length) {
+        const withIds = cannedItems.slice(0, MAX_TERMS).map((t, i) => ({
           term: t.term,
           definition: t.definition,
           difficulty: t.difficulty || 5,
