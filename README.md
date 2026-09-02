@@ -42,36 +42,34 @@ npm run dev
 
 Open the local URL Vite prints (usually `http://localhost:5173`).
 
-## How to see new changes (do this — do not download a new zip)
+## Run in Xcode (this is the app)
 
-Download ZIP from GitHub every time will keep showing the old app, because the old `npm run dev` is still running in the previous folder.
+The iPhone app lives in `ios/App/`. I copy the latest website into that Xcode project and push it to GitHub, so you only need to pull and press Play.
 
-**Do this once** (clone, not zip):
+**Do this once:**
 
 ```bash
 git clone https://github.com/brodregoss/Last-Minute-Study.git
 cd Last-Minute-Study
-npm install
-npm run dev
 ```
 
-**Then whenever there are new changes:**
+Then open this file in Xcode (double-click it in Finder, or File → Open):
 
-1. In Terminal, stop the running app (`Ctrl+C`)
-2. In the **same** folder:
+`Last-Minute-Study/ios/App/App.xcodeproj`
+
+1. At the top of Xcode, pick an iPhone simulator (for example iPhone 16).
+2. Press the Play button (or Product → Run).
+
+**Whenever there are new changes:**
 
 ```bash
-git checkout main
+cd Last-Minute-Study
 git pull origin main
-npm install
-npm run dev
 ```
 
-3. Hard-refresh the browser (`Cmd+Shift+R`)
+Then in Xcode: Product → Clean Build Folder, then Play again.
 
-To look over notes: Welcome → **use some of ours** → Bill of Rights → Continue → **Look over notes**. You should get a scroll-down list of cards.
-
-If you already downloaded a zip today: close the old Terminal, `cd` into the **new** unzipped folder (the one named `Last-Minute-Study-main`), then `npm install` and `npm run dev` again.
+Do not download a new zip each time. Do not keep an old Terminal `npm run dev` running — that is a different copy of the app.
 
 ## GitHub repository
 
@@ -110,28 +108,7 @@ npm run ios:sync # Build the web app and copy it into the Xcode project
 npm run ios:open # Open the iOS project in Xcode
 ```
 
-## Run in Xcode (iPhone Simulator)
-
-This repo is a website. Capacitor wraps that website in a native iOS app you can open in Xcode.
-
-On your Mac, in the unzipped project folder (or after `git pull`):
-
-```bash
-npm install
-npm run ios:sync
-npm run ios:open
-```
-
-Then in Xcode:
-
-1. Pick an iPhone simulator in the top toolbar.
-2. Press the Play button (or **Product → Run**).
-
-Do not open the folder as a generic Xcode project. Use `npm run ios:open`, which opens `ios/App/App.xcworkspace` / `App.xcodeproj`.
-
-After you change the web app, run `npm run ios:sync` again, then Run in Xcode.
-
-The built-in **Bill of Rights** notes are under **use some of ours** on the welcome screen. They do not need AI to load.
+The built-in **Bill of Rights** notes are under **use some of ours** on the welcome screen.
 
 ## Deploying
 
