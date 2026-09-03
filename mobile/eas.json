@@ -1,0 +1,37 @@
+{
+  "cli": {
+    "version": ">= 16.0.0",
+    "appVersionSource": "remote"
+  },
+  "build": {
+    "development": {
+      "developmentClient": true,
+      "distribution": "internal",
+      "ios": {
+        "simulator": true
+      },
+      "env": {
+        "EXPO_PUBLIC_BASE44_APP_ID": "6a6155d14517fbb12343f754",
+        "EXPO_PUBLIC_BASE44_APP_BASE_URL": "https://enthusiastic-cram-genius-flow.base44.app"
+      }
+    },
+    "preview": {
+      "distribution": "store",
+      "autoIncrement": true,
+      "env": {
+        "EXPO_PUBLIC_BASE44_APP_ID": "6a6155d14517fbb12343f754",
+        "EXPO_PUBLIC_BASE44_APP_BASE_URL": "https://enthusiastic-cram-genius-flow.base44.app"
+      }
+    },
+    "production": {
+      "autoIncrement": true,
+      "env": {
+        "EXPO_PUBLIC_BASE44_APP_ID": "6a6155d14517fbb12343f754",
+        "EXPO_PUBLIC_BASE44_APP_BASE_URL": "https://enthusiastic-cram-genius-flow.base44.app"
+      }
+    }
+  },
+  "submit": {
+    "production": {}
+  }
+}

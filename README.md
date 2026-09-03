@@ -105,6 +105,16 @@ After that, use normal git workflow from Cursor: commit and push when you save c
 
 The SDK client is in `src/api/base44Client.js`. AI calls are in `Triage.jsx`, `PanicReview.jsx`, and `PracticeTest.jsx`.
 
+## Native iOS / Xcode
+
+The Xcode app lives in `mobile/ios/`. After pulling this branch, double-click:
+
+`Open Last Minute Study in Xcode.command`
+
+That opens `mobile/ios/LastMinuteStudy.xcworkspace`. In Xcode: pick mom's Team under Signing, then **Product → Archive**.
+
+See `mobile/README.md` for TestFlight details.
+
 ## Migrating off Base44 AI later
 
 When your Base44 credits run out, replace `base44.integrations.Core.InvokeLLM` in those three files with your own LLM API (OpenAI, Anthropic, etc.), then remove `@base44/sdk`, `@base44/vite-plugin`, and the env vars.
