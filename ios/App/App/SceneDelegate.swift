@@ -1,4 +1,5 @@
 import UIKit
+import WebKit
 import Capacitor
 
 class SceneDelegate: UIResponder, UIWindowSceneDelegate {
@@ -12,7 +13,27 @@ class SceneDelegate: UIResponder, UIWindowSceneDelegate {
         window?.rootViewController = CAPBridgeViewController()
         window?.makeKeyAndVisible()
 
+        lockWebViewZoom()
+        DispatchQueue.main.async { [weak self] in self?.lockWebViewZoom() }
+
         SceneDelegateProxy.shared.scene(scene, willConnectTo: session, options: connectionOptions)
+    }
+
+    /// Stops pinch-zoom and leftover auto-zoom after focusing a text field.
+    private func lockWebViewZoom() {
+        guard let root = window?.rootViewController else { return }
+        findWebView(in: root.view)?.scrollView.pinchGestureRecognizer?.isEnabled = false
+        findWebView(in: root.view)?.scrollView.minimumZoomScale = 1
+        findWebView(in: root.view)?.scrollView.maximumZoomScale = 1
+        findWebView(in: root.view)?.scrollView.bouncesZoom = false
+    }
+
+    private func findWebView(in view: UIView) -> WKWebView? {
+        if let webView = view as? WKWebView { return webView }
+        for child in view.subviews {
+            if let found = findWebView(in: child) { return found }
+        }
+        return nil
     }
 
     func scene(_ scene: UIScene, openURLContexts URLContexts: Set<UIOpenURLContext>) {

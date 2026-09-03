@@ -127,3 +127,60 @@ export function fmtTime(ms) {
   if (h > 0) return `${h}:${String(m).padStart(2, '0')}:${String(sec).padStart(2, '0')}`;
   return `${m}:${String(sec).padStart(2, '0')}`;
 }
+
+export function normalizeAnswer(s) {
+  return String(s || '')
+    .toLowerCase()
+    .replace(/[^\p{L}\p{N}\s]/gu, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+// Exact / near-exact match so obvious answers (including case differences) are
+// marked correct even when the LLM is down or returns a malformed payload.
+export function localGradeShortAnswer(student, definition) {
+  const answer = normalizeAnswer(student);
+  const def = normalizeAnswer(definition);
+  if (!answer || !def) return null;
+  if (answer === def) {
+    return { correct: true, feedback: 'Matches the expected answer.' };
+  }
+  const shorter = answer.length <= def.length ? answer : def;
+  const longer = answer.length <= def.length ? def : answer;
+  if (shorter.length >= Math.min(4, def.length) && longer.includes(shorter)) {
+    return { correct: true, feedback: 'Close enough to the expected answer.' };
+  }
+  return null;
+}
+
+function parseJsonObject(value) {
+  if (value && typeof value === 'object' && !Array.isArray(value)) return value;
+  if (typeof value !== 'string') return null;
+  const trimmed = value.trim();
+  const start = trimmed.indexOf('{');
+  const end = trimmed.lastIndexOf('}');
+  if (start < 0 || end <= start) return null;
+  try {
+    return JSON.parse(trimmed.slice(start, end + 1));
+  } catch {
+    return null;
+  }
+}
+
+export function parseGradeResponse(res) {
+  let obj = parseJsonObject(res) || (res && typeof res === 'object' ? res : null);
+  if (!obj) return null;
+  const nested = obj.output ?? obj.data ?? obj.result ?? obj;
+  obj = parseJsonObject(nested) || (nested && typeof nested === 'object' ? nested : obj);
+  const raw = obj?.correct;
+  if (typeof raw === 'boolean') {
+    return { correct: raw, feedback: typeof obj.feedback === 'string' ? obj.feedback : '' };
+  }
+  if (typeof raw === 'string') {
+    const lowered = raw.toLowerCase();
+    if (lowered === 'true' || lowered === 'false') {
+      return { correct: lowered === 'true', feedback: typeof obj.feedback === 'string' ? obj.feedback : '' };
+    }
+  }
+  return null;
+}

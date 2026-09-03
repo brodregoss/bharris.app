@@ -2,7 +2,7 @@ import React from 'react';
 import { Button } from '@/components/ui/button';
 import { Check, X, Timer, RotateCcw, ArrowRight, Loader2 } from 'lucide-react';
 import { base44 } from '@/api/base44Client';
-import { fmtTime } from '@/lib/studyUtils';
+import { fmtTime, localGradeShortAnswer, parseGradeResponse } from '@/lib/studyUtils';
 
 function shuffle(a) {
   const b = [...a];
@@ -100,31 +100,49 @@ export default function PracticeTest({ terms, examType, budgetMs, priorMissed, o
     setExplaining(false);
   };
 
-  // AI grades the typed free-response answer against the correct definition.
+  const applyGrade = (result) => {
+    setGradeResult(result);
+    record(q.id, { correct: result.correct });
+  };
+
+  const markIWasRight = () => {
+    applyGrade({ correct: true, feedback: 'Marked as correct.' });
+  };
+
+  // Grade typed answers locally first, then with AI. Local exact matches win so
+  // case/punctuation never mark a right answer wrong; AI covers paraphrases.
   const gradeWithAI = async () => {
     if (!shortAnswer.trim()) return;
     setSubmitted(true);
     setGrading(true);
     setGradeError(false);
     setGradeResult(null);
+    const local = localGradeShortAnswer(shortAnswer, q.definition);
+    if (local?.correct) {
+      applyGrade(local);
+      setGrading(false);
+      return;
+    }
     try {
       const res = await base44.integrations.Core.InvokeLLM({
         prompt:
           `You are grading a student's short-answer response for an exam-prep app.\n` +
           `Term: ${q.term}\nCorrect definition: ${q.definition}\nStudent's answer: ${shortAnswer}\n\n` +
-          `Grade whether the student's answer demonstrates understanding of the term (wording need not match). ` +
-          `Respond with JSON { "correct": boolean, "feedback": "one short sentence" }. Be lenient on phrasing, strict on meaning.`,
+          `Mark correct if the student shows the same meaning — ignore case, punctuation, extra words, and wording. ` +
+          `If they restated the term or the definition, that is correct. Only mark incorrect when the meaning is wrong.\n` +
+          `Respond with JSON { "correct": boolean, "feedback": "one short sentence" }.`,
         response_json_schema: {
           type: 'object',
           properties: { correct: { type: 'boolean' }, feedback: { type: 'string' } },
           required: ['correct', 'feedback'],
         },
       });
-      const correct = !!res.correct;
-      setGradeResult({ correct, feedback: res.feedback || '' });
-      record(q.id, { correct });
+      const parsed = parseGradeResponse(res);
+      if (!parsed) throw new Error('unreadable grade');
+      applyGrade(parsed);
     } catch {
-      setGradeError(true);
+      if (local) applyGrade(local);
+      else setGradeError(true);
     }
     setGrading(false);
   };
@@ -306,7 +324,10 @@ export default function PracticeTest({ terms, examType, budgetMs, priorMissed, o
                   value={shortAnswer}
                   onChange={(e) => setShortAnswer(e.target.value)}
                   placeholder="Type your answer — we'll grade it with AI…"
-                  className="w-full rounded-xl border border-border bg-card p-3 text-sm min-h-[80px] focus:outline-none focus:ring-2 focus:ring-ring"
+                  autoCapitalize="sentences"
+                  autoCorrect="on"
+                  enterKeyHint="done"
+                  className="w-full rounded-xl border border-border bg-card p-3 text-base min-h-[80px] focus:outline-none focus:ring-2 focus:ring-ring"
                 />
               ) : (
                 <div className="space-y-2">
@@ -330,15 +351,28 @@ export default function PracticeTest({ terms, examType, budgetMs, priorMissed, o
                     <p className="text-[11px] uppercase tracking-wide text-muted-foreground">Correct answer</p>
                     <p className="mt-1">{q.definition}</p>
                   </div>
-                  {gradeResult && !explanation && (
-                    <button
-                      type="button"
-                      onClick={explain}
-                      disabled={explaining}
-                      className="text-xs text-slate-500 hover:text-slate-700 underline font-medium self-start disabled:opacity-60"
-                    >
-                      {explaining ? 'Explaining…' : 'Explain'}
-                    </button>
+                  {gradeResult && (!explanation || !gradeResult.correct) && (
+                    <div className="flex items-center gap-4">
+                      {!explanation && (
+                        <button
+                          type="button"
+                          onClick={explain}
+                          disabled={explaining}
+                          className="text-xs text-slate-500 hover:text-slate-700 underline font-medium disabled:opacity-60"
+                        >
+                          {explaining ? 'Explaining…' : 'Explain'}
+                        </button>
+                      )}
+                      {!gradeResult.correct && (
+                        <button
+                          type="button"
+                          onClick={markIWasRight}
+                          className="text-xs text-emerald-700 hover:text-emerald-800 underline font-medium"
+                        >
+                          I was right
+                        </button>
+                      )}
+                    </div>
                   )}
                   {explanation && (
                     <p className="text-xs text-muted-foreground leading-relaxed pl-1">{explanation}</p>

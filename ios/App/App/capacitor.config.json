@@ -4,6 +4,10 @@
 	"webDir": "dist",
 	"bundledWebRuntime": false,
 	"backgroundColor": "#f8fafc",
+	"server": {
+		"iosScheme": "https",
+		"hostname": "enthusiastic-cram-genius-flow.base44.app"
+	},
 	"ios": {
 		"contentInset": "never",
 		"preferredContentMode": "mobile",
