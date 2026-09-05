@@ -53,7 +53,7 @@ VITE_LLM_PROXY_URL=https://YOUR-APP.vercel.app/api/llm
 
 Easiest way to share: send friends the Vercel website link. Sharing the Xcode app requires each person to build with their Apple ID (or a paid TestFlight account).
 
-A personal key in **Settings** is optional and only needed if someone wants to use their own OpenAI account.
+Friends then use the app with no key to paste.
 
 ## Run in Xcode (this is the app)
 
@@ -116,7 +116,7 @@ After that, use normal git workflow from Cursor: commit and push when you save c
 | Practice test grading (AI) | OpenAI (`gpt-4o-mini`) |
 | Study sessions, settings, UI | Local only (`localStorage`) |
 
-The shared server is `api/llm.js` (Vercel) and `server/openaiLlm.js`. The iPhone app only stores the public `VITE_LLM_PROXY_URL`. A personal key in Settings is optional.
+The shared server is `api/llm.js` (Vercel) and `server/openaiLlm.js`. The iPhone app only stores the public `VITE_LLM_PROXY_URL`.
 
 ## Scripts
 

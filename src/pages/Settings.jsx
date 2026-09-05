@@ -1,44 +1,21 @@
 import React from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useTheme } from 'next-themes';
-import { ArrowLeft, Moon, Sun, KeyRound } from 'lucide-react';
+import { ArrowLeft, Moon, Sun } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Switch } from '@/components/ui/switch';
 import { Label } from '@/components/ui/label';
-import { Input } from '@/components/ui/input';
-import { clearOpenAIKey, getOpenAIKey, maskOpenAIKey, setOpenAIKey } from '@/lib/openaiKey';
-import { hasSharedAi } from '@/api/invokeLlm';
 
 export default function Settings() {
   const navigate = useNavigate();
   const { theme, setTheme, resolvedTheme } = useTheme();
   const [ready, setReady] = React.useState(false);
-  const [savedKey, setSavedKey] = React.useState('');
-  const [draft, setDraft] = React.useState('');
-  const [status, setStatus] = React.useState('');
 
   React.useEffect(() => {
     setReady(true);
-    setSavedKey(getOpenAIKey());
   }, []);
 
   const dark = ready && (resolvedTheme || theme) === 'dark';
-
-  const saveKey = () => {
-    const next = draft.trim();
-    if (!next) return;
-    setOpenAIKey(next);
-    setSavedKey(next);
-    setDraft('');
-    setStatus('Saved on this device');
-  };
-
-  const removeKey = () => {
-    clearOpenAIKey();
-    setSavedKey('');
-    setDraft('');
-    setStatus('Removed');
-  };
 
   return (
     <div className="min-h-[100dvh] bg-background text-foreground flex flex-col">
@@ -74,50 +51,6 @@ export default function Settings() {
                 disabled={!ready}
               />
             </div>
-          </section>
-
-          <section className="rounded-2xl border border-border bg-card p-5 space-y-3">
-            <div className="flex items-center gap-2">
-              <KeyRound className="w-4 h-4 text-muted-foreground shrink-0" />
-              <div className="min-w-0">
-                <h2 className="text-sm font-bold tracking-tight">OpenAI API key</h2>
-                <p className="text-xs text-muted-foreground mt-0.5">
-                  {hasSharedAi()
-                    ? 'Optional. This build already includes shared AI, so you and your testers do not need a key.'
-                    : 'Optional personal key. For friends, put the key on the server instead (see README) so nobody has to paste it.'}
-                </p>
-              </div>
-            </div>
-            {savedKey ? (
-              <p className="text-xs font-medium text-foreground">
-                Saved: {maskOpenAIKey(savedKey)}
-              </p>
-            ) : (
-              <p className="text-xs text-muted-foreground">Not set yet.</p>
-            )}
-            <Input
-              type="password"
-              autoComplete="off"
-              spellCheck={false}
-              placeholder="sk-…"
-              value={draft}
-              onChange={(e) => setDraft(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key === 'Enter') saveKey();
-              }}
-              aria-label="OpenAI API key"
-            />
-            <div className="flex items-center gap-2">
-              <Button type="button" className="rounded-2xl" onClick={saveKey} disabled={!draft.trim()}>
-                Save
-              </Button>
-              {savedKey ? (
-                <Button type="button" variant="ghost" className="rounded-2xl" onClick={removeKey}>
-                  Remove
-                </Button>
-              ) : null}
-            </div>
-            {status ? <p className="text-xs text-muted-foreground">{status}</p> : null}
           </section>
 
           <section className="rounded-2xl border border-border bg-card p-5">

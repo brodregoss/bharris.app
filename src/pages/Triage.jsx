@@ -176,24 +176,19 @@ function Triage() {
         <div className="flex-1 flex flex-col items-center justify-center gap-3 text-center px-8">
           <p className="text-sm font-medium">Couldn’t load terms</p>
           <p className="text-xs text-muted-foreground max-w-xs">
-            Add your OpenAI API key in Settings, or set up shared AI so testers don’t need a key. You can also create terms by hand from Welcome.
+            The study AI isn’t available right now. Try again, or create terms by hand from Welcome.
           </p>
-          <div className="flex items-center gap-2 mt-2">
-            <Button
-              type="button"
-              onClick={() => {
-                setLoadError(false);
-                setLoading(true);
-                setRetryTick((n) => n + 1);
-              }}
-              className="rounded-2xl"
-            >
-              Try again
-            </Button>
-            <Button type="button" variant="ghost" className="rounded-2xl" onClick={() => navigate('/settings')}>
-              Settings
-            </Button>
-          </div>
+          <Button
+            type="button"
+            onClick={() => {
+              setLoadError(false);
+              setLoading(true);
+              setRetryTick((n) => n + 1);
+            }}
+            className="mt-2 rounded-2xl"
+          >
+            Try again
+          </Button>
         </div>
       ) : (
         <>

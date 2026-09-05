@@ -1,5 +1,5 @@
 // Public hosted Base44 app (not secrets). Used when env vars are missing so
-// Base44 app id/url leftovers. AI now uses the OpenAI key from Settings.
+// Base44 app id/url leftovers. AI now goes through the shared /api/llm server.
 const DEFAULT_APP_ID = '6a6155d14517fbb12343f754';
 const DEFAULT_APP_BASE_URL = 'https://enthusiastic-cram-genius-flow.base44.app';
 
