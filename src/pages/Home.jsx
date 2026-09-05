@@ -99,17 +99,17 @@ export default function Home() {
   };
 
   return (
-    <div className="min-h-[100dvh] bg-gradient-to-b from-slate-50 to-slate-100 text-foreground flex flex-col">
-      <header className="px-3 pt-[max(1.25rem,env(safe-area-inset-top))] pb-2 flex items-center gap-1">
+    <div className="min-h-[100dvh] bg-background text-foreground flex flex-col">
+      <header className="px-3 pt-safe pb-2 flex items-center gap-1">
         <button
           type="button"
           onClick={goBack}
           aria-label="Back to notes"
-          className="w-9 h-9 rounded-full flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-accent transition"
+          className="w-11 h-11 rounded-full flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-accent transition"
         >
           <ArrowLeft className="w-5 h-5" />
         </button>
-        <div className="flex items-center justify-center w-9 h-9 rounded-xl bg-slate-900 text-white">
+        <div className="flex items-center justify-center w-9 h-9 rounded-xl bg-primary text-primary-foreground">
           <Timer className="w-5 h-5" />
         </div>
         <div>
@@ -125,9 +125,9 @@ export default function Home() {
             Tell us the clock and the test — we'll build a plan that fits.
           </p>
 
-          <div className="mb-5 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+          <div className="mb-5 rounded-2xl border border-border bg-card p-4 shadow-sm">
             <div className="flex items-start gap-3">
-              <div className="flex items-center justify-center w-9 h-9 rounded-xl bg-slate-100 text-slate-700 shrink-0">
+              <div className="flex items-center justify-center w-9 h-9 rounded-xl bg-muted text-muted-foreground shrink-0">
                 <BookOpen className="w-4 h-4" />
               </div>
               <div className="flex-1 min-w-0">
@@ -141,7 +141,7 @@ export default function Home() {
               <button
                 type="button"
                 onClick={lookOver}
-                className="text-xs font-medium text-slate-700 underline underline-offset-4 hover:text-slate-900 shrink-0"
+                className="text-xs font-medium text-foreground underline underline-offset-4 hover:text-muted-foreground shrink-0"
               >
                 Look over notes
               </button>
@@ -193,7 +193,7 @@ export default function Home() {
         </div>
       </main>
 
-      <footer className="px-6 pt-2 pb-[max(1.25rem,env(safe-area-inset-bottom))]">
+      <footer className="px-6 pt-2 pb-safe">
         <div className="max-w-md mx-auto w-full">
           <Button
             size="lg"
@@ -210,7 +210,7 @@ export default function Home() {
             className={cn(
               'w-full h-14 rounded-2xl text-base font-semibold transition-all',
               canStart
-                ? 'bg-slate-900 hover:bg-slate-800 text-white shadow-lg shadow-slate-900/20'
+                ? 'shadow-lg'
                 : 'bg-muted text-muted-foreground'
             )}
           >

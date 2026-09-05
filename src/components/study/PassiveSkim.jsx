@@ -49,7 +49,7 @@ export default function PassiveSkim({ terms, behind, onUpdateTerm, onDone }) {
           Quick exposure — no grading. Scroll through and tap to mark seen.
         </p>
         {behind && (
-          <div className="rounded-xl bg-amber-50 border border-amber-200 p-3 mb-3 text-xs text-amber-800 flex gap-2">
+          <div className="rounded-xl bg-amber-50 dark:bg-amber-500/15 border border-amber-200 dark:border-amber-500/30 p-3 mb-3 text-xs text-amber-800 dark:text-amber-200 flex gap-2">
             <AlertTriangle className="w-4 h-4 shrink-0" />
             <span>Running a bit behind — trimming your passive review to keep practice test time safe.</span>
           </div>
@@ -63,11 +63,11 @@ export default function PassiveSkim({ terms, behind, onUpdateTerm, onDone }) {
                 data-id={t.id}
                 onClick={() => toggle(t.id)}
                 className={`w-full text-left rounded-xl border p-3 transition ${
-                  seen ? 'border-emerald-300 bg-emerald-50' : 'border-border bg-card'
+                  seen ? 'border-emerald-500 bg-emerald-50 dark:bg-emerald-500/20' : 'border-border bg-card'
                 }`}
               >
-                <p className="text-sm font-semibold">{t.term}</p>
-                <p className="text-xs text-muted-foreground mt-0.5">{t.definition}</p>
+                <p className="text-lg font-semibold">{t.term}</p>
+                <p className="text-base text-muted-foreground mt-0.5 leading-relaxed">{t.definition}</p>
               </button>
             );
           })}
@@ -77,7 +77,7 @@ export default function PassiveSkim({ terms, behind, onUpdateTerm, onDone }) {
         </div>
         <Button
           onClick={onDone}
-          className="w-full h-12 rounded-2xl bg-slate-900 hover:bg-slate-800 text-white font-semibold"
+          className="w-full h-12 rounded-2xl font-semibold"
         >
           Continue
           <ArrowRight className="w-4 h-4 ml-2" />

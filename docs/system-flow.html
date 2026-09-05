@@ -1,0 +1,738 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Last Minute Study — system flow &amp; algorithms</title>
+  <style>
+    :root {
+      --bg: #f4f4f5;
+      --paper: #ffffff;
+      --ink: #18181b;
+      --muted: #52525b;
+      --line: #d4d4d8;
+      --accent: #18181b;
+      --ai: #7c3aed;
+      --ai-bg: #f5f3ff;
+      --alg: #0f766e;
+      --alg-bg: #f0fdfa;
+      --page: #1d4ed8;
+      --page-bg: #eff6ff;
+      --store: #b45309;
+      --store-bg: #fffbeb;
+      --note-bg: #18181b;
+      --note-ink: #fafafa;
+    }
+    * { box-sizing: border-box; }
+    html, body { margin: 0; padding: 0; }
+    body {
+      font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, sans-serif;
+      background: var(--bg);
+      color: var(--ink);
+      line-height: 1.45;
+    }
+    header.top {
+      position: sticky; top: 0; z-index: 20;
+      background: var(--paper);
+      border-bottom: 1px solid var(--line);
+      padding: 14px 20px;
+    }
+    header.top h1 { margin: 0; font-size: 18px; letter-spacing: -0.02em; }
+    header.top p { margin: 4px 0 0; font-size: 13px; color: var(--muted); }
+    nav {
+      display: flex; flex-wrap: wrap; gap: 8px; margin-top: 10px;
+    }
+    nav a {
+      font-size: 12px; color: var(--ink); text-decoration: none;
+      border: 1px solid var(--line); background: var(--bg);
+      padding: 6px 10px; border-radius: 999px;
+    }
+    nav a:hover { background: var(--ink); color: #fff; }
+    .wrap {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) 320px;
+      gap: 0;
+      align-items: start;
+    }
+    main { padding: 24px 20px 80px; max-width: 1100px; }
+    aside.note {
+      position: sticky; top: 78px;
+      height: calc(100vh - 90px);
+      overflow: auto;
+      background: var(--note-bg);
+      color: var(--note-ink);
+      padding: 20px;
+      border-left: 1px solid #27272a;
+    }
+    aside.note .kicker {
+      font-size: 10px; letter-spacing: 0.12em; text-transform: uppercase;
+      color: #a1a1aa; margin: 0 0 8px;
+    }
+    aside.note h2 { margin: 0 0 10px; font-size: 16px; }
+    aside.note p, aside.note li { font-size: 13px; color: #e4e4e7; }
+    aside.note .kind {
+      display: inline-block; font-size: 10px; text-transform: uppercase;
+      letter-spacing: 0.08em; padding: 2px 8px; border-radius: 999px;
+      margin-bottom: 10px; background: #3f3f46;
+    }
+    h2.sec { font-size: 22px; margin: 36px 0 8px; letter-spacing: -0.03em; }
+    h2.sec:first-of-type { margin-top: 0; }
+    .lede { color: var(--muted); font-size: 14px; margin: 0 0 16px; max-width: 70ch; }
+    .legend { display: flex; flex-wrap: wrap; gap: 8px; margin: 0 0 20px; }
+    .chip { font-size: 11px; padding: 4px 8px; border-radius: 6px; border: 1px solid var(--line); }
+    .chip.page { background: var(--page-bg); color: var(--page); }
+    .chip.ai { background: var(--ai-bg); color: var(--ai); }
+    .chip.alg { background: var(--alg-bg); color: var(--alg); }
+    .chip.store { background: var(--store-bg); color: var(--store); }
+    .flow {
+      display: flex; flex-direction: column; gap: 8px;
+    }
+    .row {
+      display: flex; flex-wrap: wrap; gap: 8px; align-items: stretch;
+    }
+    .arrow {
+      align-self: center; color: var(--muted); font-size: 12px; padding: 0 2px;
+    }
+    .arrow.down { text-align: center; padding: 2px 0; }
+    .box {
+      background: var(--paper);
+      border: 1px solid var(--line);
+      border-radius: 12px;
+      padding: 12px 14px;
+      min-width: 140px;
+      flex: 1 1 160px;
+      cursor: default;
+      transition: border-color .12s, transform .12s;
+    }
+    .box:hover, .box:focus {
+      outline: none;
+      border-color: var(--ink);
+      transform: translateY(-1px);
+    }
+    .box.page { border-left: 3px solid var(--page); }
+    .box.ai { border-left: 3px solid var(--ai); background: var(--ai-bg); }
+    .box.alg { border-left: 3px solid var(--alg); background: var(--alg-bg); }
+    .box.store { border-left: 3px solid var(--store); background: var(--store-bg); }
+    .box .tag {
+      font-size: 10px; text-transform: uppercase; letter-spacing: 0.08em;
+      color: var(--muted); margin: 0 0 4px;
+    }
+    .box h3 { margin: 0; font-size: 14px; }
+    .box .sub { margin: 4px 0 0; font-size: 12px; color: var(--muted); }
+    .lane {
+      border: 1px dashed var(--line);
+      border-radius: 16px;
+      padding: 12px;
+      background: #fafafa;
+    }
+    .lane > .label {
+      font-size: 11px; font-weight: 700; text-transform: uppercase;
+      letter-spacing: 0.1em; color: var(--muted); margin: 0 0 10px;
+    }
+    pre, code {
+      font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+    }
+    pre {
+      background: #18181b; color: #e4e4e7;
+      padding: 14px 16px; border-radius: 10px;
+      overflow: auto; font-size: 12px; line-height: 1.5;
+      white-space: pre-wrap;
+    }
+    .math {
+      background: var(--paper);
+      border: 1px solid var(--line);
+      border-radius: 12px;
+      padding: 14px 16px;
+      margin: 10px 0 16px;
+    }
+    .math h3 { margin: 0 0 8px; font-size: 15px; }
+    .math p, .math li { font-size: 13px; color: var(--muted); }
+    .eq {
+      display: block;
+      font-family: ui-monospace, Menlo, monospace;
+      background: #f4f4f5;
+      padding: 10px 12px;
+      border-radius: 8px;
+      font-size: 12.5px;
+      margin: 8px 0;
+      color: var(--ink);
+      overflow-x: auto;
+    }
+    table {
+      width: 100%; border-collapse: collapse; font-size: 13px;
+      background: var(--paper); border-radius: 12px; overflow: hidden;
+      border: 1px solid var(--line); margin: 10px 0 18px;
+    }
+    th, td { text-align: left; padding: 8px 10px; border-bottom: 1px solid var(--line); vertical-align: top; }
+    th { font-size: 11px; text-transform: uppercase; letter-spacing: 0.06em; color: var(--muted); background: #fafafa; }
+    details {
+      background: var(--paper); border: 1px solid var(--line);
+      border-radius: 12px; padding: 10px 14px; margin: 8px 0;
+    }
+    details summary { cursor: pointer; font-weight: 600; font-size: 14px; }
+    .prompt-meta { font-size: 12px; color: var(--muted); margin: 6px 0 8px; }
+    @media (max-width: 900px) {
+      .wrap { grid-template-columns: 1fr; }
+      aside.note {
+        position: fixed; left: 0; right: 0; bottom: 0; top: auto;
+        height: auto; max-height: 38vh;
+        border-left: 0; border-top: 1px solid #27272a;
+        z-index: 30;
+      }
+      main { padding-bottom: 42vh; }
+    }
+  </style>
+</head>
+<body>
+  <header class="top">
+    <h1>Last Minute Study — complete system flow</h1>
+    <p>Wireframe of every screen, background AI call, prompt, and algorithm. Hover (or tap) a box — the note panel explains idea and purpose.</p>
+    <nav>
+      <a href="#journey">User journey</a>
+      <a href="#screens">Screens</a>
+      <a href="#ai">AI functions</a>
+      <a href="#algs">Algorithms</a>
+      <a href="#data">Data &amp; storage</a>
+    </nav>
+  </header>
+
+  <div class="wrap">
+    <main>
+      <div class="legend">
+        <span class="chip page">Screen / route</span>
+        <span class="chip ai">AI (InvokeLLM)</span>
+        <span class="chip alg">Algorithm</span>
+        <span class="chip store">Storage / native</span>
+      </div>
+
+      <h2 class="sec" id="journey">1. End-to-end user journey</h2>
+      <p class="lede">One cram is notes → time/type → triage → optional skim → timed blocks → practice test → confidence sheet. Practice and panic notes hang off a saved session. Hover any box.</p>
+
+      <div class="lane" style="margin-bottom:16px">
+        <p class="label">A · First-run setup</p>
+        <div class="flow">
+          <div class="row">
+            <article class="box page" tabindex="0" data-kind="Screen" data-title="Cold start" data-note="If localStorage has neither lms_onboarded_v2 nor an active session, HashRouter / is replaced with /welcome. Purpose: never dump a first-time user on an empty home screen.">
+              <p class="tag">Gate</p>
+              <h3>Onboarding gate</h3>
+              <p class="sub">!onboarded && !session → /welcome</p>
+            </article>
+            <span class="arrow">→</span>
+            <article class="box page" tabindex="0" data-kind="Screen" data-title="Welcome /#/welcome" data-note="Notes-first entry. Three ways in: photo/PDF drop (makePhotoSource), Create terms (manual items), or Use some of ours (sample notes). Sets no session yet — only a source object in router state. Purpose: get material in with one decision.">
+              <p class="tag">#/welcome</p>
+              <h3>Welcome</h3>
+              <p class="sub">Photo · create · sample notes</p>
+            </article>
+          </div>
+          <div class="arrow down">↓</div>
+          <div class="row">
+            <article class="box page" tabindex="0" data-kind="Screen" data-title="Create terms /#/create-notes" data-note="Manual term + definition list. Continue builds source { kind:'manual', items }. Purpose: skip AI generation when the student already has a list.">
+              <p class="tag">#/create-notes</p>
+              <h3>Create terms</h3>
+              <p class="sub">Hand-typed items[]</p>
+            </article>
+            <article class="box page" tabindex="0" data-kind="Screen" data-title="Sample notes /#/upload-notes" data-note="Pick a canned SAMPLE_NOTES pack. Purpose: demo the cram without uploading. Items already have difficulty and depends_on, so triage will skip the generate-terms LLM.">
+              <p class="tag">#/upload-notes</p>
+              <h3>Use some of ours</h3>
+              <p class="sub">SAMPLE_NOTES packs</p>
+            </article>
+            <article class="box page" tabindex="0" data-kind="Screen" data-title="Review notes /#/review-notes" data-note="Edit terms/defs after setup if source.items exist. Purpose: let the student correct OCR-ish or sample wording before triage.">
+              <p class="tag">#/review-notes</p>
+              <h3>Review notes</h3>
+              <p class="sub">Edit items then back to setup</p>
+            </article>
+          </div>
+          <div class="arrow down">↓</div>
+          <div class="row">
+            <article class="box page" tabindex="0" data-kind="Screen" data-title="Time &amp; test type /#/setup" data-note="Collects hours, examType (multiple_choice | short_answer | mixed), examTiming (today | tomorrow | 2days). canStart requires all three. Writes ONBOARDING_FLAG then goes to triage with { source, setup }. Purpose: size the session clock and branch later algorithms (tiers, card mix, passive trim).">
+              <p class="tag">#/setup</p>
+              <h3>How much time?</h3>
+              <p class="sub">hours · exam type · timing</p>
+            </article>
+            <span class="arrow">→</span>
+            <article class="box page" tabindex="0" data-kind="Screen" data-title="Triage /#/triage" data-note="AI (or rankTerms on existing items) fills a 3-column board: Blank / Shaky / Know it. User can drag or Move all. Lock in maps column → confidence and difficulty → study tier, then navigates to /study. Purpose: separate 'how well I know it' from 'how hard/foundational it is'.">
+              <p class="tag">#/triage</p>
+              <h3>Triage board</h3>
+              <p class="sub">Blank · Shaky · Know it</p>
+            </article>
+          </div>
+        </div>
+      </div>
+
+      <div class="lane" style="margin-bottom:16px">
+        <p class="label">B · Cram session (#/study) — persisted every change as lms_session_v1</p>
+        <div class="flow">
+          <div class="row">
+            <article class="box page" tabindex="0" data-kind="Screen" data-title="Notes offer" data-note="New sessions start at phase notes_offer (not critical). Purpose: optional preview of every term+def before flashcards. Skip goes straight to critical recall. Resume uses saved phase so this does not repeat mid-cram.">
+              <p class="tag">phase notes_offer</p>
+              <h3>Skim notes first?</h3>
+              <p class="sub">Skip or skim</p>
+            </article>
+            <span class="arrow">→</span>
+            <article class="box page" tabindex="0" data-kind="Screen" data-title="Notes skim" data-note="Read-only TermDefList of all terms grouped Critical/Core/Passive. Start flashcards → phase critical. Purpose: same idea as Passive skim, but for the whole deck before any grading.">
+              <p class="tag">phase notes_skim</p>
+              <h3>Your notes</h3>
+              <p class="sub">All terms + defs</p>
+            </article>
+            <span class="arrow">→</span>
+            <article class="box page" tabindex="0" data-kind="Screen" data-title="Critical recall" data-note="RecallBlock on tier=critical. Budget 40% of totalMs. Retire after 2 consecutive Got its. Missed cards requeue 3–6 spots later. Purpose: spend the most time on the hardest, most foundational material.">
+              <p class="tag">phase critical</p>
+              <h3>Critical recall</h3>
+              <p class="sub">40% time · retire 2</p>
+            </article>
+          </div>
+          <div class="arrow down">↓</div>
+          <div class="row">
+            <article class="box page" tabindex="0" data-kind="Screen" data-title="Core recall" data-note="Same RecallBlock, tier=core, 30% budget, retire after 1 Got it. Purpose: second-pass coverage without demanding two perfect recalls.">
+              <p class="tag">phase core</p>
+              <h3>Core recall</h3>
+              <p class="sub">30% time · retire 1</p>
+            </article>
+            <span class="arrow">→</span>
+            <article class="box page" tabindex="0" data-kind="Screen" data-title="Passive skim" data-note="Exposure-only list of tier=passive. IntersectionObserver + tap marks seen (mastery floor 0.15 in readiness). If remaining time is tight, behind=true and a warning shows; block still runs. Purpose: cheap coverage of leftovers so the test still happens.">
+              <p class="tag">phase passive</p>
+              <h3>Passive skim</h3>
+              <p class="sub">No grading · seen flag</p>
+            </article>
+            <span class="arrow">→</span>
+            <article class="box page" tabindex="0" data-kind="Screen" data-title="Practice test" data-note="Up to 12 questions, missed-first then Critical→Core→Passive. Mixed alternates MCQ/short. Per-question 30s / 90s plus 15% session cap. Short answers: local exact match, then AI grade. Purpose: exam-shaped check that feeds stillShaky.">
+              <p class="tag">phase test</p>
+              <h3>Practice test</h3>
+              <p class="sub">≤12 Q · 15% time</p>
+            </article>
+          </div>
+          <div class="arrow down">↓</div>
+          <div class="row">
+            <article class="box page" tabindex="0" data-kind="Screen" data-title="Confidence sheet" data-note="Final pass. If examTiming ≠ today and no stopTime, ask sleep time. Then list shaky terms and optional 5-min singlePass drill (retire 1). Done → saveFinishedSession, clearSession, go home. Purpose: lock shaky items and stop introducing new material.">
+              <p class="tag">phase confidence</p>
+              <h3>Confidence sheet</h3>
+              <p class="sub">Shaky drill · 5% / 12 min wind-down</p>
+            </article>
+            <article class="box page" tabindex="0" data-kind="Screen" data-title="Cheat sheet overlay" data-note="Available on question phases: critical, core, test, confidence. Full-screen list of all terms+defs. Timer on the underlying block keeps running. Purpose: peek without leaving the cram; not a substitute for panic notes.">
+              <p class="tag">overlay</p>
+              <h3>Cheat sheet</h3>
+              <p class="sub">All terms while a question is up</p>
+            </article>
+            <article class="box alg" tabindex="0" data-kind="Algorithm" data-title="Wind-down" data-note="If examTiming is not today and now is within 45 minutes of stopTime (HH:MM), SKIP_ON_WIND_DOWN phases (passive, test, their summaries) jump to confidence. Critical/core become a 12-minute shaky-only drill. Purpose: protect sleep / memory consolidation near bedtime.">
+              <p class="tag">background</p>
+              <h3>Wind-down</h3>
+              <p class="sub">now ≥ stop − 45 min</p>
+            </article>
+          </div>
+        </div>
+      </div>
+
+      <div class="lane" style="margin-bottom:16px">
+        <p class="label">C · Always-on exits from a session</p>
+        <div class="row">
+          <article class="box page" tabindex="0" data-kind="Screen" data-title="Landing /#/" data-note="Home after onboarding. Continue → /study (hydrate from lms_session_v1). Start new cram → /welcome. Practice → /practice. Panic notes link if a session exists. Restart cram resets streaks on the finished snapshot. Purpose: one-tap resume, no extra choices.">
+            <p class="tag">#/</p>
+            <h3>Landing</h3>
+            <p class="sub">Continue · practice · new cram</p>
+          </article>
+          <article class="box page" tabindex="0" data-kind="Screen" data-title="Practice hub /#/practice" data-note="Uses active session terms if present, else last finished. Modes: Flashcards (bumpFromPractice, never Mastered), Practice test (same component as cram), Explain it (AI 1–4, only path to Mastered). Purpose: keep studying after the timed cram without a new triage.">
+            <p class="tag">#/practice</p>
+            <h3>Practice hub</h3>
+            <p class="sub">Flashcards · test · explain-it</p>
+          </article>
+          <article class="box page" tabindex="0" data-kind="Screen" data-title="Panic notes /#/panic" data-note="One-page AI summary of Critical+Core, cached by panicSignature. First open generates; signature change shows regenerate. Purpose: out-of-time reading, not another quiz.">
+            <p class="tag">#/panic</p>
+            <h3>Panic notes</h3>
+            <p class="sub">Cached markdown page</p>
+          </article>
+          <article class="box page" tabindex="0" data-kind="Screen" data-title="Settings /#/settings" data-note="Dark mode via next-themes (lms-theme). NativeChrome sets iOS status bar LIGHT (black icons) vs DARK (white icons). Purpose: readability of time/battery on the device chrome.">
+            <p class="tag">#/settings</p>
+            <h3>Settings</h3>
+            <p class="sub">Dark mode · sleep copy</p>
+          </article>
+        </div>
+      </div>
+
+      <h2 class="sec" id="screens">2. Screen inventory</h2>
+      <p class="lede">Every HashRouter route. Hover for purpose.</p>
+      <table>
+        <thead><tr><th>Route</th><th>File</th><th>Idea</th></tr></thead>
+        <tbody>
+          <tr><td>#/</td><td>Landing.jsx</td><td>Home base after first visit</td></tr>
+          <tr><td>#/welcome</td><td>Welcome.jsx</td><td>Get notes in</td></tr>
+          <tr><td>#/setup</td><td>Home.jsx</td><td>Hours, exam type, timing</td></tr>
+          <tr><td>#/create-notes</td><td>CreateNotes.jsx</td><td>Manual deck</td></tr>
+          <tr><td>#/review-notes</td><td>ReviewNotes.jsx</td><td>Edit deck</td></tr>
+          <tr><td>#/upload-notes</td><td>UploadNotes.jsx</td><td>Sample packs</td></tr>
+          <tr><td>#/triage</td><td>Triage.jsx</td><td>Self-rate + AI rank</td></tr>
+          <tr><td>#/study</td><td>StudyFlow.jsx</td><td>Timed cram state machine</td></tr>
+          <tr><td>#/practice</td><td>Practice.jsx</td><td>Untimed mastery work</td></tr>
+          <tr><td>#/panic</td><td>PanicReview.jsx</td><td>Last-minute notes page</td></tr>
+          <tr><td>#/history</td><td>PastSessions.jsx</td><td>Placeholder for finished crams</td></tr>
+          <tr><td>#/settings</td><td>Settings.jsx</td><td>Theme</td></tr>
+        </tbody>
+      </table>
+
+      <h2 class="sec" id="ai">3. Background AI (base44 InvokeLLM)</h2>
+      <p class="lede">Four LLM calls. All go through <code>base44.integrations.Core.InvokeLLM</code>. Hover a box, or expand a prompt for the exact template.</p>
+
+      <div class="row" style="margin-bottom:16px">
+        <article class="box ai" tabindex="0" data-kind="AI" data-title="Triage term generation" data-note="Runs only when source.items is empty (photo/count path). Asks for exactly N≤15 terms with difficulty 1–10 and depends_on graph. Then rankTerms() bins them into Blank/Shaky/Know it. Manual and sample decks skip this call.">
+          <p class="tag">Triage.jsx</p>
+          <h3>1. Generate terms</h3>
+          <p class="sub">When there is no items[] yet</p>
+        </article>
+        <article class="box ai" tabindex="0" data-kind="AI" data-title="Short-answer grader" data-note="Practice test (cram + practice hub). Local exact/substring match runs first and wins if correct. LLM only for paraphrases. JSON { correct, feedback }. If LLM fails, local result or error + self-grade buttons.">
+          <p class="tag">PracticeTest.jsx</p>
+          <h3>2. Grade short answer</h3>
+          <p class="sub">Meaning match, not wording</p>
+        </article>
+        <article class="box ai" tabindex="0" data-kind="AI" data-title="Wrong-answer explainer" data-note="Optional after a missed short answer. 2–3 sentences on why the definition is right. Not used for scoring. Purpose: teach, not re-grade.">
+          <p class="tag">PracticeTest.jsx</p>
+          <h3>3. Explain miss</h3>
+          <p class="sub">Optional 2–3 sentences</p>
+        </article>
+        <article class="box ai" tabindex="0" data-kind="AI" data-title="Explain-it teacher grade" data-note="Only path to Mastered (4). Scores 1–4 on teaching quality. Under 20 characters is forced Guess locally (no LLM). On LLM failure, localExplainLevel keyword ratio (max 3). Purpose: prevent self-award of mastery.">
+          <p class="tag">ExplainIt.jsx</p>
+          <h3>4. Teach-it grade</h3>
+          <p class="sub">Levels 1–4 · Mastered only here</p>
+        </article>
+        <article class="box ai" tabindex="0" data-kind="AI" data-title="Panic notes writer" data-note="One cohesive markdown page from Critical+Core JSON (tier, confidence, missed count, testResult, depends_on). Cached by panicSignature. Purpose: readable cram page when the exam is now.">
+          <p class="tag">PanicReview.jsx</p>
+          <h3>5. Panic notes</h3>
+          <p class="sub">Cached until signature changes</p>
+        </article>
+      </div>
+
+      <details open>
+        <summary>Prompt 1 — Generate triage terms</summary>
+        <p class="prompt-meta">Trigger: <code>source.items</code> empty. <code>count = min(source.terms || 12, 15)</code>. Schema: array of { term, definition, difficulty, depends_on }.</p>
+        <pre>You are building a last-minute study triage for a student about to cram "{sourceTitle}". Generate exactly {count} key terms/concepts a student must know for this exam. For each term provide: term (short name), definition (one concise sentence), difficulty (integer 1-10, 10 = hardest), depends_on (array of OTHER term names from your list that this concept builds upon; foundational concepts others rely on should have empty or few dependencies, advanced concepts should reference foundational ones). Include a healthy mix of foundational and advanced concepts. Return exactly {count} terms.</pre>
+      </details>
+
+      <details>
+        <summary>Prompt 2 — Grade short answer</summary>
+        <p class="prompt-meta">Trigger: student submits a typed answer and localGradeShortAnswer did not already mark it correct. Schema: { correct: boolean, feedback: string }.</p>
+        <pre>You are grading a student's short-answer response for an exam-prep app.
+Term: {q.term}
+Correct definition: {q.definition}
+Student's answer: {shortAnswer}
+
+Mark correct if the student shows the same meaning — ignore case, punctuation, extra words, and wording. If they restated the term or the definition, that is correct. Only mark incorrect when the meaning is wrong.
+Respond with JSON { "correct": boolean, "feedback": "one short sentence" }.</pre>
+      </details>
+
+      <details>
+        <summary>Prompt 3 — Explain a wrong short answer</summary>
+        <p class="prompt-meta">Trigger: student taps Explain after grading. Free-text, not JSON.</p>
+        <pre>A student is studying the term "{q.term}". The correct definition is: "{q.definition}". The student answered: "{shortAnswer}". In 2-3 short sentences, explain the concept clearly so the student understands why the correct definition is the right answer. Focus on helping them understand the correct answer.</pre>
+      </details>
+
+      <details>
+        <summary>Prompt 4 — Explain-it (teach) grade</summary>
+        <p class="prompt-meta">Trigger: explanation length ≥ 20. Schema: { level, points_hit, points_missed, feedback }. Level 4 cannot be awarded for a short paraphrase.</p>
+        <pre>You are grading whether a student can TEACH a concept, not whether they can recite a definition.
+Term: {current.term}
+Correct meaning: {current.definition}
+Related ideas: {depends_on joined, or "none listed"}
+Student explanation:
+{text}
+
+Score 1–4:
+1 Guess — vague, mostly wrong, or just restates the term.
+2 Getting there — some correct ideas, missing important points.
+3 Solid — would help a classmate; a few gaps.
+4 Mastered — teaches it fully: what it is, why it matters, and the key related points, as if explaining to a beginner. Do not give 4 for a short paraphrase of the definition.
+Return JSON { "level": 1-4, "points_hit": ["..."], "points_missed": ["..."], "feedback": "one or two sentences" }.</pre>
+      </details>
+
+      <details>
+        <summary>Prompt 5 — Panic notes page</summary>
+        <p class="prompt-meta">Trigger: Generate / Regenerate. Payload = Critical+Core terms with confidence, missed count, testResult, depends_on. No JSON schema — markdown string.</p>
+        <pre>You are writing last-minute exam cram notes for a student who is out of time. Below is a JSON array of the terms they must know, each with how well they currently know it. Write ONE cohesive page of study NOTES (not flashcards, not a definitions list) meant to be read straight through in a few minutes.
+
+Rules:
+- Open with the concepts they're weakest on (confidence "blank", many "missed", or tested false) — explain each plainly and fully, as if explaining to a friend in one breath. Bold the term name.
+- Then a tighter refresher for "shaky" concepts.
+- End with a one-line "You've got these:" list naming mastered concepts (confidence "know", few misses) — no explanations.
+- Skip any term whose tier is "passive".
+- Plain, casual language. Short paragraphs and bullet groups. No filler, no pep talks.
+- Where depends_on shows a foundation, explain it before the concept that builds on it.
+- Use markdown: "## Know these cold", "## Quick refresh", "## You've got these".
+
+Terms (JSON):
+{payload}</pre>
+      </details>
+
+      <h2 class="sec" id="algs">4. Algorithms — math and execution order</h2>
+      <p class="lede">Deterministic code paths. Hover the header box, then read the execution steps.</p>
+
+      <article class="box alg" tabindex="0" style="margin-bottom:10px" data-kind="Algorithm" data-title="Session clock" data-note="totalMs = max(15 minutes, hours × 3600 × 1000). sessionStart is Date.now() on new cram, or Date.now() − elapsedMs on resume so time away does not count. timeRemainingMs = totalMs − (now − sessionStart). Display via fmtTime.">
+        <h3>Session length</h3>
+        <p class="sub">studyUtils + StudyFlow</p>
+      </article>
+      <div class="math">
+        <span class="eq">totalMs = max(15 × 60 × 1000, hours × 3_600_000)</span>
+        <span class="eq">timeRemainingMs = totalMs − (now − sessionStart)</span>
+        <p>Block budgets (except Passive, which uses exam-type ratio):</p>
+        <span class="eq">critical = 0.40 · totalMs
+core     = 0.30 · totalMs
+passive  = 0.10 · totalMs   (MCQ 0.12, short-answer 0.07)
+test     = 0.15 · totalMs
+confidence = 0.05 · totalMs</span>
+      </div>
+
+      <article class="box alg" tabindex="0" style="margin-bottom:10px" data-kind="Algorithm" data-title="Triage rankTerms" data-note="After AI or canned items exist. Counts how many other terms depend on each term (foundational score). Mixes 60% normalized difficulty + 120% normalized inbound-dependency. Highest scores land in Blank so the student sees 'learn these first'. User can override by dragging.">
+        <h3>Triage ranking (pre-lock-in)</h3>
+        <p class="sub">Triage.jsx · rankTerms</p>
+      </article>
+      <div class="math">
+        <p><strong>Execute</strong></p>
+        <ol>
+          <li>For each term T, <code>depCount[T] =</code> number of other terms whose <code>depends_on</code> lists T’s name.</li>
+          <li><code>maxDiff = max(difficulty)</code>, <code>maxDep = max(depCount)</code> (floored at 1).</li>
+          <li>Score and sort descending:</li>
+        </ol>
+        <span class="eq">priority(T) = (difficulty(T) / maxDiff) × 0.6
+             + (depCount[T] / maxDep) × 1.2</span>
+        <span class="eq">blankEnd = max(1, round(n × 0.35))
+shakyEnd = blankEnd + max(1, round(n × 0.35))</span>
+        <p>Index 0 … blankEnd−1 → Blank; blankEnd … shakyEnd−1 → Shaky; rest → Know it.</p>
+        <p><strong>On Lock in</strong> (two independent axes):</p>
+        <span class="eq">confidence = know_it → "know", else the column id ("blank"|"shaky")
+studyTier  = tierFromDifficulty(difficulty, examType)</span>
+      </div>
+
+      <article class="box alg" tabindex="0" style="margin-bottom:10px" data-kind="Algorithm" data-title="Study tier from difficulty" data-note="Exam type shifts cutoffs. MCQ widens Passive (broad coverage). Short-answer pulls more into Core (depth). Mixed is the default 7/4 split. This is NOT the triage column — it is the study-block assignment.">
+        <h3>tierFromDifficulty</h3>
+        <p class="sub">studyUtils.js</p>
+      </article>
+      <div class="math">
+        <table>
+          <thead><tr><th>examType</th><th>Critical</th><th>Core</th><th>Passive</th></tr></thead>
+          <tbody>
+            <tr><td>MCQ</td><td>d ≥ 8</td><td>d ≥ 5</td><td>else</td></tr>
+            <tr><td>Short answer</td><td>d ≥ 8</td><td>d ≥ 4</td><td>else</td></tr>
+            <tr><td>Mixed (default)</td><td>d ≥ 7</td><td>d ≥ 4</td><td>else</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <article class="box alg" tabindex="0" style="margin-bottom:10px" data-kind="Algorithm" data-title="Priority (in-block order)" data-note="Used to sort cards inside Critical/Core/Passive and the wind-down queue. Higher product = seen first. A blank Critical term scores 3×3=9; a known Passive scores 1×1=1.">
+        <h3>In-session priority</h3>
+        <p class="sub">priority(term)</p>
+      </article>
+      <div class="math">
+        <span class="eq">TIER_WEIGHT  = { critical: 3, core: 2, passive: 1 }
+CONF_WEIGHT  = { blank: 3, shaky: 2, know: 1 }
+priority     = TIER_WEIGHT[tier] × CONF_WEIGHT[confidence]</span>
+      </div>
+
+      <article class="box alg" tabindex="0" style="margin-bottom:10px" data-kind="Algorithm" data-title="Recall card style" data-note="Which UI a flashcard gets, based on exam type and card index i (0-based). Recognition = pick definition among distractors. Free recall = flip then self-grade. Explain = same flip, copy asks for own words.">
+        <h3>Recall card style</h3>
+        <p class="sub">RecallBlock.jsx · cardStyle</p>
+      </article>
+      <div class="math">
+        <span class="eq">MCQ:          i % 4 === 3  → recognition, else free_recall
+Short answer: i % 5 === 4  → explain,      else free_recall
+Mixed:        i % 2 === 1  → recognition, else free_recall</span>
+        <p><strong>Recognition distractors</strong> (pickRecallDistractors): prefer terms sharing a <code>depends_on</code> concept, then same study tier, then any other term. Unique definitions, n=3, then shuffle with the correct def.</p>
+        <p><strong>Got it (multi-pass)</strong>: <code>correctStreak += 1</code>. If streak ≥ retireThreshold (Critical 2, else 1), drop from queue. Else advance; wrap increments round.</p>
+        <p><strong>Missed (multi-pass)</strong>: streak = 0; remove from current index; reinsert at</p>
+        <span class="eq">offset = 3 + floor(random × 4)     // 3, 4, 5, or 6
+insertAt = min(pos + offset, queue.length)</span>
+        <p><strong>singlePass</strong> (confidence 5-min drill): always advance pos; no requeue; retireThreshold 1; finish when pos ≥ length or 5 min.</p>
+        <p>Block also ends if <code>blockBudgetMs</code> elapses (<code>reason: 'time'</code>).</p>
+      </div>
+
+      <article class="box alg" tabindex="0" style="margin-bottom:10px" data-kind="Algorithm" data-title="Passive trim" data-note="After Core, goPassive checks remaining clock vs Passive+test+confidence. Short-answer is stricter (0.8×) so Passive shrinks sooner; MCQ is looser (1.3×). Sets behind=true (warning) but still shows Passive.">
+        <h3>Passive time guard</h3>
+        <p class="sub">StudyFlow.goPassive</p>
+      </article>
+      <div class="math">
+        <span class="eq">remaining = totalMs − (now − sessionStart)
+protected = testBudget + 0.05·totalMs
+passiveB  = totalMs × passiveRatioFor(examType)
+sensitivity = short_answer ? 0.8 : mcq ? 1.3 : 1.0
+
+if remaining &lt; (passiveB + protected) × sensitivity
+    behind ← true</span>
+      </div>
+
+      <article class="box alg" tabindex="0" style="margin-bottom:10px" data-kind="Algorithm" data-title="Practice test construction" data-note="Pick up to 12 terms. Missed (recall miss or unretired critical/core) sort first, then Critical, Core, Passive. Mixed: even index MCQ, odd short. MCQ options = correct def + 3 distractors (same tier first).">
+        <h3>buildQuestions</h3>
+        <p class="sub">PracticeTest.jsx</p>
+      </article>
+      <div class="math">
+        <span class="eq">N = min(terms.length, 12)
+sort key 1: missed ? 0 : 1
+sort key 2: critical=0, core=1, passive=2
+take first N
+
+type = mixed ? (i even → mcq, i odd → short)
+     : multiple_choice → mcq
+     : short</span>
+        <span class="eq">per-question timer:  mcq 30_000 ms · short 90_000 ms
+overall cap:         0.15 · totalMs
+expiry without answer → recorded incorrect, auto-next</span>
+      </div>
+
+      <article class="box alg" tabindex="0" style="margin-bottom:10px" data-kind="Algorithm" data-title="Local short-answer grade" data-note="Runs before the LLM. If it returns correct, AI is skipped. Protects against case/punctuation false negatives and LLM downtime.">
+        <h3>localGradeShortAnswer</h3>
+        <p class="sub">studyUtils.js</p>
+      </article>
+      <div class="math">
+        <span class="eq">normalize(s) = lower(s), strip non-letters/digits to spaces, collapse space
+
+if normalize(student) === normalize(definition) → correct
+if shorter.length ≥ min(4, def.length) AND longer includes shorter → correct
+else → null (fall through to LLM)</span>
+      </div>
+
+      <article class="box alg" tabindex="0" style="margin-bottom:10px" data-kind="Algorithm" data-title="Readiness %" data-note="Header score. Weighted average of per-term mastery by tier weight so missing Critical hurts more. Test results dominate: pass locks 1.0, fail subtracts 0.3. Seen-only Passive still gets a 0.15 floor.">
+        <h3>computeReadiness</h3>
+        <p class="sub">studyUtils.js</p>
+      </article>
+      <div class="math">
+        <span class="eq">rt = retireThreshold(tier)     // 2 if critical else 1
+m  = min(1, correctStreak / rt)
+if seen:            m = max(m, 0.15)
+if testResult true: m = 1
+if testResult false:m = max(0, m − 0.3)
+
+readiness = round( 100 × Σ (TIER_WEIGHT[t] · m_t) / Σ TIER_WEIGHT[t] )</span>
+      </div>
+
+      <article class="box alg" tabindex="0" style="margin-bottom:10px" data-kind="Algorithm" data-title="Shaky set" data-note="Union used for wind-down queue and confidence sheet. stillShaky comes from practice-test misses.">
+        <h3>isTermShaky</h3>
+        <p class="sub">studyUtils.js</p>
+      </article>
+      <div class="math">
+        <p>True if any of:</p>
+        <ul>
+          <li>id ∈ stillShaky (missed on the practice test)</li>
+          <li>confidence is blank or shaky</li>
+          <li>any recallHistory result === 'missed'</li>
+          <li>tier is critical/core and correctStreak &lt; retireThreshold</li>
+        </ul>
+      </div>
+
+      <article class="box alg" tabindex="0" style="margin-bottom:10px" data-kind="Algorithm" data-title="Wind-down window" data-note="Same-day exams never wind down (the exam is the cutoff). Non-today exams need a stopTime from ConfidenceSheet.">
+        <h3>withinStopWindow</h3>
+        <p class="sub">studyUtils.js</p>
+      </article>
+      <div class="math">
+        <span class="eq">if examTiming === "today" OR stopTime missing → false
+stop = today at HH:MM from stopTime
+active iff now ≥ stop − 45 × 60 × 1000
+
+WIND_DOWN_BUDGET_MS = 12 × 60 × 1000
+SKIP_ON_WIND_DOWN = passive, passive_summary, test, test_summary
+  → force phase confidence</span>
+      </div>
+
+      <article class="box alg" tabindex="0" style="margin-bottom:10px" data-kind="Algorithm" data-title="Practice mastery pyramid" data-note="0 Not practiced, 1 Guess, 2 Getting there, 3 Solid, 4 Mastered. User taps cannot set 4. Flashcards/tests cap at 3. Explain-it AI can set 4.">
+        <h3>Mastery machine</h3>
+        <p class="sub">mastery.js</p>
+      </article>
+      <div class="math">
+        <p><strong>Infer from a finished cram</strong> (never infers 4):</p>
+        <span class="eq">testResult false OR any missed recall → 1 Guess
+confidence blank → 0
+testResult true OR streak ≥ retireThreshold → 3 Solid
+confidence know → 2
+confidence shaky → 1
+else → 0</span>
+        <p><strong>bumpFromPractice</strong> (flashcards / practice test):</p>
+        <span class="eq">correct:  if now=0 → 2; else min(3, now+1); 4 stays 4
+wrong:    if now=4 → 3; if now=0 → 1; else max(1, now−1)</span>
+        <p><strong>userSetMastery</strong>: allow 0–3 only. Requesting 4 is ignored.</p>
+        <p><strong>sortForPractice</strong>: lowest mastery first, then A–Z.</p>
+        <p><strong>localExplainLevel</strong> (LLM down):</p>
+        <span class="eq">words = definition tokens with length &gt; 3
+ratio = (# of those words found in answer) / |words|
+ratio ≥ 0.7 AND answer has ≥ 12 words → 3
+ratio ≥ 0.4 → 2
+else → 1
+(never 4 locally)</span>
+      </div>
+
+      <article class="box alg" tabindex="0" style="margin-bottom:10px" data-kind="Algorithm" data-title="Panic cache key" data-note="If Critical/Core identity or learning state changes, signature changes and the cream regenerate bar appears. Passive terms are ignored.">
+        <h3>panicSignature</h3>
+        <p class="sub">panicCache.js</p>
+      </article>
+      <div class="math">
+        <span class="eq">for each term where tier ∈ {critical, core}:
+  piece = id|tier|confidence|correctStreak|testResult|recallResultsJoined
+signature = pieces joined by ";;"</span>
+      </div>
+
+      <h2 class="sec" id="data">5. Persistence, native, background</h2>
+      <div class="row">
+        <article class="box store" tabindex="0" data-kind="Storage" data-title="lms_session_v1" data-note="Active cram. Written on every terms/phase/blockStats/stillShaky/behind/stopTime/windDownAcknowledged change. elapsedMs = Date.now()−sessionStart so resume continues the clock without counting time away. Dispatches lms:session for the panic FAB.">
+          <p class="tag">localStorage</p>
+          <h3>lms_session_v1</h3>
+          <p class="sub">In-progress cram</p>
+        </article>
+        <article class="box store" tabindex="0" data-kind="Storage" data-title="lms_finished_v1" data-note="Snapshot when confidence sheet completes. Landing restart and practice hub (if no active session) read this. Terms may already have inferred mastery.">
+          <p class="tag">localStorage</p>
+          <h3>lms_finished_v1</h3>
+          <p class="sub">Last completed cram</p>
+        </article>
+        <article class="box store" tabindex="0" data-kind="Storage" data-title="lms_panic_summary_v1" data-note="{ signature, text, generatedAt }. Stale iff panicSignature(current terms) ≠ stored signature.">
+          <p class="tag">localStorage</p>
+          <h3>lms_panic_summary_v1</h3>
+          <p class="sub">Panic markdown cache</p>
+        </article>
+        <article class="box store" tabindex="0" data-kind="Storage" data-title="lms-theme + NativeChrome" data-note="next-themes storageKey lms-theme. NativeChrome: dark → SystemBarsStyle.Dark (white time/battery), light → Light (black icons). Requires UIViewControllerBasedStatusBarAppearance=true. html.dark { color-scheme: dark }.">
+          <p class="tag">theme + iOS</p>
+          <h3>lms-theme</h3>
+          <p class="sub">Status bar follows app theme</p>
+        </article>
+        <article class="box store" tabindex="0" data-kind="Storage" data-title="lms_onboarded_v2" data-note="Set when setup continues to triage. Landing uses it to skip Welcome on later launches.">
+          <p class="tag">localStorage</p>
+          <h3>lms_onboarded_v2</h3>
+          <p class="sub">Has seen notes-first flow</p>
+        </article>
+        <article class="box store" tabindex="0" data-kind="Native" data-title="Capacitor iOS" data-note="HashRouter inside WKWebView. ios.contentInset never + viewport-fit=cover. CSS pt-safe / pb-safe = max(1.25rem, safe-area-inset + 0.75rem). InvokeLLM still hits Base44 app 6a6155d14517fbb12343f754.">
+          <p class="tag">Capacitor 8</p>
+          <h3>iOS webview</h3>
+          <p class="sub">Edge-to-edge + hosted LLM</p>
+        </article>
+      </div>
+
+      <h2 class="sec">6. StudyFlow phase machine</h2>
+      <pre>notes_offer → notes_skim? → critical → critical_summary → core → core_summary
+    → passive → passive_summary → test → test_summary → confidence → home
+
+Wind-down: if withinStopWindow, skip passive/test (and summaries) → confidence.
+Critical/core while wind-down: queue = shaky terms only, budget 12 min, retire 1.
+
+Cheat sheet button: phases critical | core | test | confidence.</pre>
+    </main>
+
+    <aside class="note" id="note">
+      <p class="kicker" id="note-kicker">Hover a box</p>
+      <div class="kind" id="note-kind" hidden></div>
+      <h2 id="note-title">Idea &amp; purpose</h2>
+      <p id="note-body">Move the pointer over any screen, AI, or algorithm box. This panel shows why it exists and how it fits the cram. On a phone, tap the box.</p>
+    </aside>
+  </div>
+
+  <script>
+    const kindEl = document.getElementById('note-kind');
+    const titleEl = document.getElementById('note-title');
+    const bodyEl = document.getElementById('note-body');
+    const kickerEl = document.getElementById('note-kicker');
+
+    function show(el) {
+      kickerEl.textContent = 'Note';
+      kindEl.hidden = false;
+      kindEl.textContent = el.dataset.kind || 'Item';
+      titleEl.textContent = el.dataset.title || el.querySelector('h3')?.textContent || '';
+      bodyEl.textContent = el.dataset.note || '';
+    }
+
+    document.querySelectorAll('[data-note]').forEach((el) => {
+      el.addEventListener('mouseenter', () => show(el));
+      el.addEventListener('focus', () => show(el));
+      el.addEventListener('click', () => show(el));
+    });
+  </script>
+</body>
+</html>

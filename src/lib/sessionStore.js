@@ -55,3 +55,21 @@ export function saveFinishedSession(data) {
     // ignore
   }
 }
+
+// Practice uses the in-progress cram if one exists, otherwise the last finished set.
+export function loadPracticeSource() {
+  const active = loadSession();
+  if (active?.terms?.length) return { kind: 'active', session: active };
+  const finished = loadFinishedSession();
+  if (finished?.terms?.length) return { kind: 'finished', session: finished };
+  return null;
+}
+
+export function savePracticeTerms(source, terms) {
+  if (!source?.session) return;
+  if (source.kind === 'active') {
+    saveSession({ ...source.session, terms });
+  } else {
+    saveFinishedSession({ ...source.session, terms });
+  }
+}

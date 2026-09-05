@@ -6,11 +6,11 @@ import { fmtTime } from '@/lib/studyUtils';
 
 export default function StudyHeader({ readiness, timeRemainingMs, blockLabel }) {
   return (
-    <header className="px-5 pt-[max(1.5rem,env(safe-area-inset-top))] pb-3 flex items-center gap-3 border-b border-border bg-card/90 backdrop-blur sticky top-0 z-20">
+    <header className="px-5 pt-safe pb-3 flex items-center gap-3 border-b border-border bg-card/90 backdrop-blur sticky top-0 z-20 shrink-0">
       <Link
         to="/"
         aria-label="Home"
-        className="flex items-center justify-center w-8 h-8 rounded-lg bg-slate-900 text-white shrink-0 hover:bg-slate-800 transition"
+        className="flex items-center justify-center w-11 h-11 rounded-xl bg-primary text-primary-foreground shrink-0 hover:bg-primary/90 transition"
       >
         <Home className="w-4 h-4" />
       </Link>
@@ -23,10 +23,10 @@ export default function StudyHeader({ readiness, timeRemainingMs, blockLabel }) 
           <PopoverTrigger asChild>
             <button
               type="button"
-              className="flex items-center gap-1.5 focus:outline-none cursor-pointer"
+              className="flex items-center justify-center min-h-11 min-w-11 gap-1.5 -mr-1.5 focus:outline-none cursor-pointer"
               aria-label="What does readiness mean?"
             >
-              <Brain className="w-3.5 h-3.5 text-emerald-600" />
+              <Brain className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400" />
               <span className="text-sm font-bold">{readiness}%</span>
               <span className="hidden sm:inline text-[10px] text-muted-foreground">ready</span>
             </button>

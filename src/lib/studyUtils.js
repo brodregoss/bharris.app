@@ -55,7 +55,9 @@ export function confidenceFromTriage(t) {
 }
 
 export function priority(term) {
-  return TIER_WEIGHT[term.tier] * CONF_WEIGHT[term.confidence];
+  const tw = TIER_WEIGHT[term?.tier] || 0;
+  const cw = CONF_WEIGHT[term?.confidence] || 0;
+  return tw * cw;
 }
 
 export function retireThresholdForTier(tier) {
@@ -78,7 +80,7 @@ export function computeReadiness(terms) {
   let num = 0;
   let den = 0;
   terms.forEach((t) => {
-    const w = TIER_WEIGHT[t.tier];
+    const w = TIER_WEIGHT[t.tier] || 0;
     num += w * termMastery(t);
     den += w;
   });

@@ -52,11 +52,17 @@ export default function RecallBlock({
   onUpdateTerm,
   onLogAttempt,
   onDone,
+  onOpenCheat,
 }) {
   const { logEvent } = useDebug() || {};
   const byId = React.useMemo(() => Object.fromEntries(terms.map((t) => [t.id, t])), [terms]);
+  const idsKey = terms.map((t) => t.id).filter((id) => id != null && id !== '').join('|');
 
-  const [st, setSt] = React.useState({ queue: terms.map((t) => t.id), pos: 0, round: 1 });
+  const [st, setSt] = React.useState(() => ({
+    queue: terms.map((t) => t.id).filter((id) => id != null && id !== ''),
+    pos: 0,
+    round: 1,
+  }));
   const [revealed, setRevealed] = React.useState(false);
   const [timeLeftMs, setTimeLeftMs] = React.useState(blockBudgetMs);
   const [gotCount, setGotCount] = React.useState(0);
@@ -64,6 +70,8 @@ export default function RecallBlock({
   const [recogOptions, setRecogOptions] = React.useState(null);
   const gotRef = React.useRef(0);
   const doneRef = React.useRef(false);
+  const idsKeyRef = React.useRef(idsKey);
+  const skipFinishRef = React.useRef(false);
 
   const finish = React.useCallback(
     (reason) => {
@@ -73,6 +81,19 @@ export default function RecallBlock({
     },
     [onDone, terms.length]
   );
+
+  // New term set (empty Critical → Core, resume, etc.) — don't keep the old empty queue.
+  React.useLayoutEffect(() => {
+    if (idsKeyRef.current === idsKey) return;
+    idsKeyRef.current = idsKey;
+    const ids = terms.map((t) => t.id).filter((id) => id != null && id !== '');
+    doneRef.current = false;
+    gotRef.current = 0;
+    skipFinishRef.current = true;
+    setGotCount(0);
+    setSt({ queue: ids, pos: 0, round: 1 });
+    setTimeLeftMs(blockBudgetMs);
+  }, [idsKey, terms, blockBudgetMs]);
 
   // Block countdown — ends block on time budget exhausted.
   React.useEffect(() => {
@@ -88,15 +109,16 @@ export default function RecallBlock({
     return () => clearInterval(iv);
   }, [blockBudgetMs, finish]);
 
-  // Non-singlePass: block ends when every term has retired.
-  React.useEffect(() => {
+  // Finish as soon as the queue is empty so we never sit on "Wrapping up…"
+  React.useLayoutEffect(() => {
+    if (skipFinishRef.current) {
+      skipFinishRef.current = false;
+      return;
+    }
+    if (doneRef.current) return;
     if (!singlePass && st.queue.length === 0) finish('retired');
-  }, [st.queue.length, singlePass, finish]);
-
-  // SinglePass: block ends after one clean pass.
-  React.useEffect(() => {
-    if (singlePass && st.pos >= st.queue.length) finish('pass');
-  }, [st.pos, st.queue.length, singlePass, finish]);
+    else if (singlePass && st.pos >= st.queue.length) finish('pass');
+  }, [st.queue.length, st.pos, singlePass, finish]);
 
   const currentId = st.queue[st.pos];
   const current = currentId != null ? byId[currentId] : null;
@@ -119,7 +141,7 @@ export default function RecallBlock({
 
   if (!current) {
     return (
-      <div className="flex-1 flex items-center justify-center">
+      <div className="flex items-center justify-center px-8 py-16">
         <p className="text-sm text-muted-foreground">Wrapping up…</p>
       </div>
     );
@@ -192,7 +214,7 @@ export default function RecallBlock({
       <div className="flex-1 flex flex-col items-center justify-center">
         <div className="w-full max-w-md rounded-3xl border border-border bg-card p-8 shadow-sm text-center min-h-[280px] flex flex-col items-center justify-center">
           <p className="text-[11px] uppercase tracking-wide text-muted-foreground mb-3">{promptLabel}</p>
-          <p className="text-2xl font-bold tracking-tight">{current.term}</p>
+          <p className="text-3xl font-bold tracking-tight">{current.term}</p>
 
           {style === 'recognition' ? (
             <div className="mt-5 w-full space-y-2 text-left">
@@ -203,14 +225,14 @@ export default function RecallBlock({
                   <button
                     key={i}
                     onClick={() => !recogSelected && setRecogSelected(opt)}
-                    className={`w-full text-left rounded-xl border px-4 py-3 text-sm transition ${
+                    className={`w-full text-left rounded-xl border px-4 py-3 text-lg leading-relaxed transition ${
                       recogSelected
                         ? isCorrect
-                          ? 'border-emerald-400 bg-emerald-50'
+                          ? 'border-emerald-500 bg-emerald-50 text-emerald-950 dark:bg-emerald-500/20 dark:text-emerald-100'
                           : selected
-                          ? 'border-rose-400 bg-rose-50'
+                          ? 'border-rose-500 bg-rose-50 text-rose-950 dark:bg-rose-500/20 dark:text-rose-100'
                           : 'border-border'
-                        : 'border-border hover:border-slate-400 bg-card'
+                        : 'border-border hover:border-muted-foreground bg-card'
                     }`}
                   >
                     {opt}
@@ -219,7 +241,7 @@ export default function RecallBlock({
               })}
             </div>
           ) : revealed ? (
-            <p className="mt-5 text-sm text-muted-foreground leading-relaxed">{current.definition}</p>
+            <p className="mt-5 text-lg text-muted-foreground leading-relaxed">{current.definition}</p>
           ) : (
             <p className="mt-5 text-xs text-muted-foreground">
               {style === 'explain'
@@ -234,7 +256,7 @@ export default function RecallBlock({
             recogSelected ? (
               <Button
                 onClick={() => (recogSelected === current.definition ? handleGot() : handleMissed())}
-                className="w-full h-12 rounded-2xl bg-slate-900 hover:bg-slate-800 text-white font-semibold"
+                className="w-full h-12 rounded-2xl font-semibold"
               >
                 Continue
                 <ArrowRight className="w-4 h-4 ml-2" />
@@ -247,7 +269,7 @@ export default function RecallBlock({
           ) : !revealed ? (
             <Button
               onClick={() => setRevealed(true)}
-              className="w-full h-12 rounded-2xl bg-slate-900 hover:bg-slate-800 text-white font-semibold"
+              className="w-full h-12 rounded-2xl font-semibold"
             >
               <Eye className="w-4 h-4 mr-2" /> Show answer
             </Button>
@@ -255,14 +277,15 @@ export default function RecallBlock({
             <div className="grid grid-cols-2 gap-3">
               <Button
                 onClick={handleMissed}
-                variant="outline"
-                className="h-12 rounded-2xl border-rose-300 text-rose-600 hover:bg-rose-50 font-semibold"
+                variant="destructive"
+                className="h-12 rounded-2xl font-semibold"
               >
                 <X className="w-4 h-4 mr-2" /> Missed
               </Button>
               <Button
                 onClick={handleGot}
-                className="h-12 rounded-2xl bg-emerald-600 hover:bg-emerald-700 text-white font-semibold"
+                variant="success"
+                className="h-12 rounded-2xl font-semibold"
               >
                 <Check className="w-4 h-4 mr-2" /> Got it
               </Button>
@@ -274,6 +297,15 @@ export default function RecallBlock({
             ? `${Math.min(st.pos + 1, st.queue.length)}/${st.queue.length} seen`
             : `${gotCount} retired · ${st.queue.length} in rotation`}
         </p>
+        {onOpenCheat && (
+          <button
+            type="button"
+            onClick={onOpenCheat}
+            className="mt-1 text-xs text-muted-foreground hover:text-foreground underline-offset-4 hover:underline"
+          >
+            Cheat sheet
+          </button>
+        )}
       </div>
     </div>
   );

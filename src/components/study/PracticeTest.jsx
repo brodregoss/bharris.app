@@ -1,7 +1,7 @@
 import React from 'react';
 import { Button } from '@/components/ui/button';
 import { Check, X, Timer, RotateCcw, ArrowRight, Loader2 } from 'lucide-react';
-import { base44 } from '@/api/base44Client';
+import { invokeLlm } from '@/api/invokeLlm';
 import { fmtTime, localGradeShortAnswer, parseGradeResponse } from '@/lib/studyUtils';
 
 function shuffle(a) {
@@ -124,7 +124,7 @@ export default function PracticeTest({ terms, examType, budgetMs, priorMissed, o
       return;
     }
     try {
-      const res = await base44.integrations.Core.InvokeLLM({
+      const res = await invokeLlm({
         prompt:
           `You are grading a student's short-answer response for an exam-prep app.\n` +
           `Term: ${q.term}\nCorrect definition: ${q.definition}\nStudent's answer: ${shortAnswer}\n\n` +
@@ -151,7 +151,7 @@ export default function PracticeTest({ terms, examType, budgetMs, priorMissed, o
   const explain = async () => {
     setExplaining(true);
     try {
-      const res = await base44.integrations.Core.InvokeLLM({
+      const res = await invokeLlm({
         prompt:
           `A student is studying the term "${q.term}". The correct definition is: "${q.definition}". ` +
           `The student answered: "${shortAnswer}". ` +
@@ -262,7 +262,7 @@ export default function PracticeTest({ terms, examType, budgetMs, priorMissed, o
           </Button>
           <Button
             onClick={() => onDone({ missedIds, questionIds })}
-            className="h-12 rounded-2xl bg-slate-900 hover:bg-slate-800 text-white font-semibold"
+            className="h-12 rounded-2xl font-semibold"
           >
             Continue
             <ArrowRight className="w-4 h-4 ml-2" />
@@ -292,7 +292,7 @@ export default function PracticeTest({ terms, examType, budgetMs, priorMissed, o
           <p className="text-[11px] uppercase tracking-wide text-muted-foreground mb-2">
             {q.type === 'mcq' ? 'Multiple choice' : 'Short answer'} · <span className="capitalize">{q.tier}</span>
           </p>
-          <p className="text-xl font-bold tracking-tight">{q.term}</p>
+          <p className="text-3xl font-bold tracking-tight">{q.term}</p>
           {q.type === 'mcq' ? (
             <div className="mt-4 space-y-2">
               {q.options.map((opt, i) => {
@@ -302,14 +302,14 @@ export default function PracticeTest({ terms, examType, budgetMs, priorMissed, o
                   <button
                     key={i}
                     onClick={() => !answered && record(q.id, { selected: opt, correct: isCorrect })}
-                    className={`w-full text-left rounded-xl border px-4 py-3 text-sm transition ${
+                    className={`w-full text-left rounded-xl border px-4 py-3 text-lg leading-relaxed transition ${
                       answered
                         ? isCorrect
-                          ? 'border-emerald-400 bg-emerald-50'
+                          ? 'border-emerald-500 bg-emerald-50 text-emerald-950 dark:bg-emerald-500/20 dark:text-emerald-100'
                           : selected
-                          ? 'border-rose-400 bg-rose-50'
+                          ? 'border-rose-500 bg-rose-50 text-rose-950 dark:bg-rose-500/20 dark:text-rose-100'
                           : 'border-border'
-                        : 'border-border hover:border-slate-400 bg-card'
+                        : 'border-border hover:border-muted-foreground bg-card'
                     }`}
                   >
                     {opt}
@@ -335,11 +335,11 @@ export default function PracticeTest({ terms, examType, budgetMs, priorMissed, o
                     <div
                       className={`rounded-xl p-3 text-sm ${
                         gradeResult.correct
-                          ? 'bg-emerald-50 border border-emerald-300'
-                          : 'bg-rose-50 border border-rose-300'
+                          ? 'bg-emerald-50 border border-emerald-300 text-emerald-950 dark:bg-emerald-500/15 dark:border-emerald-500 dark:text-emerald-100'
+                          : 'bg-rose-50 border border-rose-300 text-rose-950 dark:bg-rose-500/15 dark:border-rose-500 dark:text-rose-100'
                       }`}
                     >
-                      <p className={`font-semibold ${gradeResult.correct ? 'text-emerald-700' : 'text-rose-700'}`}>
+                      <p className={`font-semibold ${gradeResult.correct ? 'text-emerald-700 dark:text-emerald-300' : 'text-rose-700 dark:text-rose-300'}`}>
                         {gradeResult.correct ? 'Got it' : 'Missed'}
                       </p>
                       {gradeResult.feedback && (
@@ -347,7 +347,7 @@ export default function PracticeTest({ terms, examType, budgetMs, priorMissed, o
                       )}
                     </div>
                   )}
-                  <div className="rounded-xl bg-muted p-3 text-sm">
+                  <div className="rounded-xl bg-muted p-3 text-lg leading-relaxed">
                     <p className="text-[11px] uppercase tracking-wide text-muted-foreground">Correct answer</p>
                     <p className="mt-1">{q.definition}</p>
                   </div>
@@ -358,7 +358,7 @@ export default function PracticeTest({ terms, examType, budgetMs, priorMissed, o
                           type="button"
                           onClick={explain}
                           disabled={explaining}
-                          className="text-xs text-slate-500 hover:text-slate-700 underline font-medium disabled:opacity-60"
+                          className="text-xs text-muted-foreground hover:text-foreground underline font-medium disabled:opacity-60"
                         >
                           {explaining ? 'Explaining…' : 'Explain'}
                         </button>
@@ -367,7 +367,7 @@ export default function PracticeTest({ terms, examType, budgetMs, priorMissed, o
                         <button
                           type="button"
                           onClick={markIWasRight}
-                          className="text-xs text-emerald-700 hover:text-emerald-800 underline font-medium"
+                          className="text-xs text-emerald-700 dark:text-emerald-300 hover:text-emerald-800 dark:hover:text-emerald-200 underline font-medium"
                         >
                           I was right
                         </button>
@@ -387,7 +387,7 @@ export default function PracticeTest({ terms, examType, budgetMs, priorMissed, o
             <Button
               disabled={!answered}
               onClick={next}
-              className="w-full h-12 rounded-2xl bg-slate-900 hover:bg-slate-800 text-white font-semibold"
+              className="w-full h-12 rounded-2xl font-semibold"
             >
               Next
               <ArrowRight className="w-4 h-4 ml-2" />
@@ -396,7 +396,7 @@ export default function PracticeTest({ terms, examType, budgetMs, priorMissed, o
             <Button
               onClick={gradeWithAI}
               disabled={!shortAnswer.trim()}
-              className="w-full h-12 rounded-2xl bg-slate-900 hover:bg-slate-800 text-white font-semibold"
+              className="w-full h-12 rounded-2xl font-semibold"
             >
               Grade answer
             </Button>
@@ -410,7 +410,7 @@ export default function PracticeTest({ terms, examType, budgetMs, priorMissed, o
           ) : gradeResult ? (
             <Button
               onClick={next}
-              className="w-full h-12 rounded-2xl bg-slate-900 hover:bg-slate-800 text-white font-semibold"
+              className="w-full h-12 rounded-2xl font-semibold"
             >
               Next
               <ArrowRight className="w-4 h-4 ml-2" />
@@ -418,21 +418,22 @@ export default function PracticeTest({ terms, examType, budgetMs, priorMissed, o
           ) : (
             <div className="grid grid-cols-2 gap-3">
               <Button
-                variant="outline"
+                variant="destructive"
                 onClick={() => {
                   record(q.id, { correct: false });
                   next();
                 }}
-                className="h-12 rounded-2xl border-rose-300 text-rose-600 hover:bg-rose-50 font-semibold"
+                className="h-12 rounded-2xl font-semibold"
               >
                 <X className="w-4 h-4 mr-2" /> Missed
               </Button>
               <Button
+                variant="success"
                 onClick={() => {
                   record(q.id, { correct: true });
                   next();
                 }}
-                className="h-12 rounded-2xl bg-emerald-600 hover:bg-emerald-700 text-white font-semibold"
+                className="h-12 rounded-2xl font-semibold"
               >
                 <Check className="w-4 h-4 mr-2" /> Got it
               </Button>

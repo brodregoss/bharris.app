@@ -2,13 +2,14 @@
 
 A last-minute exam cram app. Develop locally in Cursor; source code lives on GitHub.
 
-AI features (term generation, panic notes, answer grading) still use **Base44 InvokeLLM** via your hosted Base44 app backend. Everything else runs as a normal Vite + React app.
+AI features (term generation, panic notes, answer grading) use **OpenAI** through a small server so the secret key is never inside the iPhone app. Friends can beta test without pasting a key.
 
 ## Prerequisites
 
 - Node.js 20+
 - A GitHub account
-- A Base44 app (for AI credits only) — you need the app ID and backend URL
+- An OpenAI API key (restricted to List models + Model capabilities)
+- A free [Vercel](https://vercel.com) account (so friends can use AI without your key sitting in the app)
 
 ## First-time setup
 
@@ -19,20 +20,13 @@ AI features (term generation, panic notes, answer grading) still use **Base44 In
 npm install
 ```
 
-3. Copy the environment template and add your Base44 app credentials:
+3. Copy the environment template and add your **server** OpenAI key:
 
 ```bash
 cp .env.local.example .env.local
 ```
 
-Edit `.env.local`:
-
-```bash
-VITE_BASE44_APP_ID=your_app_id
-VITE_BASE44_APP_BASE_URL=https://your-app.base44.app
-```
-
-Find these in your [Base44 app dashboard](https://app.base44.com) — use the deployed app URL for `VITE_BASE44_APP_BASE_URL`.
+In `.env.local` set `OPENAI_API_KEY` (no `VITE_` prefix). That file is gitignored. Do not put the key in any `src/` file — `npm run ios:sync` would copy it into GitHub.
 
 4. Start the dev server:
 
@@ -40,7 +34,26 @@ Find these in your [Base44 app dashboard](https://app.base44.com) — use the de
 npm run dev
 ```
 
-Open the local URL Vite prints (usually `http://localhost:5173`).
+Open the local URL Vite prints (usually `http://localhost:5173`). AI calls go to `/api/llm` on your machine.
+
+## Share with friends (beta)
+
+Do **not** put the OpenAI key in the iPhone project. Put it on Vercel once. You pay for their usage, so set a **monthly budget** on the OpenAI project first.
+
+1. Push this repo to GitHub.
+2. Go to [vercel.com](https://vercel.com), import the GitHub repo, and deploy.
+3. In Vercel → Project → Settings → Environment Variables, add `OPENAI_API_KEY` with your key. Redeploy.
+4. Copy the deployment URL, then in `.env.local` set:
+
+```bash
+VITE_LLM_PROXY_URL=https://YOUR-APP.vercel.app/api/llm
+```
+
+5. Run `npm run ios:sync` and rebuild in Xcode. The iPhone app now calls that URL. Testers do not paste a key.
+
+Easiest way to share: send friends the Vercel website link. Sharing the Xcode app requires each person to build with their Apple ID (or a paid TestFlight account).
+
+A personal key in **Settings** is optional and only needed if someone wants to use their own OpenAI account.
 
 ## Run in Xcode (this is the app)
 
@@ -94,20 +107,16 @@ git push -u origin main
 
 After that, use normal git workflow from Cursor: commit and push when you save changes.
 
-## What still uses Base44
+## What uses OpenAI
 
-| Feature | Base44 dependency |
-|---------|-------------------|
-| Term triage (AI) | `InvokeLLM` |
-| Panic review notes (AI) | `InvokeLLM` |
-| Practice test grading (AI) | `InvokeLLM` |
+| Feature | How |
+|---------|-----|
+| Term triage (AI) | OpenAI (`gpt-4o-mini`) |
+| Panic review notes (AI) | OpenAI (`gpt-4o-mini`) |
+| Practice test grading (AI) | OpenAI (`gpt-4o-mini`) |
 | Study sessions, settings, UI | Local only (`localStorage`) |
 
-The SDK client is in `src/api/base44Client.js`. AI calls are in `Triage.jsx`, `PanicReview.jsx`, and `PracticeTest.jsx`.
-
-## Migrating off Base44 AI later
-
-When your Base44 credits run out, replace `base44.integrations.Core.InvokeLLM` in those three files with your own LLM API (OpenAI, Anthropic, etc.), then remove `@base44/sdk`, `@base44/vite-plugin`, and the env vars.
+The shared server is `api/llm.js` (Vercel) and `server/openaiLlm.js`. The iPhone app only stores the public `VITE_LLM_PROXY_URL`. A personal key in Settings is optional.
 
 ## Scripts
 
@@ -124,4 +133,4 @@ The built-in **Bill of Rights** notes are under **use some of ours** on the welc
 
 ## Deploying
 
-Build the static site with `npm run build` and deploy the `dist/` folder to any host (Vercel, Netlify, Cloudflare Pages, etc.). Set the same `VITE_BASE44_*` env vars in your host's dashboard so AI features keep working in production.
+Build the static site with `npm run build` and deploy to Vercel so `/api/llm` is included. Set `OPENAI_API_KEY` in the Vercel dashboard, not as a `VITE_*` variable.

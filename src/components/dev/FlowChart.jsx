@@ -3,6 +3,8 @@ import { Check, Circle, Loader2 } from 'lucide-react';
 
 // Ordered study phases — matches StudyFlow.jsx phase machine.
 const PHASES = [
+  { id: 'notes_offer', label: 'Skim notes?', group: 'Start' },
+  { id: 'notes_skim', label: 'Notes skim', group: 'Start' },
   { id: 'critical', label: 'Critical recall', group: 'Block A' },
   { id: 'critical_summary', label: 'Critical summary', group: 'Block A' },
   { id: 'core', label: 'Core recall', group: 'Block B' },
@@ -28,10 +30,10 @@ export default function FlowChart({ currentStep }) {
         return (
           <React.Fragment key={phase.id}>
             {showGroup && i > 0 && (
-              <div className="ml-[15px] border-l-2 border-dashed border-slate-200 h-3" />
+              <div className="ml-[15px] border-l-2 border-dashed border-border h-3" />
             )}
             {showGroup && (
-              <div className="text-[10px] font-bold uppercase tracking-wide text-slate-400 mb-1 ml-1">
+              <div className="text-[10px] font-bold uppercase tracking-wide text-muted-foreground mb-1 ml-1">
                 {phase.group}
               </div>
             )}
@@ -40,17 +42,17 @@ export default function FlowChart({ currentStep }) {
               {i > 0 && !showGroup && (
                 <div
                   className={`absolute left-[15px] -top-[14px] w-0.5 h-3.5 ${
-                    isPast ? 'bg-emerald-400' : 'bg-slate-200'
+                    isPast ? 'bg-emerald-400' : 'bg-border'
                   }`}
                 />
               )}
               <div
                 className={`relative z-10 w-8 h-8 rounded-full flex items-center justify-center shrink-0 border-2 transition ${
                   isCurrent
-                    ? 'bg-slate-900 border-slate-900 text-white'
+                    ? 'bg-primary border-primary text-primary-foreground'
                     : isPast
                     ? 'bg-emerald-500 border-emerald-500 text-white'
-                    : 'bg-white border-slate-200 text-slate-300'
+                    : 'bg-card border-border text-muted-foreground'
                 }`}
               >
                 {isCurrent ? (
@@ -65,16 +67,16 @@ export default function FlowChart({ currentStep }) {
                 <span
                   className={`text-xs font-medium ${
                     isCurrent
-                      ? 'text-slate-900'
+                      ? 'text-foreground'
                       : isPast
-                      ? 'text-slate-500'
-                      : 'text-slate-300'
+                      ? 'text-muted-foreground'
+                      : 'text-muted-foreground/50'
                   }`}
                 >
                   {phase.label}
                 </span>
                 {isCurrent && (
-                  <span className="ml-2 text-[10px] font-bold uppercase tracking-wide text-slate-900 bg-slate-100 px-1.5 py-0.5 rounded">
+                  <span className="ml-2 text-[10px] font-bold uppercase tracking-wide text-foreground bg-muted px-1.5 py-0.5 rounded">
                     Here
                   </span>
                 )}

@@ -16,6 +16,7 @@ export default function ConfidenceSheet({
   onDone,
   stopTime,
   onSetStopTime,
+  onOpenCheat,
 }) {
   // shaky = (critical/core never fully retired) ∪ (stillShaky from practice test).
   const shakyTerms = React.useMemo(() => {
@@ -48,7 +49,7 @@ export default function ConfidenceSheet({
           <Button
             disabled={!stopTime}
             onClick={() => setEditingStop(false)}
-            className="h-12 px-8 rounded-2xl bg-slate-900 hover:bg-slate-800 text-white font-semibold"
+            className="h-12 px-8 rounded-2xl font-semibold"
           >
             Set stop time
           </Button>
@@ -60,6 +61,7 @@ export default function ConfidenceSheet({
   if (view === 'drill') {
     return (
       <RecallBlock
+        key="confidence-drill"
         terms={shakyTerms}
         singlePass
         retireThreshold={1}
@@ -67,6 +69,7 @@ export default function ConfidenceSheet({
         blockLabel="5-min drill"
         onUpdateTerm={onUpdateTerm}
         onLogAttempt={onLogAttempt}
+        onOpenCheat={onOpenCheat}
         onDone={() => setView('final')}
       />
     );
@@ -81,8 +84,8 @@ export default function ConfidenceSheet({
     return (
       <div className="flex-1 flex flex-col px-5 pt-4 overflow-y-auto">
         <div className="max-w-md mx-auto w-full flex-1 flex flex-col items-center text-center pt-4">
-          <div className="w-14 h-14 rounded-full bg-emerald-100 flex items-center justify-center mb-5">
-            <CheckCircle2 className="w-7 h-7 text-emerald-600" />
+          <div className="w-14 h-14 rounded-full bg-emerald-100 dark:bg-emerald-500/20 flex items-center justify-center mb-5">
+            <CheckCircle2 className="w-7 h-7 text-emerald-600 dark:text-emerald-400" />
           </div>
           <h2 className="text-2xl font-bold tracking-tight mb-2">{title}</h2>
           <p className="text-sm text-muted-foreground max-w-sm mb-6">{body}</p>
@@ -105,7 +108,7 @@ export default function ConfidenceSheet({
           )}
           <Button
             onClick={onDone}
-            className="w-full h-12 rounded-2xl bg-slate-900 hover:bg-slate-800 text-white font-semibold"
+            className="w-full h-12 rounded-2xl font-semibold"
           >
             Done
           </Button>
@@ -120,7 +123,7 @@ export default function ConfidenceSheet({
       <div className="max-w-md mx-auto w-full flex-1 flex flex-col">
         <div className="flex items-center justify-between mb-1">
           <h2 className="text-xl font-bold tracking-tight">Confidence sheet</h2>
-          <span className="text-sm font-bold text-emerald-600">{readiness}%</span>
+          <span className="text-sm font-bold text-emerald-600 dark:text-emerald-400">{readiness}%</span>
         </div>
         <p className="text-xs text-muted-foreground mb-3">
           {shakyTerms.length} terms still shaky — no new material, just these.
@@ -148,14 +151,14 @@ export default function ConfidenceSheet({
         {shakyTerms.length === 0 ? (
           <Button
             onClick={() => setView('final')}
-            className="w-full h-12 rounded-2xl bg-slate-900 hover:bg-slate-800 text-white font-semibold"
+            className="w-full h-12 rounded-2xl font-semibold"
           >
             Finish up
           </Button>
         ) : (
           <Button
             onClick={() => setView('drill')}
-            className="w-full h-12 rounded-2xl bg-slate-900 hover:bg-slate-800 text-white font-semibold"
+            className="w-full h-12 rounded-2xl font-semibold"
           >
             <Brain className="w-4 h-4 mr-2" /> 5-min drill
           </Button>

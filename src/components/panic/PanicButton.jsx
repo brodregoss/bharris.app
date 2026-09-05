@@ -33,7 +33,7 @@ export default function PanicButton() {
       type="button"
       onClick={() => navigate('/panic')}
       aria-label="Test is now — panic review"
-      className="fixed z-[60] bottom-[max(1.25rem,env(safe-area-inset-bottom))] left-4 flex items-center gap-1.5 rounded-full bg-slate-900 text-white px-3.5 py-2 text-[11px] font-bold shadow-lg opacity-80 hover:opacity-100 transition active:scale-95"
+      className="fixed z-[60] bottom-safe left-4 flex items-center gap-1.5 min-h-11 rounded-full bg-primary text-primary-foreground px-3.5 py-2.5 text-[11px] font-bold shadow-lg opacity-80 hover:opacity-100 transition active:scale-95"
     >
       <Zap className="w-3.5 h-3.5 text-rose-400" />
       Test is now

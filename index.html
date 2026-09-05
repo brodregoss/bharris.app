@@ -8,6 +8,17 @@
     <meta name="apple-mobile-web-app-status-bar-style" content="default" />
     <link rel="manifest" href="/manifest.json" />
     <title>Last Minute Study</title>
+    <script>
+      (function () {
+        try {
+          var t = localStorage.getItem('lms-theme');
+          if (t === 'dark') {
+            document.documentElement.classList.add('dark');
+            document.documentElement.style.colorScheme = 'dark';
+          }
+        } catch (e) {}
+      })();
+    </script>
   </head>
   <body>
     <div id="root"></div>

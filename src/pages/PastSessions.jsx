@@ -10,7 +10,7 @@ export default function PastSessions() {
   const navigate = useNavigate();
   return (
     <div className="min-h-[100dvh] bg-background text-foreground flex flex-col">
-      <header className="flex items-center gap-1 px-3 pt-[max(1.25rem,env(safe-area-inset-top))] pb-2">
+      <header className="flex items-center gap-1 px-3 pt-safe pb-2">
         <Button variant="ghost" size="icon" onClick={() => navigate('/')} aria-label="Back">
           <ArrowLeft className="w-5 h-5" />
         </Button>

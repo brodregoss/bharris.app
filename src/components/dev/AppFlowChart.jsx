@@ -57,6 +57,8 @@ export default function AppFlowChart() {
         <Node title="Time & test type" sub="Hours · exam type · exam timing · term count · back to notes" />
         <Bar />
         <Node title="Triage (AI ranks terms, or uses manual terms)" sub="Difficulty score + depends_on per term" />
+        <Bar />
+        <Node title="Skim notes? (optional)" sub="All terms + defs before flashcards, or skip straight in" />
       </Group>
 
       <Group label="2 · Triage tiers (by exam type)">

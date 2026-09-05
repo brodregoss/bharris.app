@@ -8,7 +8,9 @@ import RecallBlock from '@/components/study/RecallBlock';
 import PassiveSkim from '@/components/study/PassiveSkim';
 import PracticeTest from '@/components/study/PracticeTest';
 import ConfidenceSheet from '@/components/study/ConfidenceSheet';
+import CheatSheet from '@/components/study/CheatSheet';
 import RoadMapDialog from '@/components/study/RoadMapDialog';
+import { NotesOfferPrompt, NotesSkim } from '@/components/study/NotesOffer';
 import {
   priority,
   computeReadiness,
@@ -21,13 +23,29 @@ import {
   BLOCK_BUDGET_RATIO,
 } from '@/lib/studyUtils';
 import { loadSession, saveSession, clearSession, saveFinishedSession } from '@/lib/sessionStore';
+import { withInferredMastery } from '@/lib/mastery';
 import { useDebug } from '@/lib/DebugContext';
 
 function byPriorityDesc(a, b) {
   return priority(b) - priority(a);
 }
 
+function skipEmptyRecallPhase(phase, counts) {
+  if (phase === 'critical' && !counts.critical) {
+    return counts.core ? 'core' : counts.passive ? 'passive' : 'test';
+  }
+  if (phase === 'core' && !counts.core) {
+    return counts.passive ? 'passive' : 'test';
+  }
+  if (phase === 'passive' && !counts.passive) {
+    return 'test';
+  }
+  return phase;
+}
+
 const PHASE_LABELS = {
+  notes_offer: 'Notes offer',
+  notes_skim: 'Notes skim',
   critical: 'Critical block',
   critical_summary: 'Critical summary',
   core: 'Core block',
@@ -43,7 +61,7 @@ const PHASE_LABELS = {
 // active so no new content reaches the user near their stop time.
 const SKIP_ON_WIND_DOWN = ['passive', 'passive_summary', 'test', 'test_summary'];
 
-export default function StudyFlow() {
+function StudyFlow() {
   const location = useLocation();
   const navigate = useNavigate();
   const { terms: rawTerms, setup: incomingSetup, initialPhase: incomingInitialPhase, keepState: incomingKeepState } = location.state || {};
@@ -60,7 +78,7 @@ export default function StudyFlow() {
           testResult: null,
         })),
         setup: incomingSetup,
-        phase: incomingInitialPhase || 'critical',
+        phase: incomingInitialPhase || 'notes_offer',
         blockStats: {},
         stillShaky: [],
         behind: false,
@@ -99,9 +117,14 @@ export default function StudyFlow() {
   const [windDownAcknowledged, setWindDownAcknowledged] = React.useState(
     () => (init ? init.windDownAcknowledged : false)
   );
+  const [cheatOpen, setCheatOpen] = React.useState(false);
   const [now, setNow] = React.useState(Date.now());
 
   const dbg = useDebug();
+  // Close the cheat sheet when leaving a question screen.
+  React.useEffect(() => {
+    setCheatOpen(false);
+  }, [phase]);
   const { reportSession, reportTerms, logEvent, clockOffset } = dbg || {};
   const clockOffsetRef = React.useRef(0);
   React.useEffect(() => {
@@ -209,11 +232,27 @@ export default function StudyFlow() {
     []
   );
 
+  const criticalCount = terms.filter((t) => t.tier === 'critical').length;
+  const coreCount = terms.filter((t) => t.tier === 'core').length;
+  const passiveCount = terms.filter((t) => t.tier === 'passive').length;
+  const tierCounts = React.useMemo(
+    () => ({ critical: criticalCount, core: coreCount, passive: passiveCount }),
+    [criticalCount, coreCount, passiveCount]
+  );
+  const startRecall = React.useCallback(() => {
+    setPhase(skipEmptyRecallPhase('critical', tierCounts));
+  }, [tierCounts]);
+  React.useLayoutEffect(() => {
+    if (!init || windDown) return;
+    const next = skipEmptyRecallPhase(phase, tierCounts);
+    if (next !== phase) setPhase(next);
+  }, [init, phase, windDown, tierCounts]);
+
   if (!init) {
     return (
       <div className="min-h-[100dvh] flex flex-col items-center justify-center px-8 text-center">
         <p className="text-sm text-muted-foreground mb-4">No study session found.</p>
-        <Button onClick={() => navigate('/')} className="rounded-2xl bg-slate-900 text-white">
+        <Button onClick={() => navigate('/')} className="rounded-2xl">
           Back to start
         </Button>
       </div>
@@ -250,17 +289,32 @@ export default function StudyFlow() {
       setBehind(true);
       logEvent?.('Passive trimmed due to time budget', { remainingMs: remaining });
     }
-    setPhase('passive');
+    setPhase(passiveCount ? 'passive' : 'test');
   };
 
   let blockLabel = 'Study session';
   let content = null;
+  const openCheat = () => setCheatOpen(true);
 
   switch (phase) {
+    case 'notes_offer':
+      blockLabel = 'Before you start';
+      content = (
+        <NotesOfferPrompt
+          onSkim={() => setPhase('notes_skim')}
+          onSkip={startRecall}
+        />
+      );
+      break;
+    case 'notes_skim':
+      blockLabel = 'Your notes';
+      content = <NotesSkim terms={terms} onDone={startRecall} />;
+      break;
     case 'critical':
       blockLabel = windDown ? 'Wind-down drill' : 'Critical recall';
       content = (
         <RecallBlock
+          key={windDown ? 'wind-down' : 'critical'}
           terms={windDown ? windDownTerms : criticalTerms}
           retireThreshold={windDown ? 1 : 2}
           blockBudgetMs={windDown ? WIND_DOWN_BUDGET_MS : criticalBudget}
@@ -268,6 +322,7 @@ export default function StudyFlow() {
           examType={setup?.examType || 'mixed'}
           onUpdateTerm={updateTerm}
           onLogAttempt={logAttempt}
+          onOpenCheat={openCheat}
           onDone={(s) => {
             setBlockStats((b) => ({ ...b, critical: s }));
             setPhase(windDown ? 'confidence' : 'critical_summary');
@@ -282,7 +337,7 @@ export default function StudyFlow() {
           message={`Nice, you got ${blockStats.critical?.got || 0} of ${
             blockStats.critical?.total || 0
           } Critical terms. Now let's hit Core — should take about ${Math.round(coreBudget / 60000)} minutes.`}
-          onContinue={() => setPhase('core')}
+          onContinue={() => setPhase(skipEmptyRecallPhase('core', tierCounts))}
         />
       );
       break;
@@ -290,6 +345,7 @@ export default function StudyFlow() {
       blockLabel = windDown ? 'Wind-down drill' : 'Core recall';
       content = (
         <RecallBlock
+          key={windDown ? 'wind-down' : 'core'}
           terms={windDown ? windDownTerms : coreTerms}
           retireThreshold={1}
           blockBudgetMs={windDown ? WIND_DOWN_BUDGET_MS : coreBudget}
@@ -297,6 +353,7 @@ export default function StudyFlow() {
           examType={setup?.examType || 'mixed'}
           onUpdateTerm={updateTerm}
           onLogAttempt={logAttempt}
+          onOpenCheat={openCheat}
           onDone={(s) => {
             setBlockStats((b) => ({ ...b, core: s }));
             setPhase(windDown ? 'confidence' : 'core_summary');
@@ -375,10 +432,11 @@ export default function StudyFlow() {
           readiness={readiness}
           onUpdateTerm={updateTerm}
           onLogAttempt={logAttempt}
+          onOpenCheat={openCheat}
           stopTime={stopTime}
           onSetStopTime={setStopTime}
           onDone={() => {
-            saveFinishedSession({ terms, setup, finishedAt: Date.now() });
+            saveFinishedSession({ terms: withInferredMastery(terms), setup, finishedAt: Date.now() });
             clearSession();
             navigate('/');
           }}
@@ -397,25 +455,66 @@ export default function StudyFlow() {
         blockLabel={blockLabel}
       />
       {windDownActive && !windDownAcknowledged && (
-        <div className="px-5 py-3 bg-amber-50 border-b border-amber-200 flex items-start gap-2">
-          <Moon className="w-4 h-4 text-amber-700 shrink-0 mt-0.5" />
-          <p className="text-xs text-amber-800 flex-1 leading-relaxed">
+        <div className="px-5 py-3 bg-amber-50 dark:bg-amber-500/15 border-b border-amber-200 dark:border-amber-500/30 flex items-start gap-2">
+          <Moon className="w-4 h-4 text-amber-700 dark:text-amber-300 shrink-0 mt-0.5" />
+          <p className="text-xs text-amber-800 dark:text-amber-200 flex-1 leading-relaxed">
             You're close to your stop time — here's your last quick pass, then get some sleep. Recall locks in
             better after sleep than more cramming right now.
           </p>
           <button
             type="button"
             onClick={() => setWindDownAcknowledged(true)}
-            className="text-xs text-amber-700 font-semibold underline-offset-4 hover:underline shrink-0"
+            className="text-xs text-amber-700 dark:text-amber-300 font-semibold underline-offset-4 hover:underline shrink-0"
           >
             Got it
           </button>
         </div>
       )}
-      {content}
-      <footer className="px-5 py-3 flex items-center justify-center bg-card/90 backdrop-blur">
+      <div className="flex-1">
+        {content || (
+          <div className="px-8 py-16 text-center">
+            <p className="text-sm text-muted-foreground">Nothing to show for this step.</p>
+          </div>
+        )}
+      </div>
+      <footer className="px-5 pt-3 pb-safe flex items-center justify-center bg-card/90 backdrop-blur mt-auto">
         <RoadMapDialog terms={terms} phase={phase} />
       </footer>
+      <CheatSheet terms={terms} open={cheatOpen} onClose={() => setCheatOpen(false)} />
     </div>
+  );
+}
+
+class StudyErrorBoundary extends React.Component {
+  constructor(props) {
+    super(props);
+    this.state = { error: null };
+  }
+  static getDerivedStateFromError(error) {
+    return { error };
+  }
+  render() {
+    if (this.state.error) {
+      return (
+        <div className="min-h-[100dvh] flex flex-col items-center justify-center px-8 text-center">
+          <p className="text-sm font-medium mb-2">Study screen hit an error</p>
+          <p className="text-xs text-muted-foreground mb-4 max-w-sm">
+            {String(this.state.error?.message || this.state.error)}
+          </p>
+          <Button type="button" onClick={() => { window.location.hash = '#/'; }} className="rounded-2xl">
+            Back to start
+          </Button>
+        </div>
+      );
+    }
+    return this.props.children;
+  }
+}
+
+export default function StudyFlowPage() {
+  return (
+    <StudyErrorBoundary>
+      <StudyFlow />
+    </StudyErrorBoundary>
   );
 }

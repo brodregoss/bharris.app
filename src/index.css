@@ -96,7 +96,16 @@
     min-height: 100%;
     min-height: 100dvh;
     min-height: -webkit-fill-available;
-    background-color: #f8fafc;
+    background-color: hsl(var(--background));
+    color: hsl(var(--foreground));
+  }
+
+  html {
+    color-scheme: light;
+  }
+
+  html.dark {
+    color-scheme: dark;
   }
 
   html,
@@ -113,5 +122,23 @@
   textarea,
   select {
     font-size: 16px;
+  }
+
+  /* WKWebView paints underlined buttons as system-link blue; keep fill on the CSS color. */
+  button {
+    -webkit-text-fill-color: currentColor;
+  }
+}
+
+@layer utilities {
+  /* Sit controls below the Dynamic Island / home indicator, with extra room to tap. */
+  .pt-safe {
+    padding-top: max(1.25rem, calc(env(safe-area-inset-top, 0px) + 0.75rem));
+  }
+  .pb-safe {
+    padding-bottom: max(1.25rem, calc(env(safe-area-inset-bottom, 0px) + 0.75rem));
+  }
+  .bottom-safe {
+    bottom: max(1.25rem, calc(env(safe-area-inset-bottom, 0px) + 0.75rem));
   }
 }

@@ -30,15 +30,7 @@ export default function Landing() {
   };
 
   const practice = () => {
-    if (!finishedSession) return;
-    navigate('/study', {
-      state: {
-        terms: finishedSession.terms,
-        setup: finishedSession.setup,
-        initialPhase: 'test',
-        keepState: true,
-      },
-    });
+    navigate('/practice');
   };
 
   // First time ever entering the app → welcome / notes-first setup.
@@ -50,12 +42,12 @@ export default function Landing() {
   return (
     <div className="min-h-[100dvh] bg-background text-foreground flex flex-col">
       {/* 1. Top corners — least-used actions, deliberately low emphasis */}
-      <header className="flex items-center justify-between px-5 pt-[max(1.25rem,env(safe-area-inset-top))]">
+      <header className="flex items-center justify-between px-5 pt-safe">
         <button
           type="button"
           onClick={() => navigate('/history')}
           aria-label="Past sessions"
-          className="w-9 h-9 rounded-full flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-accent transition"
+          className="w-11 h-11 rounded-full flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-accent transition"
         >
           <History className="w-5 h-5" />
         </button>
@@ -63,7 +55,7 @@ export default function Landing() {
           type="button"
           onClick={() => navigate('/settings')}
           aria-label="Settings"
-          className="w-9 h-9 rounded-full flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-accent transition"
+          className="w-11 h-11 rounded-full flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-accent transition"
         >
           <Settings className="w-5 h-5" />
         </button>
@@ -71,7 +63,7 @@ export default function Landing() {
 
       {/* 2. Center, quiet — logo + one short tagline, nothing to read */}
       <div className="flex-1 flex flex-col items-center justify-center px-6">
-        <div className="flex items-center justify-center w-14 h-14 rounded-2xl bg-slate-900 text-white mb-4">
+        <div className="flex items-center justify-center w-14 h-14 rounded-2xl bg-primary text-primary-foreground mb-4">
           <Timer className="w-7 h-7" />
         </div>
         <h1 className="text-xl font-bold tracking-tight">Last Minute Study</h1>
@@ -88,15 +80,22 @@ export default function Landing() {
       </div>
 
       {/* 3. Bottom third — natural one-handed thumb zone */}
-      <footer className="px-6 pb-[max(1.5rem,env(safe-area-inset-bottom))] pt-4">
+      <footer className="px-6 pb-safe pt-4">
         <div className="max-w-md mx-auto w-full flex flex-col items-stretch gap-3">
           {hasSession ? (
             <>
               <Button
                 onClick={() => navigate('/study')}
-                className="h-16 rounded-2xl bg-slate-900 hover:bg-slate-800 text-white text-lg font-bold shadow-lg shadow-slate-900/20"
+                className="h-16 rounded-2xl text-lg font-bold shadow-lg"
               >
                 <RotateCcw className="w-5 h-5 mr-2" /> Continue session
+              </Button>
+              <Button
+                variant="outline"
+                onClick={practice}
+                className="h-14 rounded-2xl text-base font-semibold"
+              >
+                Practice
               </Button>
               <button
                 type="button"
@@ -110,28 +109,29 @@ export default function Landing() {
             <>
               <Button
                 onClick={() => navigate('/welcome')}
-                className="h-16 rounded-2xl bg-slate-900 hover:bg-slate-800 text-white text-lg font-bold shadow-lg shadow-slate-900/20"
+                className="h-16 rounded-2xl text-lg font-bold shadow-lg"
               >
                 Start new cram
                 <ArrowRight className="w-5 h-5 ml-2" />
               </Button>
               {finishedSession && (
-                <div className="flex items-center justify-center gap-4 mt-1">
-                  <button
-                    type="button"
-                    onClick={restartCram}
-                    className="text-sm text-muted-foreground hover:text-foreground underline-offset-4 hover:underline"
-                  >
-                    restart cram?
-                  </button>
-                  <span className="text-muted-foreground/40">·</span>
-                  <button
-                    type="button"
+                <div className="flex flex-col gap-3 mt-1">
+                  <Button
+                    variant="outline"
                     onClick={practice}
-                    className="text-sm text-muted-foreground hover:text-foreground underline-offset-4 hover:underline"
+                    className="h-14 rounded-2xl text-base font-semibold"
                   >
-                    practice
-                  </button>
+                    Practice
+                  </Button>
+                  <div className="flex items-center justify-center gap-4">
+                    <button
+                      type="button"
+                      onClick={restartCram}
+                      className="text-sm text-muted-foreground hover:text-foreground underline-offset-4 hover:underline"
+                    >
+                      restart cram?
+                    </button>
+                  </div>
                 </div>
               )}
             </>
