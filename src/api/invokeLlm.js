@@ -37,13 +37,13 @@ async function postJson(url, body) {
  * Drop-in replacement for Base44 InvokeLLM.
  * Always uses the shared server; the OpenAI key never lives in the app.
  */
-export async function invokeLlm({ prompt, response_json_schema } = {}) {
+export async function invokeLlm({ prompt, response_json_schema, image } = {}) {
   if (!prompt) throw new Error('Missing prompt');
   const url = proxyUrl();
   if (!url) {
     throw new Error('Study AI is not available in this build.');
   }
-  const data = await postJson(url, { prompt, response_json_schema });
+  const data = await postJson(url, { prompt, response_json_schema, image });
   if (data?.result == null) throw new Error(data?.error || 'Study AI returned an empty response');
   return data.result;
 }

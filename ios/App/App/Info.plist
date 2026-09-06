@@ -70,5 +70,9 @@
 	<string>UIStatusBarStyleDarkContent</string>
 	<key>UIStatusBarHidden</key>
 	<false/>
+	<key>NSCameraUsageDescription</key>
+	<string>Last Minute Study uses the camera so you can photograph your notes and extract study terms.</string>
+	<key>NSPhotoLibraryUsageDescription</key>
+	<string>Last Minute Study uses your photo library so you can upload a picture of your notes.</string>
 </dict>
 </plist>

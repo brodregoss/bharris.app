@@ -3,6 +3,18 @@
 export const TIER_WEIGHT = { critical: 3, core: 2, passive: 1 };
 export const CONF_WEIGHT = { blank: 3, shaky: 2, know: 1 };
 
+export const TIER_LABELS = {
+  critical: 'Must know',
+  core: 'Should know',
+  passive: 'Nice to know',
+};
+
+export const TIER_HINTS = {
+  critical: 'Hardest terms — the ones that matter most on the exam.',
+  core: 'Supporting terms you should still have down.',
+  passive: 'Easier terms you only skimmed.',
+};
+
 export const BLOCK_BUDGET_RATIO = {
   critical: 0.4,
   core: 0.3,
@@ -60,6 +72,37 @@ export function priority(term) {
   return tw * cw;
 }
 
+// How many terms we can reasonably flashcard in the time left.
+// Uses ~70% of the clock (Must know + Should know) at ~3 min each.
+export function recallTermCap(hours) {
+  const h = Number(hours);
+  if (!Number.isFinite(h) || h <= 0) return 12;
+  const recallMinutes = h * 60 * 0.7;
+  return Math.max(8, Math.min(80, Math.floor(recallMinutes / 3)));
+}
+
+export function planRecallQueues(terms, hours) {
+  const list = Array.isArray(terms) ? terms : [];
+  const byPri = (a, b) => priority(b) - priority(a);
+  const critical = list.filter((t) => t.tier === 'critical').sort(byPri);
+  const core = list.filter((t) => t.tier === 'core').sort(byPri);
+  const passive = list.filter((t) => t.tier === 'passive').sort(byPri);
+  const cap = recallTermCap(hours);
+  const candidates = [...critical, ...core];
+  if (candidates.length <= cap) {
+    return { critical, core, passive, capped: false, cap };
+  }
+  const keep = new Set(candidates.slice(0, cap).map((t) => t.id));
+  const overflow = candidates.filter((t) => !keep.has(t.id));
+  return {
+    critical: critical.filter((t) => keep.has(t.id)),
+    core: core.filter((t) => keep.has(t.id)),
+    passive: [...passive, ...overflow],
+    capped: true,
+    cap,
+  };
+}
+
 export function retireThresholdForTier(tier) {
   return tier === 'critical' ? 2 : 1;
 }
@@ -91,17 +134,19 @@ export function computeReadiness(terms) {
 
 // A term is "shaky" if flagged by the practice test, self-rated blank/shaky,
 // missed in recall, or a critical/core term not yet retired.
-export function isTermShaky(term, stillShakyIds = new Set()) {
+export function isTermShaky(term, stillShakyIds = new Set(), recallIds = null) {
   if (stillShakyIds.has(term.id)) return true;
   if (term.confidence === 'blank' || term.confidence === 'shaky') return true;
   if ((term.recallHistory || []).some((h) => h.result === 'missed')) return true;
-  if ((term.tier === 'critical' || term.tier === 'core') && (term.correctStreak || 0) < retireThresholdForTier(term.tier)) return true;
+  if ((term.tier === 'critical' || term.tier === 'core') && (term.correctStreak || 0) < retireThresholdForTier(term.tier)) {
+    if (!recallIds || recallIds.has(term.id)) return true;
+  }
   return false;
 }
 
-export function shakyTermIds(terms, stillShaky = []) {
+export function shakyTermIds(terms, stillShaky = [], recallIds = null) {
   const ids = new Set(stillShaky);
-  terms.forEach((t) => { if (isTermShaky(t, ids)) ids.add(t.id); });
+  terms.forEach((t) => { if (isTermShaky(t, ids, recallIds)) ids.add(t.id); });
   return ids;
 }
 

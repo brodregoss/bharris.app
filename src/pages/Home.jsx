@@ -13,6 +13,7 @@ import {
 import { cn } from '@/lib/utils';
 import { termCount, setupReturnPath } from '@/lib/notesSource';
 import { ONBOARDING_FLAG } from '@/lib/onboarding';
+import { recallTermCap } from '@/lib/studyUtils';
 
 const STEPPER = ({ value, onChange, min = 0, step = 1, suffix }) => {
   const clamp = (v) => Math.max(min, v);
@@ -78,14 +79,22 @@ export default function Home() {
   }
 
   const count = termCount(source);
-  const canStart = hours > 0 && examType && examTiming;
+  const canStart = hours > 0 && examType && examTiming && count > 0;
   const perTerm = count && hours ? ((hours * 60) / count).toFixed(1) : null;
+  const drillCap = recallTermCap(hours);
+  const hoursHint = count > drillCap
+    ? `We'll drill about ${drillCap} terms and skim the rest`
+    : perTerm
+      ? `≈ ${perTerm} min per term`
+      : 'Time until the exam';
   const notesLabel = source.kind === 'photo'
     ? (source.name || 'Photo notes')
     : (source.title || 'Your notes');
 
   const goBack = () => {
-    navigate(setupReturnPath(source), { state: { source } });
+    navigate(setupReturnPath(source), {
+      state: { source, setup: { hours, examType, examTiming } },
+    });
   };
 
   const lookOver = () => {
@@ -152,7 +161,7 @@ export default function Home() {
             <Field
               icon={<Clock className="w-4 h-4" />}
               label="Hours available"
-              hint={perTerm ? `≈ ${perTerm} min per term` : 'Time until the exam'}
+              hint={hoursHint}
             >
               <STEPPER value={hours} onChange={setHours} min={0} step={1} suffix="hr" />
             </Field>

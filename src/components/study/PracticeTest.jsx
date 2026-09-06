@@ -1,8 +1,9 @@
 import React from 'react';
 import { Button } from '@/components/ui/button';
-import { Check, X, Timer, RotateCcw, ArrowRight, Loader2 } from 'lucide-react';
+import { Check, X, Timer, RotateCcw, ArrowRight, Loader2, ChevronDown } from 'lucide-react';
 import { invokeLlm } from '@/api/invokeLlm';
-import { fmtTime, localGradeShortAnswer, parseGradeResponse } from '@/lib/studyUtils';
+import { fmtTime, localGradeShortAnswer, parseGradeResponse, TIER_LABELS, TIER_HINTS } from '@/lib/studyUtils';
+import { fillMcqWrongAnswers, mcqNeedsGeneratedWrongs } from '@/lib/distractors';
 
 function shuffle(a) {
   const b = [...a];
@@ -16,10 +17,20 @@ function shuffle(a) {
 function pickDistractors(terms, correct, n) {
   const same = terms.filter((t) => t.id !== correct.id && t.tier === correct.tier);
   const other = terms.filter((t) => t.id !== correct.id && t.tier !== correct.tier);
-  return [...same, ...other].slice(0, n).map((t) => t.definition);
+  const seen = new Set([String(correct.definition || '').trim().toLowerCase()]);
+  const out = [];
+  for (const t of [...same, ...other]) {
+    const def = String(t.definition || '').trim();
+    const key = def.toLowerCase();
+    if (!def || seen.has(key)) continue;
+    seen.add(key);
+    out.push(def);
+    if (out.length >= n) break;
+  }
+  return out;
 }
 
-function buildQuestions(terms, examType, missedIds) {
+function buildQuestions(terms, examType, missedIds, distractorPool = terms) {
   const N = Math.min(terms.length, 12);
   const missedSet = new Set(missedIds);
   const rank = { critical: 0, core: 1, passive: 2 };
@@ -33,7 +44,7 @@ function buildQuestions(terms, examType, missedIds) {
   return chosen.map((t, i) => {
     const type =
       examType === 'mixed' ? (i % 2 === 0 ? 'mcq' : 'short') : examType === 'multiple_choice' ? 'mcq' : 'short';
-    const distractors = pickDistractors(terms, t, 3);
+    const distractors = pickDistractors(distractorPool, t, 3);
     return {
       id: t.id,
       term: t.term,
@@ -59,6 +70,14 @@ export default function PracticeTest({ terms, examType, budgetMs, priorMissed, o
   const [explaining, setExplaining] = React.useState(false);
   const [qTimeLeft, setQTimeLeft] = React.useState(budgetMs);
   const [phase, setPhase] = React.useState('taking');
+  const [openTier, setOpenTier] = React.useState(null);
+  const [prepping, setPrepping] = React.useState(
+    () =>
+      terms.length < 4 &&
+      (examType === 'multiple_choice' || examType === 'mixed' || examType === 'mcq')
+  );
+  const [prepError, setPrepError] = React.useState(false);
+  const [prepTick, setPrepTick] = React.useState(0);
   const doneRef = React.useRef(false);
 
   const finish = () => {
@@ -67,8 +86,9 @@ export default function PracticeTest({ terms, examType, budgetMs, priorMissed, o
     setPhase('results');
   };
 
-  // Overall test cap.
+  // Overall test cap. Don't burn the clock while extra MCQ choices are generated.
   React.useEffect(() => {
+    if (prepping || prepError) return;
     const start = Date.now();
     const iv = setInterval(() => {
       if (Date.now() - start > budgetMs) {
@@ -77,7 +97,34 @@ export default function PracticeTest({ terms, examType, budgetMs, priorMissed, o
       }
     }, 1000);
     return () => clearInterval(iv);
-  }, [budgetMs]);
+  }, [budgetMs, prepping, prepError]);
+
+  // Small decks don't have enough real defs for 4 MCQ choices. Invent the rest.
+  React.useEffect(() => {
+    if (!prepping) return;
+    if (!mcqNeedsGeneratedWrongs(terms, questions)) {
+      setPrepping(false);
+      return;
+    }
+    let cancelled = false;
+    (async () => {
+      try {
+        const filled = await fillMcqWrongAnswers(questions);
+        if (cancelled) return;
+        setQuestions(filled);
+        setPrepError(false);
+      } catch {
+        if (cancelled) return;
+        setPrepError(true);
+      }
+      if (!cancelled) setPrepping(false);
+    })();
+    return () => {
+      cancelled = true;
+    };
+    // questions is the deck at prep start; don't re-run after fill updates it.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [prepTick]);
 
   const q = questions[idx];
   const perQMs = (type) => (type === 'mcq' ? 30000 : 90000);
@@ -167,7 +214,7 @@ export default function PracticeTest({ terms, examType, budgetMs, priorMissed, o
   // Per-question pacing: MCQ tighter, short-answer looser; mixed uses the
   // per-question type's timer. Auto-advances on expiry (unanswered = missed).
   React.useEffect(() => {
-    if (phase !== 'taking' || !q || hasAnswered || submitted) return;
+    if (phase !== 'taking' || !q || hasAnswered || submitted || prepping || prepError) return;
     const start = Date.now();
     const limit = perQMs(q.type);
     setQTimeLeft(limit);
@@ -182,13 +229,13 @@ export default function PracticeTest({ terms, examType, budgetMs, priorMissed, o
     }, 250);
     return () => clearInterval(iv);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [idx, phase, hasAnswered, submitted]);
+  }, [idx, phase, hasAnswered, submitted, prepping, prepError]);
 
   // Dev-only: lets the floating checkmark button skip the current question and
   // mark it correct without answering or grading.
   const skipCorrectRef = React.useRef(() => {});
   skipCorrectRef.current = () => {
-    if (phase !== 'taking' || !q || hasAnswered) return;
+    if (phase !== 'taking' || !q || hasAnswered || prepping || prepError) return;
     record(q.id, { correct: true });
     next();
   };
@@ -199,6 +246,40 @@ export default function PracticeTest({ terms, examType, budgetMs, priorMissed, o
   }, []);
 
   const correctCount = Object.values(answers).filter((a) => a?.correct).length;
+
+  if (prepping || prepError) {
+    return (
+      <div className="flex-1 flex flex-col items-center justify-center gap-3 text-center px-8">
+        {prepError ? (
+          <>
+            <p className="text-sm font-medium">Couldn't finish the answer choices</p>
+            <p className="text-xs text-muted-foreground max-w-xs">
+              This test needs a few extra wrong answers. Try again in a moment.
+            </p>
+            <Button
+              type="button"
+              onClick={() => {
+                setPrepError(false);
+                setPrepping(true);
+                setPrepTick((n) => n + 1);
+              }}
+              className="mt-2 rounded-2xl"
+            >
+              Try again
+            </Button>
+          </>
+        ) : (
+          <>
+            <Loader2 className="w-8 h-8 text-muted-foreground animate-spin" />
+            <p className="text-sm font-medium">Writing extra answer choices…</p>
+            <p className="text-xs text-muted-foreground max-w-xs">
+              There aren't enough terms yet for a full multiple-choice question.
+            </p>
+          </>
+        )}
+      </div>
+    );
+  }
 
   if (phase === 'results') {
     const score = questions.length ? Math.round((correctCount / questions.length) * 100) : 0;
@@ -217,7 +298,8 @@ export default function PracticeTest({ terms, examType, budgetMs, priorMissed, o
         .map((qq) => terms.find((t) => t.id === qq.id))
         .filter(Boolean);
       if (!sub.length) return;
-      setQuestions(buildQuestions(sub, examType, []));
+      const built = buildQuestions(sub, examType, [], terms);
+      setQuestions(built);
       setAnswers({});
       setIdx(0);
       setSubmitted(false);
@@ -228,7 +310,13 @@ export default function PracticeTest({ terms, examType, budgetMs, priorMissed, o
       setExplanation(null);
       setExplaining(false);
       doneRef.current = false;
+      setOpenTier(null);
       setPhase('taking');
+      if (mcqNeedsGeneratedWrongs(terms, built)) {
+        setPrepError(false);
+        setPrepping(true);
+        setPrepTick((n) => n + 1);
+      }
     };
 
     return (
@@ -242,20 +330,63 @@ export default function PracticeTest({ terms, examType, budgetMs, priorMissed, o
               {correctCount} of {questions.length} correct
             </p>
           </div>
+          <p className="text-[11px] text-muted-foreground mb-2">Tap a level to see which terms.</p>
           <div className="space-y-2 mb-5">
             {['critical', 'core', 'passive']
               .filter((t) => byTier[t])
-              .map((t) => (
-                <div
-                  key={t}
-                  className="flex items-center justify-between rounded-xl border border-border bg-card px-4 py-3"
-                >
-                  <span className="text-sm font-semibold capitalize">{t}</span>
-                  <span className="text-sm text-muted-foreground">
-                    {byTier[t].correct}/{byTier[t].total}
-                  </span>
-                </div>
-              ))}
+              .map((t) => {
+                const open = openTier === t;
+                const ranked = terms.filter((term) => term.tier === t);
+                return (
+                  <div key={t} className="rounded-xl border border-border bg-card overflow-hidden">
+                    <button
+                      type="button"
+                      onClick={() => setOpenTier((cur) => (cur === t ? null : t))}
+                      className="w-full flex items-center justify-between gap-3 px-4 py-3 text-left"
+                      aria-expanded={open}
+                    >
+                      <span className="text-sm font-semibold">{TIER_LABELS[t]}</span>
+                      <span className="flex items-center gap-2 shrink-0">
+                        <span className="text-sm text-muted-foreground">
+                          {byTier[t].correct}/{byTier[t].total}
+                        </span>
+                        <ChevronDown
+                          className={`w-4 h-4 text-muted-foreground transition-transform ${open ? 'rotate-180' : ''}`}
+                        />
+                      </span>
+                    </button>
+                    {open && (
+                      <div className="border-t border-border px-4 py-3 space-y-2">
+                        <p className="text-xs text-muted-foreground">{TIER_HINTS[t]}</p>
+                        {ranked.map((term) => {
+                          const tested = questions.some((qq) => qq.id === term.id);
+                          const gotIt = answers[term.id]?.correct;
+                          return (
+                            <div key={term.id} className="rounded-lg bg-muted/60 p-3">
+                              <div className="flex items-start justify-between gap-2">
+                                <p className="text-sm font-semibold">{term.term}</p>
+                                {tested && (
+                                  <span
+                                    className={`flex h-5 w-5 shrink-0 items-center justify-center rounded-full ${
+                                      gotIt
+                                        ? 'bg-emerald-500 text-white'
+                                        : 'bg-rose-500 text-white'
+                                    }`}
+                                    aria-label={gotIt ? 'Got it' : 'Missed'}
+                                  >
+                                    {gotIt ? <Check className="h-3 w-3" strokeWidth={3} /> : <X className="h-3 w-3" strokeWidth={3} />}
+                                  </span>
+                                )}
+                              </div>
+                              <p className="text-xs text-muted-foreground mt-0.5 leading-relaxed">{term.definition}</p>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
           </div>
           <Button variant="outline" onClick={retake} className="h-11 rounded-2xl mb-2 font-semibold">
             <RotateCcw className="w-4 h-4 mr-2" /> Retake weak areas
@@ -290,7 +421,7 @@ export default function PracticeTest({ terms, examType, budgetMs, priorMissed, o
       <div className="max-w-md mx-auto w-full flex-1 flex flex-col">
         <div className="rounded-3xl border border-border bg-card p-6 shadow-sm min-h-[260px] flex flex-col">
           <p className="text-[11px] uppercase tracking-wide text-muted-foreground mb-2">
-            {q.type === 'mcq' ? 'Multiple choice' : 'Short answer'} · <span className="capitalize">{q.tier}</span>
+            {q.type === 'mcq' ? 'Multiple choice' : 'Short answer'} · {TIER_LABELS[q.tier] || q.tier}
           </p>
           <p className="text-3xl font-bold tracking-tight">{q.term}</p>
           {q.type === 'mcq' ? (

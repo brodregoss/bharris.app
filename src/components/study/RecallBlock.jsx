@@ -68,10 +68,12 @@ export default function RecallBlock({
   const [gotCount, setGotCount] = React.useState(0);
   const [recogSelected, setRecogSelected] = React.useState(null);
   const [recogOptions, setRecogOptions] = React.useState(null);
+  const [cardSeq, setCardSeq] = React.useState(0);
   const gotRef = React.useRef(0);
   const doneRef = React.useRef(false);
   const idsKeyRef = React.useRef(idsKey);
   const skipFinishRef = React.useRef(false);
+  const advancingRef = React.useRef(false);
 
   const finish = React.useCallback(
     (reason) => {
@@ -125,9 +127,10 @@ export default function RecallBlock({
 
   const style = cardStyle(examType, st.pos);
 
-  // Reset per-card interaction state when the card changes.
+  // Reset per-card interaction state when the card (or attempt) changes.
   // Options are shuffled once here and held until the card is answered.
   React.useEffect(() => {
+    advancingRef.current = false;
     setRevealed(false);
     setRecogSelected(null);
     if (current && style === 'recognition') {
@@ -137,7 +140,7 @@ export default function RecallBlock({
       setRecogOptions(null);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [currentId]);
+  }, [currentId, st.pos, st.round, cardSeq]);
 
   if (!current) {
     return (
@@ -148,9 +151,14 @@ export default function RecallBlock({
   }
 
   const handleGot = () => {
+    if (advancingRef.current) return;
+    advancingRef.current = true;
     const newStreak = (current.correctStreak || 0) + 1;
     onUpdateTerm(current.id, { correctStreak: newStreak });
     onLogAttempt(current.id, 'got_it');
+    setRevealed(false);
+    setRecogSelected(null);
+    setCardSeq((n) => n + 1);
 
     if (singlePass) {
       setSt((s) => ({ ...s, pos: s.pos + 1 }));
@@ -176,23 +184,46 @@ export default function RecallBlock({
   };
 
   const handleMissed = () => {
-    onUpdateTerm(current.id, { correctStreak: 0 });
-    onLogAttempt(current.id, 'missed');
+    const lastInRotation = !singlePass && st.queue.length === 1;
+    if (advancingRef.current && !lastInRotation) return;
+    const missedId = current.id;
+    onUpdateTerm(missedId, { correctStreak: 0 });
+    onLogAttempt(missedId, 'missed');
     logEvent?.(`Term "${current.term}" missed${singlePass ? '' : ', requeued'}`);
+
+    // Last card in rotation: stay on it and flip back over so they can try again.
+    if (lastInRotation) {
+      advancingRef.current = false;
+      setRevealed(false);
+      setRecogSelected(null);
+      return;
+    }
+
+    advancingRef.current = true;
+    setRevealed(false);
+    setRecogSelected(null);
+    setCardSeq((n) => n + 1);
 
     if (singlePass) {
       setSt((s) => ({ ...s, pos: s.pos + 1 }));
       return;
     }
 
+    // Remove the missed card, then show the next one. Reinsert later so a miss
+    // on the last card doesn't leave Continue stuck on the same selected answer.
     setSt((s) => {
       const nq = [...s.queue];
       nq.splice(s.pos, 1);
+      if (nq.length === 0) {
+        return { queue: [missedId], pos: 0, round: s.round + 1 };
+      }
+      const nextPos = s.pos >= nq.length ? 0 : s.pos;
       const offset = 3 + Math.floor(Math.random() * 4);
-      const insertAt = Math.min(s.pos + offset, nq.length);
-      nq.splice(insertAt, 0, current.id);
-      const wrapped = s.pos >= nq.length;
-      return { queue: nq, pos: wrapped ? 0 : s.pos, round: wrapped ? s.round + 1 : s.round };
+      const insertAt = Math.min(nextPos + offset, nq.length);
+      nq.splice(insertAt, 0, missedId);
+      const pos = insertAt <= nextPos ? nextPos + 1 : nextPos;
+      const wrapped = nextPos === 0 && s.pos !== 0;
+      return { queue: nq, pos, round: wrapped ? s.round + 1 : s.round };
     });
   };
 

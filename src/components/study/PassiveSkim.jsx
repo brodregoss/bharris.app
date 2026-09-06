@@ -32,21 +32,12 @@ export default function PassiveSkim({ terms, behind, onUpdateTerm, onDone }) {
     return () => obs.disconnect();
   }, [terms, onUpdateTerm]);
 
-  const toggle = (id) => {
-    setSeenIds((prev) => {
-      const n = new Set(prev);
-      n.add(id);
-      return n;
-    });
-    onUpdateTerm(id, { seen: true });
-  };
-
   return (
     <div className="flex-1 flex flex-col px-5 pt-4">
       <div className="max-w-md mx-auto w-full flex-1 flex flex-col">
         <h2 className="text-xl font-bold tracking-tight mb-1">Passive skim</h2>
         <p className="text-xs text-muted-foreground mb-3">
-          Quick exposure — no grading. Scroll through and tap to mark seen.
+          Quick exposure — no grading. Scroll through to review.
         </p>
         {behind && (
           <div className="rounded-xl bg-amber-50 dark:bg-amber-500/15 border border-amber-200 dark:border-amber-500/30 p-3 mb-3 text-xs text-amber-800 dark:text-amber-200 flex gap-2">
@@ -58,17 +49,16 @@ export default function PassiveSkim({ terms, behind, onUpdateTerm, onDone }) {
           {terms.map((t) => {
             const seen = seenIds.has(t.id);
             return (
-              <button
+              <div
                 key={t.id}
                 data-id={t.id}
-                onClick={() => toggle(t.id)}
-                className={`w-full text-left rounded-xl border p-3 transition ${
+                className={`w-full rounded-xl border p-3 transition ${
                   seen ? 'border-emerald-500 bg-emerald-50 dark:bg-emerald-500/20' : 'border-border bg-card'
                 }`}
               >
                 <p className="text-lg font-semibold">{t.term}</p>
                 <p className="text-base text-muted-foreground mt-0.5 leading-relaxed">{t.definition}</p>
-              </button>
+              </div>
             );
           })}
           {terms.length === 0 && (

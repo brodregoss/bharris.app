@@ -21,6 +21,7 @@ import {
   shakyTermIds,
   WIND_DOWN_BUDGET_MS,
   BLOCK_BUDGET_RATIO,
+  planRecallQueues,
 } from '@/lib/studyUtils';
 import { loadSession, saveSession, clearSession, saveFinishedSession } from '@/lib/sessionStore';
 import { withInferredMastery } from '@/lib/mastery';
@@ -212,7 +213,18 @@ function StudyFlow() {
   // never repeats across resumes / days).
   const windDownActive = withinStopWindow(setup?.examTiming, stopTime, now);
 
-  const shakyIds = React.useMemo(() => shakyTermIds(terms, stillShaky), [terms, stillShaky]);
+  const queues = React.useMemo(
+    () => planRecallQueues(terms, setup?.hours),
+    [terms, setup?.hours]
+  );
+  const recallIds = React.useMemo(
+    () => new Set([...queues.critical, ...queues.core].map((t) => t.id)),
+    [queues]
+  );
+  const shakyIds = React.useMemo(
+    () => shakyTermIds(terms, stillShaky, recallIds),
+    [terms, stillShaky, recallIds]
+  );
   const windDownTerms = React.useMemo(
     () => terms.filter((t) => shakyIds.has(t.id)).sort(byPriorityDesc),
     [terms, shakyIds]
@@ -232,9 +244,9 @@ function StudyFlow() {
     []
   );
 
-  const criticalCount = terms.filter((t) => t.tier === 'critical').length;
-  const coreCount = terms.filter((t) => t.tier === 'core').length;
-  const passiveCount = terms.filter((t) => t.tier === 'passive').length;
+  const criticalCount = queues.critical.length;
+  const coreCount = queues.core.length;
+  const passiveCount = queues.passive.length;
   const tierCounts = React.useMemo(
     () => ({ critical: criticalCount, core: coreCount, passive: passiveCount }),
     [criticalCount, coreCount, passiveCount]
@@ -266,9 +278,9 @@ function StudyFlow() {
   const coreBudget = totalMs * BLOCK_BUDGET_RATIO.core;
   const testBudget = totalMs * BLOCK_BUDGET_RATIO.test;
 
-  const criticalTerms = terms.filter((t) => t.tier === 'critical').sort(byPriorityDesc);
-  const coreTerms = terms.filter((t) => t.tier === 'core').sort(byPriorityDesc);
-  const passiveTerms = terms.filter((t) => t.tier === 'passive').sort(byPriorityDesc);
+  const criticalTerms = queues.critical;
+  const coreTerms = queues.core;
+  const passiveTerms = queues.passive;
 
   const priorMissed = terms
     .filter(
@@ -427,6 +439,7 @@ function StudyFlow() {
       content = (
         <ConfidenceSheet
           terms={terms}
+          recallIds={recallIds}
           examTiming={setup?.examTiming || 'today'}
           stillShaky={stillShaky}
           readiness={readiness}

@@ -52,20 +52,6 @@ export default function Settings() {
               />
             </div>
           </section>
-
-          <section className="rounded-2xl border border-border bg-card p-5">
-            <div className="flex items-center gap-2 mb-2">
-              <Moon className="w-4 h-4 text-muted-foreground" />
-              <h2 className="text-sm font-bold tracking-tight">Why we ask when you're sleeping</h2>
-            </div>
-            <p className="text-xs text-muted-foreground leading-relaxed">
-              Your brain does real work locking in what you studied <em>while you sleep</em> — this is called
-              memory consolidation. Cramming more new material in the last 30–45 minutes before bed usually
-              doesn't help, and can even cost you sleep that would have helped more. So once you're close to
-              your stop time, we stop introducing new material and just help you review what's already shaky.
-              You're always free to keep going — we just won't push new stuff on you that late.
-            </p>
-          </section>
         </div>
       </div>
     </div>

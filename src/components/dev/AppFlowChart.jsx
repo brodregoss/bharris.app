@@ -52,11 +52,13 @@ export default function AppFlowChart() {
       <Group label="1 · Setup">
         <Node title="Landing" sub="First visit → Welcome. Returning → Continue session or start new cram." icon={<GitBranch className="w-3.5 h-3.5" />} />
         <Bar />
-        <Node title="Welcome" sub="Drop notes · create manually · use some of ours" icon={<ClipboardCheck className="w-3.5 h-3.5" />} />
+        <Node title="Welcome" sub="Photo of notes · create manually · use some of ours" icon={<ClipboardCheck className="w-3.5 h-3.5" />} />
         <Bar />
-        <Node title="Time & test type" sub="Hours · exam type · exam timing · term count · back to notes" />
+        <Node title="Review notes (photo upload)" sub="AI finds every term on the page, writes defs, then you edit or regenerate" />
         <Bar />
-        <Node title="Triage (AI ranks terms, or uses manual terms)" sub="Difficulty score + depends_on per term" />
+        <Node title="Time & test type" sub="Hours · exam type · exam timing · term count · back to notes. Large sets: drill what the clock can cover, skim the rest." />
+        <Bar />
+        <Node title="Triage (even random columns; AI ranks user terms only)" sub="Sample sets keep built-in difficulty. User notes get a difficulty rank. You drag Blank / Shaky / Know it. Big decks still triage all terms." />
         <Bar />
         <Node title="Skim notes? (optional)" sub="All terms + defs before flashcards, or skip straight in" />
       </Group>
@@ -69,7 +71,7 @@ export default function AppFlowChart() {
       </Group>
 
       <Group label="3 · Study blocks">
-        <Node title="Critical recall" sub="40% budget · retire after 2 correct" />
+        <Node title="Critical recall" sub="40% budget · retire after 2 correct · big decks overflow extra terms into skim" />
         <Bar />
         <Node title="Core recall" sub="30% budget · retire after 1 correct" />
         <Bar />
@@ -87,7 +89,7 @@ export default function AppFlowChart() {
       </Group>
 
       <Group label="5 · Practice test (by exam type)">
-        <Branch tag="MCQ">all multiple choice</Branch>
+        <Branch tag="MCQ">all multiple choice · under 4 terms, AI writes extra wrong answers</Branch>
         <Branch tag="Short">all AI-graded free response</Branch>
         <Branch tag="Mixed">alternate MCQ / short answer</Branch>
       </Group>

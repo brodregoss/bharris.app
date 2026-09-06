@@ -14,7 +14,7 @@ const TIERS = [
 ];
 
 const COL_ORDER = ['blank', 'shaky', 'know_it'];
-const MAX_TERMS = 15;
+const RANK_BATCH = 12;
 
 function shuffle(items) {
   const a = [...items];
@@ -25,10 +25,107 @@ function shuffle(items) {
   return a;
 }
 
+// Random deal, as even as possible: counts differ by at most 1 when the
+// total isn't divisible by 3. Which column gets the extra(s) is random.
 function dealIntoColumns(terms) {
-  return shuffle(terms).map((t, i) => ({
+  const shuffled = shuffle(terms);
+  const n = COL_ORDER.length;
+  const offset = Math.floor(Math.random() * n);
+  return shuffled.map((t, i) => ({
     ...t,
-    tier: COL_ORDER[i % COL_ORDER.length],
+    tier: COL_ORDER[(i + offset) % n],
+  }));
+}
+
+function normalizeName(s) {
+  return String(s || '').trim().toLowerCase();
+}
+
+function clampDifficulty(n) {
+  const d = Number(n);
+  if (!Number.isFinite(d)) return null;
+  return Math.min(10, Math.max(1, Math.round(d)));
+}
+
+function extractTermList(res) {
+  if (Array.isArray(res?.terms)) return res.terms;
+  if (Array.isArray(res?.output?.terms)) return res.output.terms;
+  if (Array.isArray(res)) return res;
+  return [];
+}
+
+function isPreloadedSource(source) {
+  return source?.kind === 'sample';
+}
+
+function needsPriorityRank(source, items) {
+  if (isPreloadedSource(source) || !items.length) return false;
+  return items.some((t) => clampDifficulty(t.difficulty) == null);
+}
+
+async function rankChunk(chunk, allNames) {
+  const res = await invokeLlm({
+    prompt:
+      `You are ranking a student's own study terms for a last-minute exam cram.\n` +
+      `Do not add, remove, or rename terms. Rank each one from the list below.\n` +
+      `difficulty: integer 1–10 (10 = hardest / most important to know).\n` +
+      `depends_on: array of OTHER term names from the full deck that this concept builds on (empty if none).\n` +
+      `Full deck names: ${allNames.join(', ')}\n\n` +
+      `Terms to rank:\n` +
+      chunk.map((t, i) => `${i + 1}. ${t.term}: ${t.definition}`).join('\n'),
+    response_json_schema: {
+      type: 'object',
+      properties: {
+        terms: {
+          type: 'array',
+          items: {
+            type: 'object',
+            properties: {
+              term: { type: 'string' },
+              difficulty: { type: 'number' },
+              depends_on: { type: 'array', items: { type: 'string' } },
+            },
+            required: ['term', 'difficulty', 'depends_on'],
+          },
+        },
+      },
+      required: ['terms'],
+    },
+  });
+  const ranked = extractTermList(res);
+  const byName = new Map();
+  ranked.forEach((r) => {
+    const key = normalizeName(r.term);
+    if (key && !byName.has(key)) byName.set(key, r);
+  });
+  return chunk.map((t) => {
+    const hit = byName.get(normalizeName(t.term));
+    return {
+      ...t,
+      difficulty: clampDifficulty(hit?.difficulty) ?? 5,
+      depends_on: Array.isArray(hit?.depends_on) ? hit.depends_on : t.depends_on || [],
+    };
+  });
+}
+
+async function rankUserTerms(terms, onProgress) {
+  const allNames = terms.map((t) => t.term).filter(Boolean);
+  const out = [];
+  for (let i = 0; i < terms.length; i += RANK_BATCH) {
+    const chunk = terms.slice(i, i + RANK_BATCH);
+    onProgress?.(`Ranking your terms… ${Math.min(i + chunk.length, terms.length)}/${terms.length}`);
+    out.push(...(await rankChunk(chunk, allNames)));
+  }
+  return out;
+}
+
+function prepareItems(raw) {
+  return raw.map((t, i) => ({
+    term: t.term,
+    definition: t.definition,
+    difficulty: clampDifficulty(t.difficulty) ?? 5,
+    depends_on: t.depends_on || [],
+    id: t.id || `t${i}`,
   }));
 }
 
@@ -37,12 +134,19 @@ function Triage() {
   const navigate = useNavigate();
   const source = location.state?.source;
   const setup = location.state?.setup;
-  const sourceTitle = source?.title || 'Intro Psychology';
+  const sourceTitle = source?.title || source?.name || 'your notes';
 
-  const [loading, setLoading] = React.useState(true);
+  const [ranked, setRanked] = React.useState(() => {
+    const incoming = (source?.items || []).filter((t) => t?.term && t?.definition);
+    if (incoming.length && (isPreloadedSource(source) || !needsPriorityRank(source, incoming))) {
+      return dealIntoColumns(prepareItems(incoming));
+    }
+    return [];
+  });
+  const [loading, setLoading] = React.useState(() => ranked.length === 0);
+  const [loadingHint, setLoadingHint] = React.useState('Loading your terms…');
   const [loadError, setLoadError] = React.useState(false);
   const [retryTick, setRetryTick] = React.useState(0);
-  const [ranked, setRanked] = React.useState([]);
   const [dragOver, setDragOver] = React.useState(null);
 
   const lockIn = () => {
@@ -78,67 +182,45 @@ function Triage() {
   React.useEffect(() => {
     let mounted = true;
     (async () => {
-      const cannedItems = source?.items || [];
-      if (cannedItems.length) {
-        const withIds = cannedItems.slice(0, MAX_TERMS).map((t, i) => ({
-          term: t.term,
-          definition: t.definition,
-          difficulty: t.difficulty || 5,
-          depends_on: t.depends_on || [],
-          id: t.id || `t${i}`,
-        }));
-        setRanked(dealIntoColumns(withIds));
+      const incoming = (source?.items || []).filter((t) => t?.term && t?.definition);
+      const preloaded = isPreloadedSource(source);
+
+      if (incoming.length && (preloaded || !needsPriorityRank(source, incoming))) {
+        if (!mounted) return;
+        if (retryTick > 0) {
+          setRanked(dealIntoColumns(prepareItems(incoming)));
+        }
+        setLoadError(false);
         setLoading(false);
         return;
       }
 
-      const count = Math.min(source?.terms || 12, MAX_TERMS);
-      try {
-        const res = await invokeLlm({
-          prompt: `You are building a last-minute study list for a student about to cram "${sourceTitle}". Generate exactly ${count} key terms/concepts a student must know for this exam. For each term provide: term (short name), definition (one concise sentence), difficulty (integer 1-10, 10 = hardest), depends_on (array of OTHER term names from your list that this concept builds upon). Return exactly ${count} terms.`,
-          response_json_schema: {
-            type: 'object',
-            properties: {
-              terms: {
-                type: 'array',
-                items: {
-                  type: 'object',
-                  properties: {
-                    term: { type: 'string' },
-                    definition: { type: 'string' },
-                    difficulty: { type: 'number' },
-                    depends_on: { type: 'array', items: { type: 'string' } },
-                  },
-                  required: ['term', 'definition', 'difficulty', 'depends_on'],
-                },
-              },
-            },
-            required: ['terms'],
-          },
-        });
-        if (!mounted) return;
-        const list = Array.isArray(res?.terms)
-          ? res.terms
-          : Array.isArray(res?.output?.terms)
-            ? res.output.terms
-            : Array.isArray(res)
-              ? res
-              : [];
-        const raw = list.slice(0, count);
-        if (!raw.length) throw new Error('empty terms');
-        const withIds = raw.map((t, i) => ({ ...t, id: `t${i}`, depends_on: t.depends_on || [] }));
-        setRanked(dealIntoColumns(withIds));
-        setLoadError(false);
-        setLoading(false);
-      } catch {
-        if (!mounted) return;
-        setRanked([]);
-        setLoadError(true);
-        setLoading(false);
+      if (incoming.length && needsPriorityRank(source, incoming)) {
+        setLoadingHint('Ranking your terms…');
+        try {
+          const rankedItems = await rankUserTerms(prepareItems(incoming), setLoadingHint);
+          if (!mounted) return;
+          setRanked(dealIntoColumns(rankedItems));
+          setLoadError(false);
+          setLoading(false);
+        } catch {
+          if (!mounted) return;
+          setRanked([]);
+          setLoadError(true);
+          setLoading(false);
+        }
+        return;
       }
+
+      // Photo extract happens on Review notes. Samples and typed notes
+      // should already arrive with items.
+      if (!mounted) return;
+      setRanked([]);
+      setLoadError(true);
+      setLoading(false);
     })();
     return () => { mounted = false; };
-  }, [retryTick]);
+  }, [retryTick, source]);
 
   const moveTerm = (id, destTier) => {
     setRanked((prev) => prev.map((t) => (t.id === id ? { ...t, tier: destTier } : t)));
@@ -170,19 +252,20 @@ function Triage() {
       {loading ? (
         <div className="flex-1 flex flex-col items-center justify-center gap-3 text-center px-8">
           <Loader2 className="w-8 h-8 text-muted-foreground animate-spin" />
-          <p className="text-sm font-medium">Loading your terms…</p>
+          <p className="text-sm font-medium">{loadingHint}</p>
         </div>
       ) : loadError ? (
         <div className="flex-1 flex flex-col items-center justify-center gap-3 text-center px-8">
           <p className="text-sm font-medium">Couldn’t load terms</p>
           <p className="text-xs text-muted-foreground max-w-xs">
-            The study AI isn’t available right now. Try again, or create terms by hand from Welcome.
+            The study AI isn’t available right now, or there aren’t any terms yet. Try again, or go back and look over your notes.
           </p>
           <Button
             type="button"
             onClick={() => {
               setLoadError(false);
               setLoading(true);
+              setLoadingHint('Loading your terms…');
               setRetryTick((n) => n + 1);
             }}
             className="mt-2 rounded-2xl"

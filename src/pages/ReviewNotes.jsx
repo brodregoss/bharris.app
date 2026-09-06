@@ -1,9 +1,11 @@
 import React from 'react';
 import { useLocation, useNavigate, Navigate } from 'react-router-dom';
-import { ArrowLeft, Check } from 'lucide-react';
+import { ArrowLeft, Check, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
+import { extractTermsFromPhoto, generateDefinitions, regenerateDefinition } from '@/lib/extractNotes';
+import { peekPhoto, clearPhoto } from '@/lib/imageData';
 
 export default function ReviewNotes() {
   const navigate = useNavigate();
@@ -21,18 +23,80 @@ export default function ReviewNotes() {
       depends_on: t.depends_on,
     }));
   });
-
-  if (!source) {
-    return <Navigate to="/welcome" replace />;
-  }
+  const [extracting, setExtracting] = React.useState(
+    () => source?.kind === 'photo' && !source?.items?.length && !!(source?.image || peekPhoto())
+  );
+  const [extractHint, setExtractHint] = React.useState('Finding terms…');
+  const [extractError, setExtractError] = React.useState('');
+  const [regenId, setRegenId] = React.useState(null);
+  const foundRef = React.useRef(null);
+  const ranExtract = React.useRef(false);
 
   const update = (id, patch) => {
     setItems((prev) => prev.map((t) => (t.id === id ? { ...t, ...patch } : t)));
   };
 
+  const remove = (id) => {
+    setItems((prev) => prev.filter((t) => t.id !== id));
+  };
+
+  const addTerm = () => {
+    setItems((prev) => [
+      ...prev,
+      { id: `r${Date.now()}-${Math.random().toString(36).slice(2, 7)}`, term: '', definition: '' },
+    ]);
+  };
+
+  const strippedSource = (nextItems) => {
+    const { image, ...rest } = source || {};
+    return {
+      ...rest,
+      kind: rest.kind || 'photo',
+      title: rest.title || 'Your notes',
+      terms: nextItems.length,
+      items: nextItems,
+    };
+  };
+
+  const runExtract = React.useCallback(async () => {
+    const image = source?.image || peekPhoto();
+    if (!image) return;
+    setExtracting(true);
+    setExtractError('');
+    try {
+      let found = foundRef.current;
+      if (!found?.length) {
+        setExtractHint('Finding terms…');
+        found = await extractTermsFromPhoto(image, setExtractHint);
+        foundRef.current = found;
+      }
+      setExtractHint('Writing definitions…');
+      const withDefs = await generateDefinitions(found, setExtractHint);
+      setItems(withDefs);
+      setExtracting(false);
+    } catch {
+      setExtractError("Couldn't read terms from that photo. Try again, or take a clearer shot.");
+      setExtracting(false);
+    }
+  }, [source?.image]);
+
+  React.useEffect(() => {
+    if (ranExtract.current) return;
+    const image = source?.image || peekPhoto();
+    if (source?.kind === 'photo' && !source?.items?.length && image) {
+      ranExtract.current = true;
+      runExtract();
+    }
+  }, [source, runExtract]);
+
+  if (!source) {
+    return <Navigate to="/welcome" replace />;
+  }
+
   const filled = items.filter((t) => t.term.trim() && t.definition.trim());
 
-  const saveAndBack = () => {
+  const continueSetup = () => {
+    if (!filled.length) return;
     const nextItems = filled.map((t, i) => ({
       id: t.id || `r${i}`,
       term: t.term.trim(),
@@ -40,16 +104,41 @@ export default function ReviewNotes() {
       difficulty: t.difficulty,
       depends_on: t.depends_on,
     }));
-    navigate('/setup', {
-      state: {
-        setup,
-        source: {
-          ...source,
-          terms: nextItems.length || source.terms,
-          items: nextItems.length ? nextItems : source.items,
-        },
-      },
-    });
+    navigate('/setup', { state: { setup, source: strippedSource(nextItems) } });
+    clearPhoto();
+  };
+
+  const goBack = () => {
+    if (extracting) {
+      clearPhoto();
+      navigate('/welcome');
+      return;
+    }
+    if (setup) {
+      if (filled.length) continueSetup();
+      else {
+        clearPhoto();
+        navigate('/setup', { state: { setup, source: strippedSource([]) } });
+      }
+      return;
+    }
+    clearPhoto();
+    navigate('/welcome');
+  };
+
+  const regen = async (item) => {
+    if (regenId) return;
+    setRegenId(item.id);
+    try {
+      const definition = await regenerateDefinition({
+        term: item.term.trim(),
+        definition: item.definition.trim(),
+      });
+      update(item.id, { definition });
+    } catch {
+      // leave the current definition
+    }
+    setRegenId(null);
   };
 
   return (
@@ -57,7 +146,7 @@ export default function ReviewNotes() {
       <header className="px-3 pt-safe pb-2 flex items-center gap-1">
         <button
           type="button"
-          onClick={saveAndBack}
+          onClick={goBack}
           aria-label="Back"
           className="w-11 h-11 rounded-full flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-accent transition"
         >
@@ -68,40 +157,102 @@ export default function ReviewNotes() {
             {source.title || 'Your notes'}
           </h1>
           <p className="text-[11px] text-muted-foreground leading-none mt-1">
-            {items.length
-              ? `${items.length} terms — scroll and edit if you want`
-              : 'No terms to look over yet'}
+            {extracting
+              ? extractHint
+              : items.length
+                ? `${items.length} terms — edit anything that looks off`
+                : 'No terms to look over yet'}
           </p>
         </div>
       </header>
 
       <main className="flex-1 px-5 pt-3 overflow-y-auto">
         <div className="max-w-md mx-auto w-full space-y-3 pb-4">
-          {items.length === 0 ? (
-            <p className="text-sm text-muted-foreground text-center py-10">
-              No terms to look over yet. Terms will be extracted after you start.
-            </p>
-          ) : (
-            items.map((item, i) => (
-              <div
-                key={item.id}
-                className="rounded-2xl border border-border bg-card p-4 space-y-3 shadow-sm"
+          {extracting ? (
+            <div className="flex flex-col items-center justify-center py-16 text-center gap-3">
+              <Loader2 className="w-8 h-8 text-muted-foreground animate-spin" />
+              <p className="text-sm font-medium">{extractHint}</p>
+              <p className="text-xs text-muted-foreground max-w-xs">
+                Reading your photo, then writing a short definition for each term.
+              </p>
+            </div>
+          ) : extractError ? (
+            <div className="flex flex-col items-center justify-center py-16 text-center gap-3">
+              <p className="text-sm font-medium">Couldn't read that photo</p>
+              <p className="text-xs text-muted-foreground max-w-xs">{extractError}</p>
+              <Button
+                type="button"
+                onClick={() => {
+                  ranExtract.current = true;
+                  runExtract();
+                }}
+                className="mt-2 rounded-2xl"
               >
-                <p className="text-xs font-medium text-muted-foreground">Term {i + 1}</p>
-                <Input
-                  value={item.term}
-                  onChange={(e) => update(item.id, { term: e.target.value })}
-                  placeholder="Term"
-                  className="h-11 rounded-xl font-semibold"
-                />
-                <Textarea
-                  value={item.definition}
-                  onChange={(e) => update(item.id, { definition: e.target.value })}
-                  placeholder="Definition"
-                  className="min-h-[72px] rounded-xl"
-                />
-              </div>
-            ))
+                Try again
+              </Button>
+              <button
+                type="button"
+                onClick={() => {
+                  clearPhoto();
+                  navigate('/welcome');
+                }}
+                className="text-xs text-muted-foreground underline-offset-4 hover:underline"
+              >
+                Choose a different photo
+              </button>
+            </div>
+          ) : (
+            <>
+              {items.length === 0 && (
+                <p className="text-sm text-muted-foreground text-center py-10">
+                  No terms to look over yet.
+                </p>
+              )}
+              {items.map((item, i) => (
+                <div
+                  key={item.id}
+                  className="rounded-2xl border border-border bg-card p-4 space-y-3 shadow-sm"
+                >
+                  <p className="text-xs font-medium text-muted-foreground">Term {i + 1}</p>
+                  <Input
+                    value={item.term}
+                    onChange={(e) => update(item.id, { term: e.target.value })}
+                    placeholder="Term"
+                    className="h-11 rounded-xl font-semibold"
+                  />
+                  <Textarea
+                    value={item.definition}
+                    onChange={(e) => update(item.id, { definition: e.target.value })}
+                    placeholder="Definition"
+                    className="min-h-[72px] rounded-xl"
+                  />
+                  <div className="flex items-center justify-between gap-3">
+                    <button
+                      type="button"
+                      onClick={() => regen(item)}
+                      disabled={!!regenId || !item.term.trim()}
+                      className="text-xs text-muted-foreground hover:text-foreground underline-offset-4 hover:underline disabled:opacity-50"
+                    >
+                      {regenId === item.id ? 'Regenerating…' : 'Regenerate definition'}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => remove(item.id)}
+                      className="text-xs text-muted-foreground hover:text-foreground underline-offset-4 hover:underline"
+                    >
+                      Remove
+                    </button>
+                  </div>
+                </div>
+              ))}
+              <button
+                type="button"
+                onClick={addTerm}
+                className="text-xs text-muted-foreground hover:text-foreground underline-offset-4 hover:underline px-1"
+              >
+                Add a missed term
+              </button>
+            </>
           )}
         </div>
       </main>
@@ -110,11 +261,12 @@ export default function ReviewNotes() {
         <div className="max-w-md mx-auto w-full">
           <Button
             size="lg"
-            onClick={saveAndBack}
+            disabled={!filled.length || extracting}
+            onClick={continueSetup}
             className="w-full h-14 rounded-2xl text-base font-semibold shadow-lg"
           >
             <Check className="w-5 h-5 mr-2" />
-            Done
+            Looks good
           </Button>
         </div>
       </footer>

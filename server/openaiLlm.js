@@ -1,6 +1,7 @@
 const MODEL = 'gpt-4o-mini';
 const OPENAI_URL = 'https://api.openai.com/v1/chat/completions';
 const MAX_PROMPT_CHARS = 24000;
+const MAX_IMAGE_CHARS = 5_000_000;
 
 function toStrictSchema(schema) {
   if (!schema || typeof schema !== 'object' || Array.isArray(schema)) return schema;
@@ -24,7 +25,7 @@ function openaiErrorMessage(payload, status) {
   return `OpenAI request failed (${status || 'network'})`;
 }
 
-export async function runLlm({ prompt, response_json_schema } = {}) {
+export async function runLlm({ prompt, response_json_schema, image } = {}) {
   const apiKey = process.env.OPENAI_API_KEY;
   if (!apiKey) {
     throw new Error('Server is missing OPENAI_API_KEY');
@@ -35,10 +36,25 @@ export async function runLlm({ prompt, response_json_schema } = {}) {
   if (prompt.length > MAX_PROMPT_CHARS) {
     throw new Error('Prompt is too long');
   }
+  if (image != null) {
+    if (typeof image !== 'string' || !image.startsWith('data:image/')) {
+      throw new Error('Photo must be an image');
+    }
+    if (image.length > MAX_IMAGE_CHARS) {
+      throw new Error('Photo is too large');
+    }
+  }
+
+  const content = image
+    ? [
+        { type: 'text', text: prompt },
+        { type: 'image_url', image_url: { url: image } },
+      ]
+    : prompt;
 
   const body = {
     model: MODEL,
-    messages: [{ role: 'user', content: prompt }],
+    messages: [{ role: 'user', content }],
     temperature: 0.4,
   };
 

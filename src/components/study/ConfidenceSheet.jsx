@@ -8,6 +8,7 @@ import { retireThresholdForTier } from '@/lib/studyUtils';
 // Screen E — final compressed pass over the still-shaky terms.
 export default function ConfidenceSheet({
   terms,
+  recallIds,
   examTiming,
   stillShaky,
   readiness,
@@ -18,16 +19,17 @@ export default function ConfidenceSheet({
   onSetStopTime,
   onOpenCheat,
 }) {
-  // shaky = (critical/core never fully retired) ∪ (stillShaky from practice test).
+  // shaky = (recall-queue critical/core never fully retired) ∪ (stillShaky from practice test).
   const shakyTerms = React.useMemo(() => {
     const set = new Set(stillShaky);
+    const queued = recallIds instanceof Set ? recallIds : null;
     terms.forEach((t) => {
       if ((t.tier === 'critical' || t.tier === 'core') && (t.correctStreak || 0) < retireThresholdForTier(t.tier)) {
-        set.add(t.id);
+        if (!queued || queued.has(t.id)) set.add(t.id);
       }
     });
     return terms.filter((t) => set.has(t.id));
-  }, [terms, stillShaky]);
+  }, [terms, stillShaky, recallIds]);
 
   const [view, setView] = React.useState('list'); // list | drill | final
   const [editingStop, setEditingStop] = React.useState(false);

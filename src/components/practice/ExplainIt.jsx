@@ -6,6 +6,29 @@ import { invokeLlm } from '@/api/invokeLlm';
 import { parseExplainGrade, sortForPractice, MASTERY, MASTERY_LEVELS, localExplainLevel } from '@/lib/mastery';
 import UnderstandingPyramid from './UnderstandingPyramid';
 
+const MAX_EXPLAIN_WORDS = 250;
+
+function wordCount(text) {
+  return (String(text).trim().match(/\S+/g) || []).length;
+}
+
+function clampToWordLimit(text, max) {
+  if (wordCount(text) <= max) return text;
+  const parts = String(text).match(/\S+|\s+/g) || [];
+  let words = 0;
+  let out = '';
+  for (const part of parts) {
+    if (/^\s+$/.test(part)) {
+      out += part;
+      continue;
+    }
+    if (words >= max) break;
+    out += part;
+    words += 1;
+  }
+  return out;
+}
+
 export default function ExplainIt({ terms, onUpdateTerm, onDone }) {
   const [queue] = React.useState(() =>
     sortForPractice(terms)
@@ -28,7 +51,7 @@ export default function ExplainIt({ terms, onUpdateTerm, onDone }) {
   }, [pos]);
 
   const gradeExplanation = async () => {
-    const text = draft.trim();
+    const text = clampToWordLimit(draft, MAX_EXPLAIN_WORDS).trim();
     if (!text || !current) return;
     if (text.length < 20) {
       const result = {
@@ -116,6 +139,8 @@ export default function ExplainIt({ terms, onUpdateTerm, onDone }) {
     );
   }
 
+  const atWordLimit = wordCount(draft) >= MAX_EXPLAIN_WORDS;
+
   const label = MASTERY_LEVELS.find((l) => l.level === grade?.level)?.label;
 
   return (
@@ -136,10 +161,15 @@ export default function ExplainIt({ terms, onUpdateTerm, onDone }) {
           <>
             <Textarea
               value={draft}
-              onChange={(e) => setDraft(e.target.value)}
+              onChange={(e) => setDraft(clampToWordLimit(e.target.value, MAX_EXPLAIN_WORDS))}
               placeholder="Start with what it is, then how you'd teach it…"
               className="mt-4 min-h-[160px] rounded-2xl text-base p-4"
             />
+            {atWordLimit ? (
+              <p className="mt-2 text-xs text-muted-foreground" aria-live="polite">
+                You’ve hit the word limit
+              </p>
+            ) : null}
             <Button
               onClick={gradeExplanation}
               disabled={!draft.trim() || grading}

@@ -1,23 +1,41 @@
 import React from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ArrowLeft, Upload } from 'lucide-react';
+import { ArrowLeft, Upload, Loader2 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { makePhotoSource } from '@/lib/notesSource';
+import { fileToJpegDataUrl, stashPhoto } from '@/lib/imageData';
 import { loadSession } from '@/lib/sessionStore';
 import { ONBOARDING_FLAG } from '@/lib/onboarding';
 
 export default function Welcome() {
   const navigate = useNavigate();
   const [dragging, setDragging] = React.useState(false);
+  const [reading, setReading] = React.useState(false);
+  const [readError, setReadError] = React.useState('');
   const inputRef = React.useRef(null);
 
   const canGoBack = typeof window !== 'undefined'
     ? !!(localStorage.getItem(ONBOARDING_FLAG) || loadSession())
     : false;
 
-  const takeFile = (file) => {
-    if (!file) return;
-    navigate('/setup', { state: { source: makePhotoSource(file) } });
+  const takeFile = async (file) => {
+    if (!file || reading) return;
+    if (file.type && !file.type.startsWith('image/')) {
+      setReadError('Please choose a photo of your notes.');
+      return;
+    }
+    setReadError('');
+    setReading(true);
+    try {
+      const image = await fileToJpegDataUrl(file);
+      stashPhoto(image);
+      navigate('/review-notes', {
+        state: { source: makePhotoSource({ name: file.name }) },
+      });
+    } catch {
+      setReadError('Could not read that photo. Try another one.');
+      setReading(false);
+    }
   };
 
   const onDrop = (e) => {
@@ -54,38 +72,46 @@ export default function Welcome() {
           </div>
 
           <div
-            onClick={() => inputRef.current?.click()}
+            onClick={() => !reading && inputRef.current?.click()}
             onDragOver={(e) => {
               e.preventDefault();
-              setDragging(true);
+              if (!reading) setDragging(true);
             }}
             onDragLeave={() => setDragging(false)}
             onDrop={onDrop}
             className={cn(
-              'w-full rounded-3xl border-2 border-dashed px-6 py-12 flex flex-col items-center gap-4 transition text-center cursor-pointer',
+              'w-full rounded-3xl border-2 border-dashed px-6 py-12 flex flex-col items-center gap-4 transition text-center',
+              reading ? 'cursor-wait opacity-80' : 'cursor-pointer',
               dragging
                 ? 'border-primary bg-primary/5'
                 : 'border-border bg-card hover:border-muted-foreground'
             )}
           >
             <div className="w-12 h-12 rounded-full bg-muted flex items-center justify-center">
-              <Upload className="w-5 h-5 text-muted-foreground" />
+              {reading ? (
+                <Loader2 className="w-5 h-5 text-muted-foreground animate-spin" />
+              ) : (
+                <Upload className="w-5 h-5 text-muted-foreground" />
+              )}
             </div>
             <div>
-              <p className="text-base font-semibold">Drop notes here</p>
+              <p className="text-base font-semibold">{reading ? 'Opening photo…' : 'Drop notes here'}</p>
               <p className="text-xs text-muted-foreground mt-1">Photos of handwritten or printed notes</p>
             </div>
             <button
               type="button"
               onClick={(e) => {
                 e.stopPropagation();
-                navigate('/create-notes');
+                if (!reading) navigate('/create-notes');
               }}
               className="text-sm text-foreground underline underline-offset-4 hover:text-muted-foreground"
             >
               create manually
             </button>
           </div>
+          {readError && (
+            <p className="text-xs text-rose-600 dark:text-rose-400 text-center mt-3">{readError}</p>
+          )}
           <input
             ref={inputRef}
             type="file"
