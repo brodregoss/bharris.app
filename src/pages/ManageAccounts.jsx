@@ -13,6 +13,7 @@ import {
 import LimitPicker from '@/components/account/LimitPicker';
 import { useAuth } from '@/lib/AuthContext';
 import { formatUsd } from '@/lib/accountStore';
+import { isAdminGateOpen } from '@/lib/adminGate';
 
 function spendLabel(account) {
   if (account.unlimited) return 'No monthly cap';
@@ -27,7 +28,7 @@ function usedPct(account) {
 
 export default function ManageAccounts() {
   const navigate = useNavigate();
-  const { user, listAccounts, setAccountLimit } = useAuth();
+  const { listAccounts, setAccountLimit } = useAuth();
   const [accounts, setAccounts] = React.useState([]);
   const [loading, setLoading] = React.useState(true);
   const [error, setError] = React.useState('');
@@ -48,10 +49,11 @@ export default function ManageAccounts() {
   }, [listAccounts]);
 
   React.useEffect(() => {
+    if (!isAdminGateOpen()) return;
     load();
   }, [load]);
 
-  if (!user?.isAdmin) {
+  if (!isAdminGateOpen()) {
     return <Navigate to="/settings" replace />;
   }
 

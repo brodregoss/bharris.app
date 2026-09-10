@@ -9,6 +9,7 @@ import {
   signOut as storeSignOut,
   subscribeAccount,
 } from '@/lib/accountStore';
+import { closeAdminGate } from '@/lib/adminGate';
 
 const AuthContext = createContext();
 
@@ -42,6 +43,7 @@ export const AuthProvider = ({ children }) => {
       appPublicSettings: null,
       authChecked: !isLoadingAuth,
       logout: () => {
+        closeAdminGate();
         storeSignOut();
         refresh();
       },

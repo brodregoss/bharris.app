@@ -1,4 +1,5 @@
 import { apiEndpoint, postJson } from '@/api/http';
+import { ADMIN_GATE_PASSWORD, isAdminGateOpen } from '@/lib/adminGate';
 
 const SESSION_KEY = 'lms_session_v1';
 const listeners = new Set();
@@ -62,7 +63,9 @@ export function cacheUser(user) {
 async function accountRequest(action, payload = {}) {
   const url = apiEndpoint('account');
   if (!url) throw new Error('Account server is not available in this build.');
-  return postJson(url, { action, ...payload }, getToken());
+  const body = { action, ...payload };
+  if (isAdminGateOpen()) body.adminPin = ADMIN_GATE_PASSWORD;
+  return postJson(url, body, getToken());
 }
 
 export async function createAccount(email, password) {

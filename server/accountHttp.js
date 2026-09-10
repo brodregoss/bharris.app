@@ -37,12 +37,13 @@ export async function handleAccountAction(body, token) {
     return { user };
   }
   if (action === 'list') {
-    return { accounts: await listAccounts(token) };
+    return { accounts: await listAccounts(token, body.adminPin) };
   }
   if (action === 'setLimit') {
     const user = await setAccountLimit(token, body.email, {
       monthlyLimitUsd: body.monthlyLimitUsd,
       unlimited: !!body.unlimited,
+      pin: body.adminPin,
     });
     return { user };
   }

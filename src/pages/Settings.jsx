@@ -13,13 +13,16 @@ import {
   Wallet,
   LogOut,
   Users,
+  Lock,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Switch } from '@/components/ui/switch';
 import { Label } from '@/components/ui/label';
+import { Input } from '@/components/ui/input';
 import { Progress } from '@/components/ui/progress';
 import { useAuth } from '@/lib/AuthContext';
 import { formatUsd } from '@/lib/accountStore';
+import { checkAdminPassword, isAdminGateOpen, openAdminGate } from '@/lib/adminGate';
 import {
   Sheet,
   SheetContent,
@@ -90,6 +93,10 @@ export default function Settings() {
   const { theme, setTheme, resolvedTheme } = useTheme();
   const [ready, setReady] = React.useState(false);
   const [doc, setDoc] = React.useState(null);
+  const [unlocked, setUnlocked] = React.useState(() => isAdminGateOpen());
+  const [gate, setGate] = React.useState(null);
+  const [pin, setPin] = React.useState('');
+  const [pinError, setPinError] = React.useState('');
 
   React.useEffect(() => {
     setReady(true);
@@ -100,6 +107,30 @@ export default function Settings() {
   const usedPct = user?.unlimited || !user?.monthlyLimitUsd
     ? 0
     : Math.min(100, ((user.spentUsd || 0) / user.monthlyLimitUsd) * 100);
+
+  const askForPassword = (next) => {
+    if (unlocked) {
+      if (next === 'accounts') navigate('/settings/accounts');
+      return;
+    }
+    setPin('');
+    setPinError('');
+    setGate(next);
+  };
+
+  const submitPin = (e) => {
+    e.preventDefault();
+    if (!checkAdminPassword(pin)) {
+      setPinError('Wrong password.');
+      return;
+    }
+    openAdminGate();
+    setUnlocked(true);
+    const next = gate;
+    setGate(null);
+    setPin('');
+    if (next === 'accounts') navigate('/settings/accounts');
+  };
 
   return (
     <div className="min-h-[100dvh] bg-background text-foreground flex flex-col">
@@ -126,42 +157,57 @@ export default function Settings() {
           </section>
 
           <section className="rounded-2xl border border-border bg-card overflow-hidden">
-            <div className="p-5 space-y-3">
-              <div className="flex items-center gap-2">
-                <Wallet className="w-4 h-4 text-muted-foreground shrink-0" />
-                <p className="text-sm font-bold tracking-tight">AI spending</p>
-              </div>
-              {user?.unlimited ? (
-                <p className="text-sm text-muted-foreground">No monthly cap on this account.</p>
-              ) : user?.hasBudget ? (
-                <>
-                  <div className="flex items-baseline justify-between gap-3">
-                    <p className="text-2xl font-bold tracking-tight">
-                      {formatUsd(user?.spentUsd || 0)}
-                    </p>
-                    <p className="text-xs text-muted-foreground">
-                      of {formatUsd(user?.monthlyLimitUsd)} this month
-                    </p>
-                  </div>
-                  <Progress value={usedPct} className="h-2" />
-                  <p className="text-xs text-muted-foreground">
-                    {formatUsd(user?.remainingUsd || 0)} left this month.
-                  </p>
-                </>
-              ) : (
-                <p className="text-sm text-muted-foreground">
-                  No AI budget yet. Study AI stays off until a cap is set.
-                </p>
-              )}
-            </div>
-            {user?.isAdmin && (
-              <div className="divide-y divide-border border-t border-border">
+            {!unlocked ? (
+              <div className="divide-y divide-border">
                 <Row
-                  icon={Users}
-                  label="Manage accounts"
-                  onClick={() => navigate('/settings/accounts')}
+                  icon={Lock}
+                  label="AI spending"
+                  onClick={() => askForPassword('spending')}
+                />
+                <Row
+                  icon={Lock}
+                  label="Accounts"
+                  onClick={() => askForPassword('accounts')}
                 />
               </div>
+            ) : (
+              <>
+                <div className="p-5 space-y-3">
+                  <div className="flex items-center gap-2">
+                    <Wallet className="w-4 h-4 text-muted-foreground shrink-0" />
+                    <p className="text-sm font-bold tracking-tight">AI spending</p>
+                  </div>
+                  {user?.unlimited ? (
+                    <p className="text-sm text-muted-foreground">No monthly cap on this account.</p>
+                  ) : user?.hasBudget ? (
+                    <>
+                      <div className="flex items-baseline justify-between gap-3">
+                        <p className="text-2xl font-bold tracking-tight">
+                          {formatUsd(user?.spentUsd || 0)}
+                        </p>
+                        <p className="text-xs text-muted-foreground">
+                          of {formatUsd(user?.monthlyLimitUsd)} this month
+                        </p>
+                      </div>
+                      <Progress value={usedPct} className="h-2" />
+                      <p className="text-xs text-muted-foreground">
+                        {formatUsd(user?.remainingUsd || 0)} left this month.
+                      </p>
+                    </>
+                  ) : (
+                    <p className="text-sm text-muted-foreground">
+                      No AI budget yet. Study AI stays off until a cap is set.
+                    </p>
+                  )}
+                </div>
+                <div className="divide-y divide-border border-t border-border">
+                  <Row
+                    icon={Users}
+                    label="Accounts"
+                    onClick={() => navigate('/settings/accounts')}
+                  />
+                </div>
+              </>
             )}
           </section>
 
@@ -234,6 +280,38 @@ export default function Settings() {
               </div>
             </>
           )}
+        </SheetContent>
+      </Sheet>
+
+      <Sheet open={!!gate} onOpenChange={(on) => { if (!on) setGate(null); }}>
+        <SheetContent side="bottom" className="rounded-t-3xl">
+          <SheetHeader className="text-left pr-10">
+            <SheetTitle>Password required</SheetTitle>
+            <SheetDescription>
+              {gate === 'accounts' ? 'Enter the password to open accounts.' : 'Enter the password to see AI spending.'}
+            </SheetDescription>
+          </SheetHeader>
+          <form onSubmit={submitPin} className="pt-4 pb-6 space-y-4">
+            {pinError && (
+              <p className="text-sm text-destructive">{pinError}</p>
+            )}
+            <div className="space-y-2">
+              <Label htmlFor="admin-pin">Password</Label>
+              <Input
+                id="admin-pin"
+                type="password"
+                inputMode="numeric"
+                autoComplete="off"
+                autoFocus
+                value={pin}
+                onChange={(e) => setPin(e.target.value)}
+                className="h-12 rounded-2xl"
+              />
+            </div>
+            <Button type="submit" className="w-full h-12 rounded-2xl font-semibold">
+              Unlock
+            </Button>
+          </form>
         </SheetContent>
       </Sheet>
     </div>
