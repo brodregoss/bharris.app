@@ -6,27 +6,10 @@ import { invokeLlm } from '@/api/invokeLlm';
 import { parseExplainGrade, sortForPractice, MASTERY, MASTERY_LEVELS, localExplainLevel } from '@/lib/mastery';
 import UnderstandingPyramid from './UnderstandingPyramid';
 
-const MAX_EXPLAIN_WORDS = 250;
+const MAX_EXPLAIN_CHARS = 200;
 
-function wordCount(text) {
-  return (String(text).trim().match(/\S+/g) || []).length;
-}
-
-function clampToWordLimit(text, max) {
-  if (wordCount(text) <= max) return text;
-  const parts = String(text).match(/\S+|\s+/g) || [];
-  let words = 0;
-  let out = '';
-  for (const part of parts) {
-    if (/^\s+$/.test(part)) {
-      out += part;
-      continue;
-    }
-    if (words >= max) break;
-    out += part;
-    words += 1;
-  }
-  return out;
+function clampChars(text, max) {
+  return String(text).slice(0, max);
 }
 
 export default function ExplainIt({ terms, onUpdateTerm, onDone }) {
@@ -51,7 +34,7 @@ export default function ExplainIt({ terms, onUpdateTerm, onDone }) {
   }, [pos]);
 
   const gradeExplanation = async () => {
-    const text = clampToWordLimit(draft, MAX_EXPLAIN_WORDS).trim();
+    const text = clampChars(draft, MAX_EXPLAIN_CHARS).trim();
     if (!text || !current) return;
     if (text.length < 20) {
       const result = {
@@ -139,7 +122,7 @@ export default function ExplainIt({ terms, onUpdateTerm, onDone }) {
     );
   }
 
-  const atWordLimit = wordCount(draft) >= MAX_EXPLAIN_WORDS;
+  const atCharLimit = draft.length >= MAX_EXPLAIN_CHARS;
 
   const label = MASTERY_LEVELS.find((l) => l.level === grade?.level)?.label;
 
@@ -161,15 +144,16 @@ export default function ExplainIt({ terms, onUpdateTerm, onDone }) {
           <>
             <Textarea
               value={draft}
-              onChange={(e) => setDraft(clampToWordLimit(e.target.value, MAX_EXPLAIN_WORDS))}
+              maxLength={MAX_EXPLAIN_CHARS}
+              onChange={(e) => setDraft(clampChars(e.target.value, MAX_EXPLAIN_CHARS))}
               placeholder="Start with what it is, then how you'd teach it…"
               className="mt-4 min-h-[160px] rounded-2xl text-base p-4"
             />
-            {atWordLimit ? (
-              <p className="mt-2 text-xs text-muted-foreground" aria-live="polite">
-                You’ve hit the word limit
-              </p>
-            ) : null}
+            <p className="mt-2 text-xs text-muted-foreground tabular-nums" aria-live="polite">
+              {atCharLimit
+                ? 'You’ve hit the character limit'
+                : `${draft.length}/${MAX_EXPLAIN_CHARS}`}
+            </p>
             <Button
               onClick={gradeExplanation}
               disabled={!draft.trim() || grading}

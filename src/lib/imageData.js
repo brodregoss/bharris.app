@@ -1,18 +1,53 @@
-// Shrink a notes photo so it can be sent to the study AI.
-// Keep the data URL off React Router history — iOS caps history state size.
+// Shrink notes photos so they can be sent to the study AI.
+// Keep data URLs off React Router history — iOS caps history state size.
 
-let pendingPhoto = null;
+// A page or two of notes — not a chapter or a book.
+export const MAX_NOTE_PHOTOS = 2;
+export const MAX_NOTE_PHOTO_BYTES = 12 * 1024 * 1024;
+
+let pendingPhotos = [];
+
+export function stashPhotos(images) {
+  pendingPhotos = (Array.isArray(images) ? images : images ? [images] : []).filter(Boolean);
+}
 
 export function stashPhoto(image) {
-  pendingPhoto = image || null;
+  stashPhotos(image ? [image] : []);
+}
+
+export function peekPhotos() {
+  return pendingPhotos;
 }
 
 export function peekPhoto() {
-  return pendingPhoto;
+  return pendingPhotos[0] || null;
 }
 
 export function clearPhoto() {
-  pendingPhoto = null;
+  pendingPhotos = [];
+}
+
+export function validateNotePhotos(fileList) {
+  const files = [...(fileList || [])].filter(Boolean);
+  if (!files.length) {
+    return { error: 'Please choose a photo of your notes.' };
+  }
+  if (files.length > MAX_NOTE_PHOTOS) {
+    return {
+      error: 'You can attach up to 2 photos — a page or two of notes, not a whole book.',
+    };
+  }
+  for (const file of files) {
+    if (file.type && !file.type.startsWith('image/')) {
+      return { error: 'Please choose photos of your notes.' };
+    }
+    if (file.size > MAX_NOTE_PHOTO_BYTES) {
+      return {
+        error: 'Each photo must be under 12 MB. Snap a page or two — not a scan of the book.',
+      };
+    }
+  }
+  return { files };
 }
 
 export function fileToJpegDataUrl(file, { maxDim = 1600, quality = 0.72 } = {}) {

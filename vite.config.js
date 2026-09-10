@@ -6,7 +6,9 @@ import { llmDevPlugin } from './server/llmDevPlugin.js'
 // https://vite.dev/config/
 export default defineConfig(({ mode }) => {
   const env = loadEnv(mode, process.cwd(), '')
-  if (env.OPENAI_API_KEY) process.env.OPENAI_API_KEY = env.OPENAI_API_KEY
+  for (const key of ['OPENAI_API_KEY', 'ACCOUNT_SECRET', 'ADMIN_EMAIL', 'KV_REST_API_URL', 'KV_REST_API_TOKEN']) {
+    if (env[key]) process.env[key] = env[key]
+  }
 
   return {
     // Relative asset URLs so the built app works inside the Xcode / Capacitor webview.

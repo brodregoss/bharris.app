@@ -1,4 +1,5 @@
 import { runLlm } from '../server/openaiLlm.js';
+import { runLlmForAccount, setCors, tokenFromReq } from '../server/accountHttp.js';
 
 export const config = {
   maxDuration: 60,
@@ -32,12 +33,6 @@ function overLimit(ip) {
   return current.count > MAX_HITS;
 }
 
-function setCors(res) {
-  res.setHeader('Access-Control-Allow-Origin', '*');
-  res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
-}
-
 export default async function handler(req, res) {
   setCors(res);
   if (req.method === 'OPTIONS') {
@@ -55,11 +50,15 @@ export default async function handler(req, res) {
 
   try {
     const body = typeof req.body === 'string' ? JSON.parse(req.body || '{}') : (req.body || {});
-    const result = await runLlm(body);
-    res.status(200).json({ result });
+    const payload = await runLlmForAccount(runLlm, body, tokenFromReq(req, body));
+    res.status(200).json(payload);
   } catch (error) {
     const message = error instanceof Error ? error.message : 'AI request failed';
-    const status = message.includes('missing OPENAI_API_KEY') ? 500 : 400;
+    const status = message.includes('missing OPENAI_API_KEY')
+      ? 500
+      : /sign in|budget|AI cap/i.test(message)
+        ? 403
+        : 400;
     res.status(status).json({ error: message });
   }
 }

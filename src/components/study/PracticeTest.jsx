@@ -56,6 +56,12 @@ function buildQuestions(terms, examType, missedIds, distractorPool = terms) {
   });
 }
 
+const MAX_SHORT_ANSWER_CHARS = 100;
+
+function clampChars(text, max) {
+  return String(text).slice(0, max);
+}
+
 // Screen D — timed self-test weighted toward previously-missed items.
 export default function PracticeTest({ terms, examType, budgetMs, priorMissed, onDone }) {
   const [questions, setQuestions] = React.useState(() => buildQuestions(terms, examType, priorMissed));
@@ -159,12 +165,13 @@ export default function PracticeTest({ terms, examType, budgetMs, priorMissed, o
   // Grade typed answers locally first, then with AI. Local exact matches win so
   // case/punctuation never mark a right answer wrong; AI covers paraphrases.
   const gradeWithAI = async () => {
-    if (!shortAnswer.trim()) return;
+    const answer = clampChars(shortAnswer, MAX_SHORT_ANSWER_CHARS).trim();
+    if (!answer) return;
     setSubmitted(true);
     setGrading(true);
     setGradeError(false);
     setGradeResult(null);
-    const local = localGradeShortAnswer(shortAnswer, q.definition);
+    const local = localGradeShortAnswer(answer, q.definition);
     if (local?.correct) {
       applyGrade(local);
       setGrading(false);
@@ -174,7 +181,7 @@ export default function PracticeTest({ terms, examType, budgetMs, priorMissed, o
       const res = await invokeLlm({
         prompt:
           `You are grading a student's short-answer response for an exam-prep app.\n` +
-          `Term: ${q.term}\nCorrect definition: ${q.definition}\nStudent's answer: ${shortAnswer}\n\n` +
+          `Term: ${q.term}\nCorrect definition: ${q.definition}\nStudent's answer: ${answer}\n\n` +
           `Mark correct if the student shows the same meaning — ignore case, punctuation, extra words, and wording. ` +
           `If they restated the term or the definition, that is correct. Only mark incorrect when the meaning is wrong.\n` +
           `Respond with JSON { "correct": boolean, "feedback": "one short sentence" }.`,
@@ -201,7 +208,7 @@ export default function PracticeTest({ terms, examType, budgetMs, priorMissed, o
       const res = await invokeLlm({
         prompt:
           `A student is studying the term "${q.term}". The correct definition is: "${q.definition}". ` +
-          `The student answered: "${shortAnswer}". ` +
+          `The student answered: "${clampChars(shortAnswer, MAX_SHORT_ANSWER_CHARS)}". ` +
           `In 2-3 short sentences, explain the concept clearly so the student understands why the correct definition is the right answer. Focus on helping them understand the correct answer.`,
       });
       setExplanation(typeof res === 'string' ? res : String(res));
@@ -451,15 +458,23 @@ export default function PracticeTest({ terms, examType, budgetMs, priorMissed, o
           ) : (
             <div className="mt-4">
               {!submitted ? (
-                <textarea
-                  value={shortAnswer}
-                  onChange={(e) => setShortAnswer(e.target.value)}
-                  placeholder="Type your answer — we'll grade it with AI…"
-                  autoCapitalize="sentences"
-                  autoCorrect="on"
-                  enterKeyHint="done"
-                  className="w-full rounded-xl border border-border bg-card p-3 text-base min-h-[80px] focus:outline-none focus:ring-2 focus:ring-ring"
-                />
+                <>
+                  <textarea
+                    value={shortAnswer}
+                    maxLength={MAX_SHORT_ANSWER_CHARS}
+                    onChange={(e) => setShortAnswer(clampChars(e.target.value, MAX_SHORT_ANSWER_CHARS))}
+                    placeholder="Type your answer — we'll grade it with AI…"
+                    autoCapitalize="sentences"
+                    autoCorrect="on"
+                    enterKeyHint="done"
+                    className="w-full rounded-xl border border-border bg-card p-3 text-base min-h-[80px] focus:outline-none focus:ring-2 focus:ring-ring"
+                  />
+                  <p className="mt-2 text-xs text-muted-foreground tabular-nums" aria-live="polite">
+                    {shortAnswer.length >= MAX_SHORT_ANSWER_CHARS
+                      ? 'You’ve hit the character limit'
+                      : `${shortAnswer.length}/${MAX_SHORT_ANSWER_CHARS}`}
+                  </p>
+                </>
               ) : (
                 <div className="space-y-2">
                   {gradeResult && (

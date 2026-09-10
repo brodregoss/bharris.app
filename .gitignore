@@ -33,6 +33,9 @@ dist-ssr
 .vite
 base44/.app.jsonc
 
+# Account store (passwords + spend). Local and /tmp copies only.
+/data/accounts.json
+
 # iOS / Xcode
 ios/App/Pods
 ios/DerivedData

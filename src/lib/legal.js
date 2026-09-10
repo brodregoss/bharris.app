@@ -12,22 +12,22 @@ export const ABOUT_SECTIONS = [
   },
   {
     title: 'AI',
-    body: 'Term extraction from photos, definition writing, panic notes, and answer grading go through a small server that calls OpenAI. Those features can be wrong. Treat them as a study aid, not the answer key.',
+    body: 'Term extraction from photos, definition writing, panic notes, and answer grading go through a small server that calls OpenAI. Those features count toward the monthly AI cap set for your account. They can be wrong. Treat them as a study aid, not the answer key.',
   },
 ];
 
 export const PRIVACY_SECTIONS = [
   {
-    title: 'No account required',
-    body: 'You can use Last Minute Study without signing in. We do not collect a name, email, or profile to use the app.',
+    title: 'Account',
+    body: 'You create an account with an email and password. The app owner can see accounts and set a monthly AI cap. Notes are not used as a cloud backup.',
   },
   {
     title: 'What stays on your device',
-    body: 'Your notes, study sessions, practice progress, and appearance settings are stored locally on this phone or browser. They are not uploaded as an account backup.',
+    body: 'Your notes, study sessions, practice progress, appearance settings, and account details are stored locally on this phone or browser.',
   },
   {
     title: 'What leaves your device',
-    body: 'If you photograph notes, that image is sent to our server so terms and definitions can be extracted. Panic notes, definition generation, and practice-test grading send the relevant terms and answers to the same server, which forwards them to OpenAI to produce a response. We do not sell this content.',
+    body: 'If you photograph notes (up to two pages), those images are sent to our server so terms and definitions can be extracted. Panic notes, definition generation, and practice-test grading send the relevant terms and answers to the same server, which forwards them to OpenAI to produce a response. We do not sell this content.',
   },
   {
     title: 'Camera and photos',
@@ -42,7 +42,7 @@ export const PRIVACY_SECTIONS = [
 export const TERMS_SECTIONS = [
   {
     title: 'Using the app',
-    body: 'Last Minute Study is for personal studying. Built-in sample notes are for trying the app, not a complete course.',
+    body: 'Last Minute Study is for personal studying. An account is required. Built-in sample notes are for trying the app, not a complete course.',
   },
   {
     title: 'No academic guarantee',

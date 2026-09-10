@@ -85,6 +85,19 @@ export async function extractTermsFromPhoto(image, onProgress) {
   return list;
 }
 
+export async function extractTermsFromPhotos(images, onProgress) {
+  const list = (Array.isArray(images) ? images : [images]).filter(Boolean);
+  if (!list.length) throw new Error('empty terms');
+  let all = [];
+  for (let i = 0; i < list.length; i++) {
+    const page = list.length > 1 ? ` (page ${i + 1} of ${list.length})` : '';
+    const found = await extractTermsFromPhoto(list[i], (msg) => onProgress?.(`${msg}${page}`));
+    all = mergeUnique(all, found);
+  }
+  if (!all.length) throw new Error('empty terms');
+  return all;
+}
+
 async function defineChunk(terms) {
   const res = await invokeLlm({
     prompt:

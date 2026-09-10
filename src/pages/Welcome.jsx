@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { ArrowLeft, Upload, Loader2 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { makePhotoSource } from '@/lib/notesSource';
-import { fileToJpegDataUrl, stashPhoto } from '@/lib/imageData';
+import { fileToJpegDataUrl, stashPhotos, validateNotePhotos } from '@/lib/imageData';
 import { loadSession } from '@/lib/sessionStore';
 import { ONBOARDING_FLAG } from '@/lib/onboarding';
 
@@ -18,19 +18,26 @@ export default function Welcome() {
     ? !!(localStorage.getItem(ONBOARDING_FLAG) || loadSession())
     : false;
 
-  const takeFile = async (file) => {
-    if (!file || reading) return;
-    if (file.type && !file.type.startsWith('image/')) {
-      setReadError('Please choose a photo of your notes.');
+  const takeFiles = async (fileList) => {
+    if (reading) return;
+    const checked = validateNotePhotos(fileList);
+    if (checked.error) {
+      setReadError(checked.error);
       return;
     }
     setReadError('');
     setReading(true);
     try {
-      const image = await fileToJpegDataUrl(file);
-      stashPhoto(image);
+      const images = [];
+      for (const file of checked.files) {
+        images.push(await fileToJpegDataUrl(file));
+      }
+      stashPhotos(images);
+      const name = checked.files.length === 1
+        ? checked.files[0].name
+        : `${checked.files.length} photos`;
       navigate('/review-notes', {
-        state: { source: makePhotoSource({ name: file.name }) },
+        state: { source: makePhotoSource({ name }) },
       });
     } catch {
       setReadError('Could not read that photo. Try another one.');
@@ -41,7 +48,7 @@ export default function Welcome() {
   const onDrop = (e) => {
     e.preventDefault();
     setDragging(false);
-    takeFile(e.dataTransfer.files?.[0]);
+    takeFiles(e.dataTransfer.files);
   };
 
   return (
@@ -96,7 +103,9 @@ export default function Welcome() {
             </div>
             <div>
               <p className="text-base font-semibold">{reading ? 'Opening photo…' : 'Drop notes here'}</p>
-              <p className="text-xs text-muted-foreground mt-1">Photos of handwritten or printed notes</p>
+              <p className="text-xs text-muted-foreground mt-1">
+                Up to 2 photos · a page or two of notes
+              </p>
             </div>
             <button
               type="button"
@@ -116,9 +125,10 @@ export default function Welcome() {
             ref={inputRef}
             type="file"
             accept="image/*"
+            multiple
             className="hidden"
             onChange={(e) => {
-              takeFile(e.target.files?.[0]);
+              takeFiles(e.target.files);
               e.target.value = '';
             }}
           />

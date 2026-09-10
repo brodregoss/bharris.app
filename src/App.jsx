@@ -19,6 +19,11 @@ import PanicReview from './pages/PanicReview';
 import PastSessions from './pages/PastSessions';
 import Settings from './pages/Settings';
 import Practice from './pages/Practice';
+import Account from './pages/Account';
+import AccountSignIn from './pages/AccountSignIn';
+import AccountCreate from './pages/AccountCreate';
+import ManageAccounts from './pages/ManageAccounts';
+import RequireAccount from '@/components/RequireAccount';
 import { DebugProvider } from '@/lib/DebugContext';
 import DebugPanel from '@/components/dev/DebugPanel';
 
@@ -33,19 +38,25 @@ function App() {
             <Router>
               <ScrollToTop />
               <Routes>
-                <Route path="/" element={<Landing />} />
-                <Route path="/welcome" element={<Welcome />} />
-                <Route path="/setup" element={<Home />} />
-                <Route path="/create-notes" element={<CreateNotes />} />
-                <Route path="/review-notes" element={<ReviewNotes />} />
-                <Route path="/history" element={<PastSessions />} />
-                <Route path="/settings" element={<Settings />} />
-                <Route path="/practice" element={<Practice />} />
-                <Route path="/upload-notes" element={<UploadNotes />} />
-                <Route path="/triage" element={<Triage />} />
-                <Route path="/study" element={<StudyFlow />} />
-                <Route path="/panic" element={<PanicReview />} />
-                <Route path="*" element={<PageNotFound />} />
+                <Route path="/account" element={<Account />} />
+                <Route path="/account/signin" element={<AccountSignIn />} />
+                <Route path="/account/create" element={<AccountCreate />} />
+                <Route element={<RequireAccount />}>
+                  <Route path="/" element={<Landing />} />
+                  <Route path="/welcome" element={<Welcome />} />
+                  <Route path="/setup" element={<Home />} />
+                  <Route path="/create-notes" element={<CreateNotes />} />
+                  <Route path="/review-notes" element={<ReviewNotes />} />
+                  <Route path="/history" element={<PastSessions />} />
+                  <Route path="/settings" element={<Settings />} />
+                  <Route path="/settings/accounts" element={<ManageAccounts />} />
+                  <Route path="/practice" element={<Practice />} />
+                  <Route path="/upload-notes" element={<UploadNotes />} />
+                  <Route path="/triage" element={<Triage />} />
+                  <Route path="/study" element={<StudyFlow />} />
+                  <Route path="/panic" element={<PanicReview />} />
+                  <Route path="*" element={<PageNotFound />} />
+                </Route>
               </Routes>
               <DebugPanel />
             </Router>

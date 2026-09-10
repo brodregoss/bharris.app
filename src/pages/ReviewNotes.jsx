@@ -4,8 +4,17 @@ import { ArrowLeft, Check, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
-import { extractTermsFromPhoto, generateDefinitions, regenerateDefinition } from '@/lib/extractNotes';
-import { peekPhoto, clearPhoto } from '@/lib/imageData';
+import { extractTermsFromPhotos, generateDefinitions, regenerateDefinition } from '@/lib/extractNotes';
+import { peekPhotos, peekPhoto, clearPhoto } from '@/lib/imageData';
+
+function photosFor(source) {
+  const stashed = peekPhotos();
+  if (stashed.length) return stashed;
+  if (Array.isArray(source?.images) && source.images.length) return source.images.filter(Boolean);
+  if (source?.image) return [source.image];
+  const one = peekPhoto();
+  return one ? [one] : [];
+}
 
 export default function ReviewNotes() {
   const navigate = useNavigate();
@@ -24,7 +33,7 @@ export default function ReviewNotes() {
     }));
   });
   const [extracting, setExtracting] = React.useState(
-    () => source?.kind === 'photo' && !source?.items?.length && !!(source?.image || peekPhoto())
+    () => source?.kind === 'photo' && !source?.items?.length && photosFor(source).length > 0
   );
   const [extractHint, setExtractHint] = React.useState('Finding terms…');
   const [extractError, setExtractError] = React.useState('');
@@ -59,15 +68,15 @@ export default function ReviewNotes() {
   };
 
   const runExtract = React.useCallback(async () => {
-    const image = source?.image || peekPhoto();
-    if (!image) return;
+    const images = photosFor(source);
+    if (!images.length) return;
     setExtracting(true);
     setExtractError('');
     try {
       let found = foundRef.current;
       if (!found?.length) {
         setExtractHint('Finding terms…');
-        found = await extractTermsFromPhoto(image, setExtractHint);
+        found = await extractTermsFromPhotos(images, setExtractHint);
         foundRef.current = found;
       }
       setExtractHint('Writing definitions…');
@@ -78,12 +87,12 @@ export default function ReviewNotes() {
       setExtractError("Couldn't read terms from that photo. Try again, or take a clearer shot.");
       setExtracting(false);
     }
-  }, [source?.image]);
+  }, [source]);
 
   React.useEffect(() => {
     if (ranExtract.current) return;
-    const image = source?.image || peekPhoto();
-    if (source?.kind === 'photo' && !source?.items?.length && image) {
+    const images = photosFor(source);
+    if (source?.kind === 'photo' && !source?.items?.length && images.length) {
       ranExtract.current = true;
       runExtract();
     }
@@ -173,7 +182,7 @@ export default function ReviewNotes() {
               <Loader2 className="w-8 h-8 text-muted-foreground animate-spin" />
               <p className="text-sm font-medium">{extractHint}</p>
               <p className="text-xs text-muted-foreground max-w-xs">
-                Reading your photo, then writing a short definition for each term.
+                Reading your photo{photosFor(source).length > 1 ? 's' : ''}, then writing a short definition for each term.
               </p>
             </div>
           ) : extractError ? (

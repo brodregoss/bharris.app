@@ -85,9 +85,15 @@ export async function runLlm({ prompt, response_json_schema, image } = {}) {
     throw new Error('OpenAI returned an empty response');
   }
 
-  if (!response_json_schema) return text;
+  const usage = {
+    prompt_tokens: Number(payload?.usage?.prompt_tokens) || 0,
+    completion_tokens: Number(payload?.usage?.completion_tokens) || 0,
+    total_tokens: Number(payload?.usage?.total_tokens) || 0,
+  };
+
+  if (!response_json_schema) return { result: text, usage };
   try {
-    return JSON.parse(text);
+    return { result: JSON.parse(text), usage };
   } catch {
     throw new Error('OpenAI returned unreadable JSON');
   }

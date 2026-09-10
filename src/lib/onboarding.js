@@ -1,3 +1,11 @@
+import { loadSession } from '@/lib/sessionStore';
+
 // Bump this when the first-run screen changes so existing browsers
 // see the new welcome once instead of the old landing.
 export const ONBOARDING_FLAG = 'lms_onboarded_v2';
+
+export function afterAuthPath() {
+  if (typeof window === 'undefined') return '/';
+  const onboarded = !!localStorage.getItem(ONBOARDING_FLAG) || !!loadSession();
+  return onboarded ? '/' : '/welcome';
+}

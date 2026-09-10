@@ -10,10 +10,16 @@ import {
   Shield,
   FileText,
   ChevronRight,
+  Wallet,
+  LogOut,
+  Users,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Switch } from '@/components/ui/switch';
 import { Label } from '@/components/ui/label';
+import { Progress } from '@/components/ui/progress';
+import { useAuth } from '@/lib/AuthContext';
+import { formatUsd } from '@/lib/accountStore';
 import {
   Sheet,
   SheetContent,
@@ -80,6 +86,7 @@ function Row({ icon: Icon, label, value, onClick }) {
 
 export default function Settings() {
   const navigate = useNavigate();
+  const { user, logout } = useAuth();
   const { theme, setTheme, resolvedTheme } = useTheme();
   const [ready, setReady] = React.useState(false);
   const [doc, setDoc] = React.useState(null);
@@ -90,6 +97,9 @@ export default function Settings() {
 
   const dark = ready && (resolvedTheme || theme) === 'dark';
   const open = DOCS[doc];
+  const usedPct = user?.unlimited || !user?.monthlyLimitUsd
+    ? 0
+    : Math.min(100, ((user.spentUsd || 0) / user.monthlyLimitUsd) * 100);
 
   return (
     <div className="min-h-[100dvh] bg-background text-foreground flex flex-col">
@@ -107,12 +117,52 @@ export default function Settings() {
                 <User className="w-5 h-5 text-muted-foreground" />
               </div>
               <div className="min-w-0">
-                <p className="text-sm font-bold tracking-tight">Not signed in</p>
+                <p className="text-sm font-bold tracking-tight truncate">{user?.email || 'Signed in'}</p>
                 <p className="text-xs text-muted-foreground mt-0.5">
-                  No account needed. Notes and sessions stay on this device.
+                  Notes and sessions stay on this device.
                 </p>
               </div>
             </div>
+          </section>
+
+          <section className="rounded-2xl border border-border bg-card overflow-hidden">
+            <div className="p-5 space-y-3">
+              <div className="flex items-center gap-2">
+                <Wallet className="w-4 h-4 text-muted-foreground shrink-0" />
+                <p className="text-sm font-bold tracking-tight">AI spending</p>
+              </div>
+              {user?.unlimited ? (
+                <p className="text-sm text-muted-foreground">No monthly cap on this account.</p>
+              ) : user?.hasBudget ? (
+                <>
+                  <div className="flex items-baseline justify-between gap-3">
+                    <p className="text-2xl font-bold tracking-tight">
+                      {formatUsd(user?.spentUsd || 0)}
+                    </p>
+                    <p className="text-xs text-muted-foreground">
+                      of {formatUsd(user?.monthlyLimitUsd)} this month
+                    </p>
+                  </div>
+                  <Progress value={usedPct} className="h-2" />
+                  <p className="text-xs text-muted-foreground">
+                    {formatUsd(user?.remainingUsd || 0)} left this month.
+                  </p>
+                </>
+              ) : (
+                <p className="text-sm text-muted-foreground">
+                  No AI budget yet. Study AI stays off until a cap is set.
+                </p>
+              )}
+            </div>
+            {user?.isAdmin && (
+              <div className="divide-y divide-border border-t border-border">
+                <Row
+                  icon={Users}
+                  label="Manage accounts"
+                  onClick={() => navigate('/settings/accounts')}
+                />
+              </div>
+            )}
           </section>
 
           <section className="rounded-2xl border border-border bg-card p-5">
@@ -147,6 +197,18 @@ export default function Settings() {
             <Row icon={Shield} label="Privacy Policy" onClick={() => setDoc('privacy')} />
             <Row icon={FileText} label="Terms of Service" onClick={() => setDoc('terms')} />
           </section>
+
+          <button
+            type="button"
+            onClick={() => {
+              logout();
+              navigate('/account', { replace: true });
+            }}
+            className="flex items-center justify-center gap-2 text-sm text-muted-foreground hover:text-foreground"
+          >
+            <LogOut className="w-4 h-4" />
+            Sign out
+          </button>
 
           <p className="mt-auto pt-8 text-center text-xs font-bold text-muted-foreground">
             Honorable Mention – Room 91B
