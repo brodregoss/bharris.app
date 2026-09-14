@@ -50,34 +50,59 @@ export function validateNotePhotos(fileList) {
   return { files };
 }
 
-export function fileToJpegDataUrl(file, { maxDim = 1600, quality = 0.72 } = {}) {
-  return new Promise((resolve, reject) => {
-    if (!file) {
-      reject(new Error('No photo selected'));
-      return;
+function drawToJpeg(source, width, height, maxDim, quality) {
+  const scale = Math.min(1, maxDim / Math.max(width, height, 1));
+  const w = Math.max(1, Math.round(width * scale));
+  const h = Math.max(1, Math.round(height * scale));
+  const canvas = document.createElement('canvas');
+  canvas.width = w;
+  canvas.height = h;
+  const ctx = canvas.getContext('2d');
+  if (!ctx) throw new Error('Could not read that photo');
+  ctx.fillStyle = '#fff';
+  ctx.fillRect(0, 0, w, h);
+  ctx.drawImage(source, 0, 0, w, h);
+  return canvas.toDataURL('image/jpeg', quality);
+}
+
+export async function fileToJpegDataUrl(file, { maxDim = 1600, quality = 0.72 } = {}) {
+  if (!file) throw new Error('No photo selected');
+
+  if (typeof createImageBitmap === 'function') {
+    try {
+      const bitmap = await createImageBitmap(file);
+      try {
+        return drawToJpeg(bitmap, bitmap.width, bitmap.height, maxDim, quality);
+      } finally {
+        bitmap.close?.();
+      }
+    } catch {
+      // Some iPhone photos (HEIC) need the Image element path instead.
     }
+  }
+
+  return new Promise((resolve, reject) => {
     const url = URL.createObjectURL(file);
     const img = new Image();
+    const finish = (err, data) => {
+      URL.revokeObjectURL(url);
+      if (err) reject(err);
+      else resolve(data);
+    };
     img.onload = () => {
-      URL.revokeObjectURL(url);
-      const scale = Math.min(1, maxDim / Math.max(img.width, img.height));
-      const w = Math.max(1, Math.round(img.width * scale));
-      const h = Math.max(1, Math.round(img.height * scale));
-      const canvas = document.createElement('canvas');
-      canvas.width = w;
-      canvas.height = h;
-      const ctx = canvas.getContext('2d');
-      if (!ctx) {
-        reject(new Error('Could not read that photo'));
-        return;
+      try {
+        finish(null, drawToJpeg(
+          img,
+          img.naturalWidth || img.width,
+          img.naturalHeight || img.height,
+          maxDim,
+          quality,
+        ));
+      } catch (err) {
+        finish(err instanceof Error ? err : new Error('Could not read that photo'));
       }
-      ctx.drawImage(img, 0, 0, w, h);
-      resolve(canvas.toDataURL('image/jpeg', quality));
     };
-    img.onerror = () => {
-      URL.revokeObjectURL(url);
-      reject(new Error('Could not read that photo'));
-    };
+    img.onerror = () => finish(new Error('Could not read that photo'));
     img.src = url;
   });
 }

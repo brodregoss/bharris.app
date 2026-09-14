@@ -1,7 +1,7 @@
 import { handleAccountAction, setCors, tokenFromReq } from '../server/accountHttp.js';
 
 export default async function handler(req, res) {
-  setCors(res);
+  setCors(res, req);
   if (req.method === 'OPTIONS') {
     res.status(204).end();
     return;

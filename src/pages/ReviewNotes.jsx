@@ -83,8 +83,15 @@ export default function ReviewNotes() {
       const withDefs = await generateDefinitions(found, setExtractHint);
       setItems(withDefs);
       setExtracting(false);
-    } catch {
-      setExtractError("Couldn't read terms from that photo. Try again, or take a clearer shot.");
+    } catch (err) {
+      const message = err instanceof Error ? err.message : '';
+      if (/password|limit is used|isn’t available/i.test(message)) {
+        setExtractError(message);
+      } else if (message === 'empty terms') {
+        setExtractError('No terms turned up on that page. Try a clearer shot, or add them by hand.');
+      } else {
+        setExtractError(message || "Couldn't read terms from that photo. Try again, or take a clearer shot.");
+      }
       setExtracting(false);
     }
   }, [source]);

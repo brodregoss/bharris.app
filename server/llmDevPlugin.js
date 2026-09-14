@@ -16,7 +16,7 @@ async function readJson(req) {
 }
 
 function applyCors(res) {
-  setCors(res);
+  setCors(res, req);
 }
 
 async function handleApi(req, res, kind) {

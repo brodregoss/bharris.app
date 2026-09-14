@@ -169,6 +169,12 @@ async function loadStore() {
   return memory;
 }
 
+async function storeWithBuiltins() {
+  const store = await loadStore();
+  if (applyBuiltins(store)) await saveStore(store);
+  return store;
+}
+
 async function saveStore(store) {
   memory = store;
   writeFileStore(store);
@@ -205,7 +211,7 @@ export function emailFromToken(token) {
 }
 
 async function getRecord(email) {
-  const store = await loadStore();
+  const store = await storeWithBuiltins();
   const record = applyPeriod(store.users[normalizeEmail(email)]);
   if (!record) return null;
   if (record !== store.users[record.email]) {
@@ -414,7 +420,7 @@ export async function recordSpendForToken(token, usd) {
   const amount = Number(usd);
   if (!Number.isFinite(amount) || amount <= 0) return userFromToken(token);
   return locked(async () => {
-    const store = await loadStore();
+    const store = await storeWithBuiltins();
     const record = applyPeriod(store.users[email]);
     if (!record) return null;
     store.users[email] = {
