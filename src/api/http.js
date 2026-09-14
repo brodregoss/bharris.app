@@ -2,6 +2,10 @@ import { Capacitor, CapacitorHttp } from '@capacitor/core';
 
 export function apiEndpoint(name) {
   const configured = String(import.meta.env.VITE_LLM_PROXY_URL || '').trim().replace(/\/$/, '');
+  const onLocalBrowser = !Capacitor.isNativePlatform()
+    && typeof window !== 'undefined'
+    && /^(localhost|127\.0\.0\.1)$/.test(window.location.hostname);
+  if (onLocalBrowser) return `/api/${name}`;
   if (configured) {
     const origin = configured.replace(/\/api\/llm$/i, '');
     return `${origin}/api/${name}`;

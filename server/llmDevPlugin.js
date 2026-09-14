@@ -44,7 +44,7 @@ async function handleApi(req, res, kind) {
     const message = error instanceof Error ? error.message : 'Request failed';
     const status = message.includes('missing OPENAI_API_KEY')
       ? 500
-      : /sign in|admin only|wrong email|budget|AI cap/i.test(message)
+      : /password|admin only|wrong email|budget|AI cap|AI limit/i.test(message)
         ? 403
         : 400;
     sendJson(res, status, { error: message });

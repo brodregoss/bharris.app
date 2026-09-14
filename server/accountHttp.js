@@ -6,6 +6,8 @@ import {
   recordSpendForToken,
   registerAccount,
   setAccountLimit,
+  unlockWithPin,
+  usageForToken,
   userFromToken,
 } from './accountDb.js';
 
@@ -25,6 +27,9 @@ export function tokenFromReq(req, body = {}) {
 
 export async function handleAccountAction(body, token) {
   const action = String(body?.action || '');
+  if (action === 'unlock') {
+    return unlockWithPin(body.pin);
+  }
   if (action === 'register') {
     return registerAccount(body.email, body.password);
   }
@@ -33,8 +38,11 @@ export async function handleAccountAction(body, token) {
   }
   if (action === 'me') {
     const user = await userFromToken(token);
-    if (!user) throw new Error('Sign in first.');
+    if (!user) throw new Error('Enter the password first.');
     return { user };
+  }
+  if (action === 'usage') {
+    return usageForToken(token);
   }
   if (action === 'list') {
     return { accounts: await listAccounts(token, body.adminPin) };

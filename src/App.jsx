@@ -1,7 +1,7 @@
 import { Toaster } from "@/components/ui/toaster"
 import { QueryClientProvider } from '@tanstack/react-query'
 import { queryClientInstance } from '@/lib/query-client'
-import { HashRouter as Router, Route, Routes } from 'react-router-dom';
+import { HashRouter as Router, Navigate, Route, Routes } from 'react-router-dom';
 import { ThemeProvider } from 'next-themes';
 import NativeChrome from '@/components/NativeChrome';
 import PageNotFound from './lib/PageNotFound';
@@ -20,9 +20,6 @@ import PastSessions from './pages/PastSessions';
 import Settings from './pages/Settings';
 import Practice from './pages/Practice';
 import Account from './pages/Account';
-import AccountSignIn from './pages/AccountSignIn';
-import AccountCreate from './pages/AccountCreate';
-import ManageAccounts from './pages/ManageAccounts';
 import RequireAccount from '@/components/RequireAccount';
 import { DebugProvider } from '@/lib/DebugContext';
 import DebugPanel from '@/components/dev/DebugPanel';
@@ -39,8 +36,8 @@ function App() {
               <ScrollToTop />
               <Routes>
                 <Route path="/account" element={<Account />} />
-                <Route path="/account/signin" element={<AccountSignIn />} />
-                <Route path="/account/create" element={<AccountCreate />} />
+                <Route path="/account/signin" element={<Navigate to="/account" replace />} />
+                <Route path="/account/create" element={<Navigate to="/account" replace />} />
                 <Route element={<RequireAccount />}>
                   <Route path="/" element={<Landing />} />
                   <Route path="/welcome" element={<Welcome />} />
@@ -49,7 +46,7 @@ function App() {
                   <Route path="/review-notes" element={<ReviewNotes />} />
                   <Route path="/history" element={<PastSessions />} />
                   <Route path="/settings" element={<Settings />} />
-                  <Route path="/settings/accounts" element={<ManageAccounts />} />
+                  <Route path="/settings/accounts" element={<Navigate to="/settings" replace />} />
                   <Route path="/practice" element={<Practice />} />
                   <Route path="/upload-notes" element={<UploadNotes />} />
                   <Route path="/triage" element={<Triage />} />

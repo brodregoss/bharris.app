@@ -1,7 +1,6 @@
 import { apiEndpoint, postJson } from '@/api/http';
-import { ADMIN_GATE_PASSWORD, isAdminGateOpen } from '@/lib/adminGate';
 
-const SESSION_KEY = 'lms_session_v1';
+const SESSION_KEY = 'lms_unlock_v1';
 const listeners = new Set();
 
 function notify() {
@@ -62,25 +61,17 @@ export function cacheUser(user) {
 
 async function accountRequest(action, payload = {}) {
   const url = apiEndpoint('account');
-  if (!url) throw new Error('Account server is not available in this build.');
-  const body = { action, ...payload };
-  if (isAdminGateOpen()) body.adminPin = ADMIN_GATE_PASSWORD;
-  return postJson(url, body, getToken());
+  if (!url) throw new Error('The password screen is not available in this build.');
+  return postJson(url, { action, ...payload }, getToken());
 }
 
-export async function createAccount(email, password) {
-  const data = await accountRequest('register', { email, password });
+export async function unlockWithPin(pin) {
+  const data = await accountRequest('unlock', { pin });
   writeSession({ token: data.token, user: data.user });
   return data.user;
 }
 
-export async function signIn(email, password) {
-  const data = await accountRequest('login', { email, password });
-  writeSession({ token: data.token, user: data.user });
-  return data.user;
-}
-
-export function signOut() {
+export function lockApp() {
   writeSession(null);
 }
 
@@ -97,27 +88,21 @@ export async function refreshUser() {
   }
 }
 
-export async function listAccounts() {
-  const data = await accountRequest('list');
-  return data.accounts || [];
-}
-
-export async function setAccountLimit(email, { monthlyLimitUsd, unlimited = false } = {}) {
-  const data = await accountRequest('setLimit', { email, monthlyLimitUsd, unlimited });
-  const current = getCurrentUser();
-  if (current?.email === data.user?.email) cacheUser(data.user);
-  return data.user;
+export async function getUsage() {
+  const data = await accountRequest('usage');
+  if (data.me) cacheUser(data.me);
+  return data;
 }
 
 export function assertCanSpend() {
   const user = getCurrentUser();
-  if (!user) throw new Error('Sign in to use study AI.');
+  if (!user) throw new Error('Enter the password to use study AI.');
   if (user.unlimited) return user;
   if (!user.hasBudget) {
-    throw new Error('This account doesn’t have an AI budget yet.');
+    throw new Error('Study AI isn’t available right now.');
   }
   if ((user.remainingUsd ?? 0) <= 0) {
-    throw new Error('This account has used its monthly AI cap.');
+    throw new Error('This month’s AI limit is used up.');
   }
   return user;
 }

@@ -11,18 +11,14 @@ import {
   FileText,
   ChevronRight,
   Wallet,
-  LogOut,
-  Users,
   Lock,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Switch } from '@/components/ui/switch';
 import { Label } from '@/components/ui/label';
-import { Input } from '@/components/ui/input';
 import { Progress } from '@/components/ui/progress';
 import { useAuth } from '@/lib/AuthContext';
-import { formatUsd } from '@/lib/accountStore';
-import { checkAdminPassword, isAdminGateOpen, openAdminGate } from '@/lib/adminGate';
+import { formatUsd, getUsage } from '@/lib/accountStore';
 import {
   Sheet,
   SheetContent,
@@ -87,50 +83,73 @@ function Row({ icon: Icon, label, value, onClick }) {
   );
 }
 
+function usedPct(person) {
+  if (!person || person.unlimited || !person.monthlyLimitUsd) return 0;
+  return Math.min(100, ((person.spentUsd || 0) / person.monthlyLimitUsd) * 100);
+}
+
+function UsageBlock({ heading, person }) {
+  return (
+    <div className="p-5 space-y-3">
+      <div className="flex items-center gap-2">
+        <Wallet className="w-4 h-4 text-muted-foreground shrink-0" />
+        <p className="text-sm font-bold tracking-tight">{heading}</p>
+      </div>
+      {person?.unlimited ? (
+        <p className="text-sm text-muted-foreground">No monthly limit.</p>
+      ) : person?.hasBudget ? (
+        <>
+          <div className="flex items-baseline justify-between gap-3">
+            <p className="text-2xl font-bold tracking-tight">
+              {formatUsd(person?.spentUsd || 0)}
+            </p>
+            <p className="text-xs text-muted-foreground">
+              of {formatUsd(person?.monthlyLimitUsd)} this month
+            </p>
+          </div>
+          <Progress value={usedPct(person)} className="h-2" />
+          <p className="text-xs text-muted-foreground">
+            {formatUsd(person?.remainingUsd || 0)} left this month.
+          </p>
+        </>
+      ) : (
+        <p className="text-sm text-muted-foreground">
+          Study AI isn’t available right now.
+        </p>
+      )}
+    </div>
+  );
+}
+
 export default function Settings() {
   const navigate = useNavigate();
-  const { user, logout } = useAuth();
+  const { user, isAdmin, lock } = useAuth();
   const { theme, setTheme, resolvedTheme } = useTheme();
   const [ready, setReady] = React.useState(false);
   const [doc, setDoc] = React.useState(null);
-  const [unlocked, setUnlocked] = React.useState(() => isAdminGateOpen());
-  const [gate, setGate] = React.useState(null);
-  const [pin, setPin] = React.useState('');
-  const [pinError, setPinError] = React.useState('');
+  const [usage, setUsage] = React.useState(null);
 
   React.useEffect(() => {
     setReady(true);
   }, []);
 
+  React.useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const next = await getUsage();
+        if (!cancelled) setUsage(next);
+      } catch {
+        if (!cancelled) setUsage({ me: user });
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [isAdmin]);
+
   const dark = ready && (resolvedTheme || theme) === 'dark';
   const open = DOCS[doc];
-  const usedPct = user?.unlimited || !user?.monthlyLimitUsd
-    ? 0
-    : Math.min(100, ((user.spentUsd || 0) / user.monthlyLimitUsd) * 100);
-
-  const askForPassword = (next) => {
-    if (unlocked) {
-      if (next === 'accounts') navigate('/settings/accounts');
-      return;
-    }
-    setPin('');
-    setPinError('');
-    setGate(next);
-  };
-
-  const submitPin = (e) => {
-    e.preventDefault();
-    if (!checkAdminPassword(pin)) {
-      setPinError('Wrong password.');
-      return;
-    }
-    openAdminGate();
-    setUnlocked(true);
-    const next = gate;
-    setGate(null);
-    setPin('');
-    if (next === 'accounts') navigate('/settings/accounts');
-  };
+  const me = usage?.me || user;
+  const guests = usage?.guests;
 
   return (
     <div className="min-h-[100dvh] bg-background text-foreground flex flex-col">
@@ -148,7 +167,9 @@ export default function Settings() {
                 <User className="w-5 h-5 text-muted-foreground" />
               </div>
               <div className="min-w-0">
-                <p className="text-sm font-bold tracking-tight truncate">{user?.email || 'Signed in'}</p>
+                <p className="text-sm font-bold tracking-tight truncate">
+                  {isAdmin ? 'Admin' : APP_NAME}
+                </p>
                 <p className="text-xs text-muted-foreground mt-0.5">
                   Notes and sessions stay on this device.
                 </p>
@@ -156,60 +177,16 @@ export default function Settings() {
             </div>
           </section>
 
-          <section className="rounded-2xl border border-border bg-card overflow-hidden">
-            {!unlocked ? (
-              <div className="divide-y divide-border">
-                <Row
-                  icon={Lock}
-                  label="AI spending"
-                  onClick={() => askForPassword('spending')}
-                />
-                <Row
-                  icon={Lock}
-                  label="Accounts"
-                  onClick={() => askForPassword('accounts')}
-                />
-              </div>
-            ) : (
-              <>
-                <div className="p-5 space-y-3">
-                  <div className="flex items-center gap-2">
-                    <Wallet className="w-4 h-4 text-muted-foreground shrink-0" />
-                    <p className="text-sm font-bold tracking-tight">AI spending</p>
-                  </div>
-                  {user?.unlimited ? (
-                    <p className="text-sm text-muted-foreground">No monthly cap on this account.</p>
-                  ) : user?.hasBudget ? (
-                    <>
-                      <div className="flex items-baseline justify-between gap-3">
-                        <p className="text-2xl font-bold tracking-tight">
-                          {formatUsd(user?.spentUsd || 0)}
-                        </p>
-                        <p className="text-xs text-muted-foreground">
-                          of {formatUsd(user?.monthlyLimitUsd)} this month
-                        </p>
-                      </div>
-                      <Progress value={usedPct} className="h-2" />
-                      <p className="text-xs text-muted-foreground">
-                        {formatUsd(user?.remainingUsd || 0)} left this month.
-                      </p>
-                    </>
-                  ) : (
-                    <p className="text-sm text-muted-foreground">
-                      No AI budget yet. Study AI stays off until a cap is set.
-                    </p>
-                  )}
-                </div>
-                <div className="divide-y divide-border border-t border-border">
-                  <Row
-                    icon={Users}
-                    label="Accounts"
-                    onClick={() => navigate('/settings/accounts')}
-                  />
-                </div>
-              </>
-            )}
-          </section>
+          {isAdmin ? (
+            <section className="rounded-2xl border border-border bg-card overflow-hidden divide-y divide-border">
+              <UsageBlock heading="Admin usage" person={me} />
+              <UsageBlock heading="Guests usage" person={guests} />
+            </section>
+          ) : (
+            <section className="rounded-2xl border border-border bg-card overflow-hidden">
+              <UsageBlock heading="AI usage" person={me} />
+            </section>
+          )}
 
           <section className="rounded-2xl border border-border bg-card p-5">
             <div className="flex items-center justify-between gap-4">
@@ -247,13 +224,13 @@ export default function Settings() {
           <button
             type="button"
             onClick={() => {
-              logout();
+              lock();
               navigate('/account', { replace: true });
             }}
             className="flex items-center justify-center gap-2 text-sm text-muted-foreground hover:text-foreground"
           >
-            <LogOut className="w-4 h-4" />
-            Sign out
+            <Lock className="w-4 h-4" />
+            Lock
           </button>
 
           <p className="mt-auto pt-8 text-center text-xs font-bold text-muted-foreground">
@@ -280,38 +257,6 @@ export default function Settings() {
               </div>
             </>
           )}
-        </SheetContent>
-      </Sheet>
-
-      <Sheet open={!!gate} onOpenChange={(on) => { if (!on) setGate(null); }}>
-        <SheetContent side="bottom" className="rounded-t-3xl">
-          <SheetHeader className="text-left pr-10">
-            <SheetTitle>Password required</SheetTitle>
-            <SheetDescription>
-              {gate === 'accounts' ? 'Enter the password to open accounts.' : 'Enter the password to see AI spending.'}
-            </SheetDescription>
-          </SheetHeader>
-          <form onSubmit={submitPin} className="pt-4 pb-6 space-y-4">
-            {pinError && (
-              <p className="text-sm text-destructive">{pinError}</p>
-            )}
-            <div className="space-y-2">
-              <Label htmlFor="admin-pin">Password</Label>
-              <Input
-                id="admin-pin"
-                type="password"
-                inputMode="numeric"
-                autoComplete="off"
-                autoFocus
-                value={pin}
-                onChange={(e) => setPin(e.target.value)}
-                className="h-12 rounded-2xl"
-              />
-            </div>
-            <Button type="submit" className="w-full h-12 rounded-2xl font-semibold">
-              Unlock
-            </Button>
-          </form>
         </SheetContent>
       </Sheet>
     </div>

@@ -12,18 +12,18 @@ export const ABOUT_SECTIONS = [
   },
   {
     title: 'AI',
-    body: 'Term extraction from photos, definition writing, panic notes, and answer grading go through a small server that calls OpenAI. Those features count toward the monthly AI cap set for your account. They can be wrong. Treat them as a study aid, not the answer key.',
+    body: 'Term extraction from photos, definition writing, panic notes, and answer grading go through a small server that calls OpenAI. Those features count toward a monthly AI limit. They can be wrong. Treat them as a study aid, not the answer key.',
   },
 ];
 
 export const PRIVACY_SECTIONS = [
   {
-    title: 'Account',
-    body: 'You create an account with an email and password. The app owner can see accounts and set a monthly AI cap. Notes are not used as a cloud backup.',
+    title: 'Password',
+    body: 'The app is password protected on this device. Notes are not used as a cloud backup.',
   },
   {
     title: 'What stays on your device',
-    body: 'Your notes, study sessions, practice progress, appearance settings, and account details are stored locally on this phone or browser.',
+    body: 'Your notes, study sessions, practice progress, and appearance settings are stored locally on this phone or browser.',
   },
   {
     title: 'What leaves your device',
@@ -42,7 +42,7 @@ export const PRIVACY_SECTIONS = [
 export const TERMS_SECTIONS = [
   {
     title: 'Using the app',
-    body: 'Last Minute Study is for personal studying. An account is required. Built-in sample notes are for trying the app, not a complete course.',
+    body: 'Last Minute Study is for personal studying. A password is required to open the app. Built-in sample notes are for trying the app, not a complete course.',
   },
   {
     title: 'No academic guarantee',

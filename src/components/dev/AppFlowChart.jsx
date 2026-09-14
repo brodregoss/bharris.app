@@ -50,7 +50,7 @@ export default function AppFlowChart() {
   return (
     <div className="space-y-4">
       <Group label="1 · Setup">
-        <Node title="Landing" sub="First visit → account, then Welcome. Returning → Continue session or start new cram. Admin can manage accounts from Settings." icon={<GitBranch className="w-3.5 h-3.5" />} />
+        <Node title="Landing" sub="First visit → password, then Welcome. Returning → Continue session or start new cram." icon={<GitBranch className="w-3.5 h-3.5" />} />
         <Bar />
         <Node title="Welcome" sub="Photo of notes · create manually · use some of ours" icon={<ClipboardCheck className="w-3.5 h-3.5" />} />
         <Bar />

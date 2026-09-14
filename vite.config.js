@@ -6,7 +6,15 @@ import { llmDevPlugin } from './server/llmDevPlugin.js'
 // https://vite.dev/config/
 export default defineConfig(({ mode }) => {
   const env = loadEnv(mode, process.cwd(), '')
-  for (const key of ['OPENAI_API_KEY', 'ACCOUNT_SECRET', 'ADMIN_EMAIL', 'KV_REST_API_URL', 'KV_REST_API_TOKEN']) {
+  for (const key of [
+    'OPENAI_API_KEY',
+    'ACCOUNT_SECRET',
+    'ADMIN_EMAIL',
+    'KV_REST_API_URL',
+    'KV_REST_API_TOKEN',
+    'UPSTASH_REDIS_REST_URL',
+    'UPSTASH_REDIS_REST_TOKEN',
+  ]) {
     if (env[key]) process.env[key] = env[key]
   }
 

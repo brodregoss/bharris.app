@@ -1,13 +1,10 @@
 import React, { createContext, useContext, useEffect, useMemo, useState } from 'react';
 import {
-  createAccount as createStoredAccount,
   getCurrentUser,
-  listAccounts as storeListAccounts,
+  lockApp as storeLockApp,
   refreshUser,
-  setAccountLimit as storeSetAccountLimit,
-  signIn as storeSignIn,
-  signOut as storeSignOut,
   subscribeAccount,
+  unlockWithPin as storeUnlock,
 } from '@/lib/accountStore';
 import { closeAdminGate } from '@/lib/adminGate';
 
@@ -34,36 +31,28 @@ export const AuthProvider = ({ children }) => {
 
   const value = useMemo(() => {
     const refresh = () => setUser(getCurrentUser());
+    const lock = () => {
+      closeAdminGate();
+      storeLockApp();
+      refresh();
+    };
     return {
       user,
       isAuthenticated: !!user,
+      isAdmin: !!user?.isAdmin,
       isLoadingAuth,
       isLoadingPublicSettings: false,
       authError: null,
       appPublicSettings: null,
       authChecked: !isLoadingAuth,
-      logout: () => {
-        closeAdminGate();
-        storeSignOut();
-        refresh();
-      },
+      logout: lock,
+      lock,
       navigateToLogin: () => {},
       checkUserAuth: async () => refresh(),
       checkAppState: async () => {},
-      signIn: async (email, password) => {
-        const next = await storeSignIn(email, password);
+      unlock: async (pin) => {
+        const next = await storeUnlock(pin);
         setUser(next);
-        return next;
-      },
-      createAccount: async (email, password) => {
-        const next = await createStoredAccount(email, password);
-        setUser(next);
-        return next;
-      },
-      listAccounts: () => storeListAccounts(),
-      setAccountLimit: async (email, options) => {
-        const next = await storeSetAccountLimit(email, options);
-        refresh();
         return next;
       },
     };

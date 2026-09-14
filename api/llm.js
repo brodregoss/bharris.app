@@ -56,7 +56,7 @@ export default async function handler(req, res) {
     const message = error instanceof Error ? error.message : 'AI request failed';
     const status = message.includes('missing OPENAI_API_KEY')
       ? 500
-      : /sign in|budget|AI cap/i.test(message)
+      : /password|budget|AI cap|AI limit/i.test(message)
         ? 403
         : 400;
     res.status(status).json({ error: message });

@@ -62,6 +62,16 @@ function clampChars(text, max) {
   return String(text).slice(0, max);
 }
 
+function hintFromDefinition(definition) {
+  const text = String(definition || '').replace(/\s+/g, ' ').trim();
+  if (!text) return '';
+  const words = text.split(' ');
+  if (words.length <= 2) return `${words[0]}…`;
+  const keep = Math.min(5, Math.max(2, Math.ceil(words.length * 0.28)));
+  const n = Math.min(keep, words.length - 1);
+  return `${words.slice(0, n).join(' ')}…`;
+}
+
 // Screen D — timed self-test weighted toward previously-missed items.
 export default function PracticeTest({ terms, examType, budgetMs, priorMissed, onDone }) {
   const [questions, setQuestions] = React.useState(() => buildQuestions(terms, examType, priorMissed));
@@ -69,6 +79,7 @@ export default function PracticeTest({ terms, examType, budgetMs, priorMissed, o
   const [answers, setAnswers] = React.useState({}); // qid -> { selected?, correct }
   const [submitted, setSubmitted] = React.useState(false);
   const [shortAnswer, setShortAnswer] = React.useState('');
+  const [showHint, setShowHint] = React.useState(false);
   const [grading, setGrading] = React.useState(false);
   const [gradeResult, setGradeResult] = React.useState(null);
   const [gradeError, setGradeError] = React.useState(false);
@@ -146,6 +157,7 @@ export default function PracticeTest({ terms, examType, budgetMs, priorMissed, o
     setIdx((i) => i + 1);
     setSubmitted(false);
     setShortAnswer('');
+    setShowHint(false);
     setGradeResult(null);
     setGradeError(false);
     setGrading(false);
@@ -311,6 +323,7 @@ export default function PracticeTest({ terms, examType, budgetMs, priorMissed, o
       setIdx(0);
       setSubmitted(false);
       setShortAnswer('');
+      setShowHint(false);
       setGradeResult(null);
       setGradeError(false);
       setGrading(false);
@@ -469,11 +482,27 @@ export default function PracticeTest({ terms, examType, budgetMs, priorMissed, o
                     enterKeyHint="done"
                     className="w-full rounded-xl border border-border bg-card p-3 text-base min-h-[80px] focus:outline-none focus:ring-2 focus:ring-ring"
                   />
-                  <p className="mt-2 text-xs text-muted-foreground tabular-nums" aria-live="polite">
-                    {shortAnswer.length >= MAX_SHORT_ANSWER_CHARS
-                      ? 'You’ve hit the character limit'
-                      : `${shortAnswer.length}/${MAX_SHORT_ANSWER_CHARS}`}
-                  </p>
+                  <div className="mt-2 flex items-center justify-between gap-3">
+                    <p className="text-xs text-muted-foreground tabular-nums" aria-live="polite">
+                      {shortAnswer.length >= MAX_SHORT_ANSWER_CHARS
+                        ? 'You’ve hit the character limit'
+                        : `${shortAnswer.length}/${MAX_SHORT_ANSWER_CHARS}`}
+                    </p>
+                    {!showHint ? (
+                      <button
+                        type="button"
+                        onClick={() => setShowHint(true)}
+                        className="text-xs text-muted-foreground hover:text-foreground underline font-medium shrink-0"
+                      >
+                        Hint
+                      </button>
+                    ) : null}
+                  </div>
+                  {showHint ? (
+                    <p className="mt-2 text-sm text-muted-foreground leading-relaxed">
+                      {hintFromDefinition(q.definition)}
+                    </p>
+                  ) : null}
                 </>
               ) : (
                 <div className="space-y-2">

@@ -17,6 +17,12 @@ function adminEmail() {
   return String(process.env.ADMIN_EMAIL || '').trim().toLowerCase();
 }
 
+export const ADMIN_PIN = '95032';
+export const GUEST_PIN = '12345';
+const ADMIN_ID = 'admin@local';
+const GUEST_ID = 'guest@local';
+const GUEST_LIMIT_USD = 1;
+
 function filePath() {
   if (process.env.VERCEL) return '/tmp/lms-accounts.json';
   return path.join(process.cwd(), 'data', 'accounts.json');
@@ -82,24 +88,34 @@ export function toPublicUser(record) {
 }
 
 function spendError(user) {
-  if (!user) return 'Sign in to use study AI.';
+  if (!user) return 'Enter the password to use study AI.';
   if (user.unlimited) return null;
   if (!user.hasBudget) {
-    return 'This account doesn’t have an AI budget yet.';
+    return 'Study AI isn’t available right now.';
   }
   if ((user.remainingUsd ?? 0) <= 0) {
-    return 'This account has used its monthly AI cap.';
+    return 'This month’s AI limit is used up.';
   }
   return null;
 }
 
-async function kvGet() {
-  const url = String(process.env.KV_REST_API_URL || '').replace(/\/$/, '');
-  const token = process.env.KV_REST_API_TOKEN;
+function kvConfig() {
+  const url = String(
+    process.env.KV_REST_API_URL
+    || process.env.UPSTASH_REDIS_REST_URL
+    || '',
+  ).replace(/\/$/, '');
+  const token = process.env.KV_REST_API_TOKEN || process.env.UPSTASH_REDIS_REST_TOKEN;
   if (!url || !token) return null;
+  return { url, token };
+}
+
+async function kvGet() {
+  const kv = kvConfig();
+  if (!kv) return null;
   try {
-    const res = await fetch(`${url}/get/${KV_KEY}`, {
-      headers: { Authorization: `Bearer ${token}` },
+    const res = await fetch(`${kv.url}/get/${encodeURIComponent(KV_KEY)}`, {
+      headers: { Authorization: `Bearer ${kv.token}` },
     });
     if (!res.ok) return null;
     const data = await res.json();
@@ -111,16 +127,15 @@ async function kvGet() {
 }
 
 async function kvSet(store) {
-  const url = String(process.env.KV_REST_API_URL || '').replace(/\/$/, '');
-  const token = process.env.KV_REST_API_TOKEN;
-  if (!url || !token) return;
-  await fetch(`${url}/set/${KV_KEY}`, {
+  const kv = kvConfig();
+  if (!kv) return;
+  await fetch(kv.url, {
     method: 'POST',
     headers: {
-      Authorization: `Bearer ${token}`,
+      Authorization: `Bearer ${kv.token}`,
       'Content-Type': 'application/json',
     },
-    body: JSON.stringify(JSON.stringify(store)),
+    body: JSON.stringify(['SET', KV_KEY, JSON.stringify(store)]),
   });
 }
 
@@ -200,10 +215,98 @@ async function getRecord(email) {
   return record;
 }
 
+function applyBuiltins(store) {
+  let changed = false;
+  const admin = applyPeriod(store.users[ADMIN_ID]);
+  if (!admin) {
+    store.users[ADMIN_ID] = {
+      email: ADMIN_ID,
+      createdAt: Date.now(),
+      role: 'admin',
+      monthlyLimitUsd: null,
+      unlimited: true,
+      spentUsd: 0,
+      periodKey: periodKey(),
+    };
+    changed = true;
+  } else if (admin.role !== 'admin' || !admin.unlimited) {
+    store.users[ADMIN_ID] = {
+      ...admin,
+      role: 'admin',
+      unlimited: true,
+      monthlyLimitUsd: null,
+    };
+    changed = true;
+  } else if (admin !== store.users[ADMIN_ID]) {
+    store.users[ADMIN_ID] = admin;
+    changed = true;
+  }
+
+  const guest = applyPeriod(store.users[GUEST_ID]);
+  if (!guest) {
+    store.users[GUEST_ID] = {
+      email: GUEST_ID,
+      createdAt: Date.now(),
+      role: 'user',
+      monthlyLimitUsd: GUEST_LIMIT_USD,
+      unlimited: false,
+      spentUsd: 0,
+      periodKey: periodKey(),
+    };
+    changed = true;
+  } else if (guest.unlimited || guest.monthlyLimitUsd !== GUEST_LIMIT_USD) {
+    store.users[GUEST_ID] = {
+      ...guest,
+      role: 'user',
+      unlimited: false,
+      monthlyLimitUsd: GUEST_LIMIT_USD,
+    };
+    changed = true;
+  } else if (guest !== store.users[GUEST_ID]) {
+    store.users[GUEST_ID] = guest;
+    changed = true;
+  }
+  return changed;
+}
+
 export async function userFromToken(token) {
   const email = emailFromToken(token);
   if (!email) return null;
   return toPublicUser(await getRecord(email));
+}
+
+export async function unlockWithPin(pin) {
+  const value = String(pin || '');
+  let id = null;
+  if (value === ADMIN_PIN) id = ADMIN_ID;
+  else if (value === GUEST_PIN) id = GUEST_ID;
+  else throw new Error('Wrong password.');
+  return locked(async () => {
+    const store = await loadStore();
+    if (applyBuiltins(store)) await saveStore(store);
+    const record = applyPeriod(store.users[id]);
+    if (record !== store.users[id]) {
+      store.users[id] = record;
+      await saveStore(store);
+    }
+    return { token: signToken(id), user: toPublicUser(record) };
+  });
+}
+
+export async function usageForToken(token) {
+  const email = emailFromToken(token);
+  if (!email) throw new Error('Enter the password first.');
+  return locked(async () => {
+    const store = await loadStore();
+    if (applyBuiltins(store)) await saveStore(store);
+    const me = toPublicUser(applyPeriod(store.users[email]));
+    if (!me) throw new Error('Enter the password first.');
+    if (!me.isAdmin) return { me };
+    return {
+      me: toPublicUser(applyPeriod(store.users[ADMIN_ID])),
+      guests: toPublicUser(applyPeriod(store.users[GUEST_ID])),
+    };
+  });
 }
 
 export async function registerAccount(email, password) {
