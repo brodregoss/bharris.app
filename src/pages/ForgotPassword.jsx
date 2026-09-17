@@ -1,41 +1,43 @@
-import React, { useState } from "react";
-import { Link } from "react-router-dom";
-import { base44 } from "@/api/base44Client";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Mail, ArrowLeft, Loader2 } from "lucide-react";
-import AuthLayout from "@/components/AuthLayout";
+import React, { useState } from 'react';
+import { Link } from 'react-router-dom';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Mail, ArrowLeft, Loader2 } from 'lucide-react';
+import AuthShell from '@/components/AuthShell';
+import { firebaseErrorMessage, firebaseResetPassword } from '@/lib/firebase';
 
 export default function ForgotPassword() {
-  const [email, setEmail] = useState("");
+  const [email, setEmail] = useState('');
   const [loading, setLoading] = useState(false);
   const [sent, setSent] = useState(false);
+  const [error, setError] = useState('');
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    setError('');
     setLoading(true);
     try {
-      await base44.auth.resetPasswordRequest(email);
-    } catch {
-      // Always show success regardless
+      await firebaseResetPassword(email);
+      setSent(true);
+    } catch (err) {
+      setError(firebaseErrorMessage(err));
     } finally {
       setLoading(false);
-      setSent(true);
     }
   };
 
   return (
-    <AuthLayout
-      icon={Mail}
+    <AuthShell
+      eyebrow="Welcome back"
       title="Reset password"
-      subtitle="We'll send you a link to reset it"
-      footer={
-        <Link to="/login" className="text-primary font-medium hover:underline">
-          <ArrowLeft className="w-3 h-3 inline mr-1" />Back to log in
-        </Link>
-      }
+      subtitle="We'll email a reset link if that account exists"
     >
+      {error && (
+        <div className="mb-4 p-3 rounded-2xl bg-destructive/10 text-destructive text-sm">
+          {error}
+        </div>
+      )}
       {sent ? (
         <p className="text-sm text-foreground text-center">
           If an account exists with that email, you'll receive a password reset link shortly.
@@ -54,23 +56,29 @@ export default function ForgotPassword() {
                 placeholder="you@example.com"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
-                className="pl-10 h-12"
+                className="pl-10 h-12 rounded-2xl"
                 required
               />
             </div>
           </div>
-          <Button type="submit" className="w-full h-12 font-medium" disabled={loading}>
+          <Button type="submit" className="w-full h-14 rounded-2xl text-base font-semibold" disabled={loading}>
             {loading ? (
               <>
                 <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                Sending...
+                Sending…
               </>
             ) : (
-              "Send reset link"
+              'Send reset link'
             )}
           </Button>
         </form>
       )}
-    </AuthLayout>
+      <p className="text-center text-sm text-muted-foreground mt-6">
+        <Link to="/account/signin" className="text-foreground font-medium underline underline-offset-4">
+          <ArrowLeft className="w-3 h-3 inline mr-1" />
+          Back to sign in
+        </Link>
+      </p>
+    </AuthShell>
   );
 }

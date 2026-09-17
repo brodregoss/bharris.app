@@ -5,20 +5,22 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import AuthShell from '@/components/AuthShell';
+import GoogleSignInButton from '@/components/account/GoogleSignInButton';
 import { useAuth } from '@/lib/AuthContext';
 import { afterAuthPath } from '@/lib/onboarding';
 
 export default function AccountCreate() {
   const navigate = useNavigate();
-  const { isAuthenticated, createAccount } = useAuth();
+  const { isAuthenticated, createAccount, signInWithGoogle } = useAuth();
   const [email, setEmail] = React.useState('');
   const [password, setPassword] = React.useState('');
   const [confirm, setConfirm] = React.useState('');
   const [error, setError] = React.useState('');
   const [loading, setLoading] = React.useState(false);
+  const [googleLoading, setGoogleLoading] = React.useState(false);
 
   if (isAuthenticated) {
-    return <Navigate to="/" replace />;
+    return <Navigate to={afterAuthPath()} replace />;
   }
 
   const handleSubmit = async (e) => {
@@ -39,6 +41,19 @@ export default function AccountCreate() {
     }
   };
 
+  const handleGoogle = async () => {
+    setError('');
+    setGoogleLoading(true);
+    try {
+      await signInWithGoogle();
+      navigate(afterAuthPath(), { replace: true });
+    } catch (err) {
+      setError(err.message || 'Could not sign in with Google.');
+    } finally {
+      setGoogleLoading(false);
+    }
+  };
+
   return (
     <AuthShell
       eyebrow="Welcome To"
@@ -51,6 +66,8 @@ export default function AccountCreate() {
           {error}
         </div>
       )}
+      <GoogleSignInButton onClick={handleGoogle} loading={googleLoading} disabled={loading} />
+      <p className="text-center text-xs text-muted-foreground my-4">or use email</p>
       <form onSubmit={handleSubmit} className="space-y-4">
         <div className="space-y-2">
           <Label htmlFor="email">Email</Label>
@@ -103,7 +120,7 @@ export default function AccountCreate() {
             />
           </div>
         </div>
-        <Button type="submit" className="w-full h-14 rounded-2xl text-base font-semibold" disabled={loading}>
+        <Button type="submit" className="w-full h-14 rounded-2xl text-base font-semibold" disabled={loading || googleLoading}>
           {loading ? (
             <>
               <Loader2 className="w-4 h-4 mr-2 animate-spin" />

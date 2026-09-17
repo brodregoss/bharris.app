@@ -1,0 +1,61 @@
+export const VIRTUAL_BUCKETS = 65536;
+export const SHARD_BINDINGS = [
+  'USER_00',
+  'USER_01',
+  'USER_02',
+  'USER_03',
+  'USER_04',
+  'USER_05',
+  'USER_06',
+  'USER_07',
+];
+
+export function json(data, status = 200, headers = {}) {
+  return new Response(JSON.stringify(data), {
+    status,
+    headers: { 'Content-Type': 'application/json', ...headers },
+  });
+}
+
+export function errorJson(message, status = 400, extra = {}) {
+  return json({ error: { message, ...extra } }, status);
+}
+
+export function periodKey(date = new Date()) {
+  return `${date.getUTCFullYear()}-${String(date.getUTCMonth() + 1).padStart(2, '0')}`;
+}
+
+export function quotaLimit(env, tier) {
+  const free = Number(env.FREE_AI_QUOTA) || 30;
+  const pro = Number(env.PRO_AI_QUOTA) || 500;
+  return tier === 'pro' ? pro : free;
+}
+
+export function publicUser(row, { isAdmin = false } = {}) {
+  const used = Number(row.ai_quota_used) || 0;
+  const limit = Number(row.ai_quota_limit) || 0;
+  const remaining = Math.max(0, limit - used);
+  const unlimited = row.subscription_tier === 'pro' && limit >= 100000;
+  return {
+    uid: row.firebase_uid,
+    email: row.email || '',
+    displayName: row.display_name || '',
+    isAdmin,
+    subscriptionTier: row.subscription_tier || 'free',
+    doStatus: row.do_status || 'pending',
+    aiQuotaUsed: used,
+    aiQuotaLimit: limit,
+    remainingQuota: remaining,
+    hasBudget: unlimited || remaining > 0,
+    unlimited,
+    period: row.ai_quota_period || periodKey(),
+  };
+}
+
+export async function readJson(request) {
+  try {
+    return await request.json();
+  } catch {
+    return {};
+  }
+}

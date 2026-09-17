@@ -22,8 +22,12 @@ import {
   WIND_DOWN_BUDGET_MS,
   BLOCK_BUDGET_RATIO,
   planRecallQueues,
+  sessionRankMode,
+  tierLabelsFor,
+  RANK_MODE,
 } from '@/lib/studyUtils';
 import { loadSession, saveSession, clearSession, saveFinishedSession } from '@/lib/sessionStore';
+import { getActiveUid } from '@/lib/userStorage';
 import { withInferredMastery } from '@/lib/mastery';
 import { useDebug } from '@/lib/DebugContext';
 
@@ -65,12 +69,16 @@ const SKIP_ON_WIND_DOWN = ['passive', 'passive_summary', 'test', 'test_summary']
 function StudyFlow() {
   const location = useLocation();
   const navigate = useNavigate();
-  const { terms: rawTerms, setup: incomingSetup, initialPhase: incomingInitialPhase, keepState: incomingKeepState } = location.state || {};
+  const { terms: rawTerms, setup: incomingSetup, initialPhase: incomingInitialPhase, keepState: incomingKeepState, sessionId: incomingSessionId } = location.state || {};
 
   // Hydrate from an incoming triage result, or from a saved session on resume.
   const [init] = React.useState(() => {
+    const ownerUid = getActiveUid();
     if (rawTerms && rawTerms.length) {
+      const existing = loadSession();
       return {
+        id: incomingSessionId || existing?.id,
+        ownerUid,
         terms: incomingKeepState ? rawTerms : rawTerms.map((t) => ({
           ...t,
           recallHistory: [],
@@ -91,6 +99,8 @@ function StudyFlow() {
     const saved = loadSession();
     if (saved && saved.terms?.length) {
       return {
+        id: saved.id,
+        ownerUid,
         terms: saved.terms,
         setup: saved.setup,
         phase: saved.phase || 'critical',
@@ -99,7 +109,6 @@ function StudyFlow() {
         behind: saved.behind || false,
         stopTime: saved.stopTime || null,
         windDownAcknowledged: !!saved.windDownAcknowledged,
-        // continue the clock from where it was (time away doesn't count)
         sessionStart: Date.now() - (saved.elapsedMs || 0),
       };
     }
@@ -142,10 +151,29 @@ function StudyFlow() {
     setNow(Date.now() + clockOffsetRef.current);
   }, [clockOffset]);
 
+  const sessionIdRef = React.useRef(init?.id);
+
+  React.useEffect(() => {
+    const leaveIfSwitched = () => {
+      if (init && getActiveUid() !== init.ownerUid) navigate('/', { replace: true });
+    };
+    window.addEventListener('lms:session', leaveIfSwitched);
+    window.addEventListener('storage', leaveIfSwitched);
+    return () => {
+      window.removeEventListener('lms:session', leaveIfSwitched);
+      window.removeEventListener('storage', leaveIfSwitched);
+    };
+  }, [init, navigate]);
+
   // Persist session so the user can resume where they left off.
   React.useEffect(() => {
     if (!init) return;
-    saveSession({
+    if (getActiveUid() !== init.ownerUid) {
+      navigate('/', { replace: true });
+      return;
+    }
+    const saved = saveSession({
+      id: sessionIdRef.current,
       setup,
       terms,
       phase,
@@ -157,7 +185,8 @@ function StudyFlow() {
       elapsedMs: Date.now() - sessionStart,
       savedAt: Date.now(),
     });
-  }, [init, setup, terms, phase, blockStats, stillShaky, behind, stopTime, windDownAcknowledged, sessionStart]);
+    if (saved?.id) sessionIdRef.current = saved.id;
+  }, [init, setup, terms, phase, blockStats, stillShaky, behind, stopTime, windDownAcknowledged, sessionStart, navigate]);
 
   // Report live session state + terms to the dev debug panel (dev mode only).
   const devOn = !!dbg?.enabled;
@@ -304,6 +333,10 @@ function StudyFlow() {
     setPhase(passiveCount ? 'passive' : 'test');
   };
 
+  const rankMode = sessionRankMode(setup, terms, { title: init?.title });
+  const labels = tierLabelsFor(rankMode);
+  const difficultyRank = rankMode === RANK_MODE.DIFFICULTY;
+
   let blockLabel = 'Study session';
   let content = null;
   const openCheat = () => setCheatOpen(true);
@@ -320,17 +353,17 @@ function StudyFlow() {
       break;
     case 'notes_skim':
       blockLabel = 'Your notes';
-      content = <NotesSkim terms={terms} onDone={startRecall} />;
+      content = <NotesSkim terms={terms} rankMode={rankMode} onDone={startRecall} />;
       break;
     case 'critical':
-      blockLabel = windDown ? 'Wind-down drill' : 'Critical recall';
+      blockLabel = windDown ? 'Wind-down drill' : difficultyRank ? labels.critical : 'Critical recall';
       content = (
         <RecallBlock
           key={windDown ? 'wind-down' : 'critical'}
           terms={windDown ? windDownTerms : criticalTerms}
           retireThreshold={windDown ? 1 : 2}
           blockBudgetMs={windDown ? WIND_DOWN_BUDGET_MS : criticalBudget}
-          blockLabel={windDown ? 'Wind-down drill' : 'Critical recall'}
+          blockLabel={blockLabel}
           examType={setup?.examType || 'mixed'}
           onUpdateTerm={updateTerm}
           onLogAttempt={logAttempt}
@@ -345,23 +378,25 @@ function StudyFlow() {
     case 'critical_summary':
       content = (
         <BlockSummary
-          title="Critical block done"
+          title={difficultyRank ? `${labels.critical} done` : 'Critical block done'}
           message={`Nice, you got ${blockStats.critical?.got || 0} of ${
             blockStats.critical?.total || 0
-          } Critical terms. Now let's hit Core — should take about ${Math.round(coreBudget / 60000)} minutes.`}
+          } ${difficultyRank ? 'difficult concepts' : 'Critical terms'}. Now let's hit ${
+            difficultyRank ? labels.core : 'Core'
+          } — should take about ${Math.round(coreBudget / 60000)} minutes.`}
           onContinue={() => setPhase(skipEmptyRecallPhase('core', tierCounts))}
         />
       );
       break;
     case 'core':
-      blockLabel = windDown ? 'Wind-down drill' : 'Core recall';
+      blockLabel = windDown ? 'Wind-down drill' : difficultyRank ? labels.core : 'Core recall';
       content = (
         <RecallBlock
           key={windDown ? 'wind-down' : 'core'}
           terms={windDown ? windDownTerms : coreTerms}
           retireThreshold={1}
           blockBudgetMs={windDown ? WIND_DOWN_BUDGET_MS : coreBudget}
-          blockLabel={windDown ? 'Wind-down drill' : 'Core recall'}
+          blockLabel={blockLabel}
           examType={setup?.examType || 'mixed'}
           onUpdateTerm={updateTerm}
           onLogAttempt={logAttempt}
@@ -376,20 +411,22 @@ function StudyFlow() {
     case 'core_summary':
       content = (
         <BlockSummary
-          title="Core block done"
+          title={difficultyRank ? `${labels.core} done` : 'Core block done'}
           message={`Solid — ${blockStats.core?.got || 0} of ${
             blockStats.core?.total || 0
-          } Core terms down. Quick pass on the rest, then a practice test.`}
+          } ${difficultyRank ? 'tougher concepts' : 'Core terms'} down. Quick pass on the rest, then a practice test.`}
           onContinue={goPassive}
         />
       );
       break;
     case 'passive':
-      blockLabel = 'Passive skim';
+      blockLabel = difficultyRank ? labels.passive : 'Passive skim';
       content = (
         <PassiveSkim
           terms={passiveTerms}
+          allTerms={terms}
           behind={behind}
+          rankMode={rankMode}
           onUpdateTerm={updateTerm}
           onDone={() => setPhase('passive_summary')}
         />
@@ -409,6 +446,7 @@ function StudyFlow() {
       content = (
         <PracticeTest
           terms={terms}
+          rankMode={rankMode}
           examType={setup?.examType || 'mixed'}
           budgetMs={testBudget}
           priorMissed={priorMissed}
@@ -449,7 +487,12 @@ function StudyFlow() {
           stopTime={stopTime}
           onSetStopTime={setStopTime}
           onDone={() => {
-            saveFinishedSession({ terms: withInferredMastery(terms), setup, finishedAt: Date.now() });
+            saveFinishedSession({
+              id: sessionIdRef.current,
+              terms: withInferredMastery(terms),
+              setup,
+              finishedAt: Date.now(),
+            });
             clearSession();
             navigate('/');
           }}
@@ -493,7 +536,7 @@ function StudyFlow() {
       <footer className="px-5 pt-3 pb-safe flex items-center justify-center bg-card/90 backdrop-blur mt-auto">
         <RoadMapDialog terms={terms} phase={phase} />
       </footer>
-      <CheatSheet terms={terms} open={cheatOpen} onClose={() => setCheatOpen(false)} />
+      <CheatSheet terms={terms} rankMode={rankMode} open={cheatOpen} onClose={() => setCheatOpen(false)} />
     </div>
   );
 }

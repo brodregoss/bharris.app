@@ -17,6 +17,7 @@ node_modules
 dist
 dist-ssr
 *.local
+.tools
 
 # Editor directories and files
 .vscode/*
@@ -35,6 +36,11 @@ base44/.app.jsonc
 
 # Account store (passwords + spend). Local and /tmp copies only.
 /data/accounts.json
+
+# Cloudflare Worker local state
+.wrangler
+worker/.wrangler
+worker/.dev.vars
 
 # iOS / Xcode
 ios/App/Pods

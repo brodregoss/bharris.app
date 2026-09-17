@@ -2,6 +2,7 @@ import React from 'react';
 import { BookOpen, ArrowRight } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import TermDefList from './TermDefList';
+import { inferRankMode, rankModeSkimHint } from '@/lib/studyUtils';
 
 export function NotesOfferPrompt({ onSkim, onSkip }) {
   return (
@@ -29,16 +30,15 @@ export function NotesOfferPrompt({ onSkim, onSkip }) {
   );
 }
 
-export function NotesSkim({ terms, onDone }) {
+export function NotesSkim({ terms, onDone, rankMode }) {
+  const mode = inferRankMode(terms, { rankMode });
   return (
     <div className="flex flex-col px-5 pt-4 pb-4">
       <div className="max-w-md mx-auto w-full">
         <h2 className="text-xl font-bold tracking-tight mb-1">Your notes</h2>
-        <p className="text-xs text-muted-foreground mb-3">
-          Every term and definition. Scroll through, then start flashcards when you’re ready.
-        </p>
+        <p className="text-xs text-muted-foreground mb-3">{rankModeSkimHint(mode)}</p>
         <div className="mb-4">
-          <TermDefList terms={terms} />
+          <TermDefList terms={terms} rankMode={mode} />
         </div>
         <Button type="button" onClick={onDone} className="w-full h-12 rounded-2xl font-semibold">
           Start flashcards

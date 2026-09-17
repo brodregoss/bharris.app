@@ -1,6 +1,8 @@
-import { apiEndpoint, postJson } from '@/api/http';
+import { workerRequest } from '@/lib/workerClient';
+import { cancelPendingCloudSave } from '@/lib/sessionStore';
+import { getActiveUid, setActiveUid } from '@/lib/userStorage';
 
-const SESSION_KEY = 'lms_unlock_v1';
+const USER_KEY = 'lms_user_v2';
 const listeners = new Set();
 
 function notify() {
@@ -12,10 +14,10 @@ export function subscribeAccount(fn) {
   return () => listeners.delete(fn);
 }
 
-function readSession() {
+function readUser() {
   if (typeof window === 'undefined') return null;
   try {
-    const raw = localStorage.getItem(SESSION_KEY);
+    const raw = localStorage.getItem(USER_KEY);
     if (!raw) return null;
     return JSON.parse(raw);
   } catch {
@@ -23,13 +25,10 @@ function readSession() {
   }
 }
 
-function writeSession(session) {
-  if (!session) {
-    localStorage.removeItem(SESSION_KEY);
-  } else {
-    localStorage.setItem(SESSION_KEY, JSON.stringify(session));
-  }
-  notify();
+export function getCurrentUser() {
+  const user = readUser();
+  if (user?.uid && !getActiveUid()) setActiveUid(user.uid, user.uid);
+  return user;
 }
 
 export function formatUsd(value, { compact = false } = {}) {
@@ -44,64 +43,61 @@ export function formatUsd(value, { compact = false } = {}) {
   }).format(amount);
 }
 
-export function getToken() {
-  return readSession()?.token || '';
-}
-
-export function getCurrentUser() {
-  return readSession()?.user || null;
-}
-
 export function cacheUser(user) {
-  const session = readSession();
-  if (!session?.token || !user) return user;
-  writeSession({ ...session, user });
+  if (typeof window === 'undefined') return user;
+  if (!user) {
+    cancelPendingCloudSave();
+    localStorage.removeItem(USER_KEY);
+    setActiveUid('');
+  } else {
+    const previousUid = readUser()?.uid || getActiveUid();
+    if (user.uid && previousUid && previousUid !== user.uid) cancelPendingCloudSave();
+    localStorage.setItem(USER_KEY, JSON.stringify(user));
+    if (user.uid) setActiveUid(user.uid, previousUid);
+  }
+  notify();
   return user;
 }
 
-async function accountRequest(action, payload = {}) {
-  const url = apiEndpoint('account');
-  if (!url) throw new Error('The password screen is not available in this build.');
-  return postJson(url, { action, ...payload }, getToken());
+export function clearAccountCache() {
+  cacheUser(null);
 }
 
-export async function unlockWithPin(pin) {
-  const data = await accountRequest('unlock', { pin });
-  writeSession({ token: data.token, user: data.user });
-  return data.user;
-}
-
-export function lockApp() {
-  writeSession(null);
+export async function ensureCloudUser(firebaseUser) {
+  const data = await workerRequest('POST', '/v1/users/me', {
+    email: firebaseUser?.email || '',
+    displayName: firebaseUser?.displayName || '',
+  });
+  return cacheUser(data.user);
 }
 
 export async function refreshUser() {
-  const token = getToken();
-  if (!token) return null;
   try {
-    const data = await accountRequest('me');
-    cacheUser(data.user);
-    return data.user;
+    const data = await workerRequest('GET', '/v1/users/me');
+    return cacheUser(data.user);
   } catch {
-    writeSession(null);
-    return null;
+    return readUser();
   }
 }
 
 export async function getUsage() {
-  const data = await accountRequest('usage');
+  const data = await workerRequest('GET', '/v1/users/me/usage');
   if (data.me) cacheUser(data.me);
+  else if (data.user) cacheUser(data.user);
+  return data;
+}
+
+export async function refreshSubscription() {
+  const data = await workerRequest('POST', '/v1/users/me/subscription/refresh', {});
+  if (data.user) cacheUser(data.user);
   return data;
 }
 
 export function assertCanSpend() {
   const user = getCurrentUser();
-  if (!user) throw new Error('Enter the password to use study AI.');
+  if (!user) throw new Error('Sign in to use study AI.');
   if (user.unlimited) return user;
-  if (!user.hasBudget) {
-    throw new Error('Study AI isn’t available right now.');
-  }
-  if ((user.remainingUsd ?? 0) <= 0) {
+  if (!user.hasBudget || (user.remainingQuota ?? 0) <= 0) {
     throw new Error('This month’s AI limit is used up.');
   }
   return user;

@@ -3,7 +3,7 @@ import { useNavigate, Navigate } from 'react-router-dom';
 import { Timer, History, Settings, ArrowRight, RotateCcw } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { loadSession, loadFinishedSession } from '@/lib/sessionStore';
-import { ONBOARDING_FLAG } from '@/lib/onboarding';
+import { isOnboarded } from '@/lib/onboarding';
 
 // Persistent home base. The only job here is getting the user into a session
 // in one tap, with zero decisions to weigh. Everything informational lives one
@@ -11,10 +11,16 @@ import { ONBOARDING_FLAG } from '@/lib/onboarding';
 // landing is the entry. "Start new cram" returns to Welcome.
 export default function Landing() {
   const navigate = useNavigate();
+  const [, setSessionTick] = React.useState(0);
+  React.useEffect(() => {
+    const bump = () => setSessionTick((n) => n + 1);
+    window.addEventListener('lms:session', bump);
+    return () => window.removeEventListener('lms:session', bump);
+  }, []);
   // Read fresh on every render so the first-time redirect and the Continue
   // button never go stale if storage changes while the screen is mounted.
   const hasSession = typeof window !== 'undefined' ? !!loadSession() : false;
-  const onboarded = typeof window !== 'undefined' ? !!localStorage.getItem(ONBOARDING_FLAG) : false;
+  const onboarded = typeof window !== 'undefined' ? isOnboarded() : false;
   const finishedSession = typeof window !== 'undefined' ? loadFinishedSession() : null;
 
   const restartCram = () => {

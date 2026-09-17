@@ -4,8 +4,8 @@ import { ArrowLeft, Upload, Loader2 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { makePhotoSource } from '@/lib/notesSource';
 import { fileToJpegDataUrl, stashPhotos, validateNotePhotos } from '@/lib/imageData';
-import { loadSession } from '@/lib/sessionStore';
-import { ONBOARDING_FLAG } from '@/lib/onboarding';
+import { uploadNoteImages } from '@/lib/notesUpload';
+import { isOnboarded } from '@/lib/onboarding';
 
 export default function Welcome() {
   const navigate = useNavigate();
@@ -14,9 +14,7 @@ export default function Welcome() {
   const [readError, setReadError] = React.useState('');
   const inputRef = React.useRef(null);
 
-  const canGoBack = typeof window !== 'undefined'
-    ? !!(localStorage.getItem(ONBOARDING_FLAG) || loadSession())
-    : false;
+  const canGoBack = typeof window !== 'undefined' ? isOnboarded() : false;
 
   const takeFiles = async (fileList) => {
     if (reading) return;
@@ -36,8 +34,15 @@ export default function Welcome() {
       const name = checked.files.length === 1
         ? checked.files[0].name
         : `${checked.files.length} photos`;
+      let noteId = '';
+      try {
+        const note = await uploadNoteImages(images, { title: name });
+        noteId = note?.id || '';
+      } catch {
+        // Extract still runs from the in-memory photos; R2 persist can retry later.
+      }
       navigate('/review-notes', {
-        state: { source: makePhotoSource({ name }) },
+        state: { source: { ...makePhotoSource({ name }), noteId } },
       });
     } catch {
       setReadError('Could not read that photo. Try another one.');

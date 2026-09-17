@@ -1,36 +1,34 @@
 import React from 'react';
 import { Navigate, useLocation, useNavigate } from 'react-router-dom';
-import { Loader2, Lock } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
 import { useAuth } from '@/lib/AuthContext';
 import { afterAuthPath } from '@/lib/onboarding';
+import GoogleSignInButton from '@/components/account/GoogleSignInButton';
 
 export default function Account() {
   const navigate = useNavigate();
   const location = useLocation();
-  const { isAuthenticated, unlock } = useAuth();
+  const { isAuthenticated, authError, firebaseUser, retryCloud, signInWithGoogle } = useAuth();
   const from = location.state?.from;
-  const [pin, setPin] = React.useState('');
-  const [error, setError] = React.useState('');
-  const [loading, setLoading] = React.useState(false);
+  const [retrying, setRetrying] = React.useState(false);
+  const [googleLoading, setGoogleLoading] = React.useState(false);
+  const [googleError, setGoogleError] = React.useState('');
+  const safeFrom = from === '/' || from === '/welcome' || from === '/settings' || from === '/history' || from === '/practice';
 
   if (isAuthenticated) {
-    return <Navigate to={from && from !== '/account' ? from : afterAuthPath()} replace />;
+    return <Navigate to={safeFrom ? from : afterAuthPath()} replace />;
   }
 
-  const handleSubmit = async (e) => {
-    e.preventDefault();
-    setError('');
-    setLoading(true);
+  const handleGoogle = async () => {
+    setGoogleError('');
+    setGoogleLoading(true);
     try {
-      await unlock(pin);
-      navigate(from && from !== '/account' ? from : afterAuthPath(), { replace: true });
+      await signInWithGoogle();
+      navigate(afterAuthPath(), { replace: true });
     } catch (err) {
-      setError(err.message || 'Wrong password.');
+      setGoogleError(err.message || 'Could not sign in with Google.');
     } finally {
-      setLoading(false);
+      setGoogleLoading(false);
     }
   };
 
@@ -41,45 +39,50 @@ export default function Account() {
         <h1 className="text-4xl sm:text-5xl font-bold tracking-tight mt-2 leading-[1.05]">
           Last Minute Study
         </h1>
-        <p className="text-base text-muted-foreground mt-4">Enter the password to continue</p>
+        <p className="text-base text-muted-foreground mt-4">Create an account or sign back in</p>
+        {(authError || googleError) && (
+          <div className="mt-4 max-w-sm mx-auto">
+            <p className="text-sm text-destructive">{googleError || authError}</p>
+            {firebaseUser && !googleError && (
+              <Button
+                variant="outline"
+                className="mt-3 h-11 rounded-2xl"
+                disabled={retrying}
+                onClick={async () => {
+                  setRetrying(true);
+                  try {
+                    await retryCloud();
+                  } catch {
+                    // Error text stays on screen.
+                  } finally {
+                    setRetrying(false);
+                  }
+                }}
+              >
+                Try again
+              </Button>
+            )}
+          </div>
+        )}
       </div>
 
       <footer className="px-6 pb-safe pt-4">
-        <form onSubmit={handleSubmit} className="max-w-md mx-auto w-full flex flex-col gap-3">
-          {error && (
-            <p className="text-sm text-destructive text-center">{error}</p>
-          )}
-          <div className="space-y-2 text-left">
-            <Label htmlFor="app-password">Password</Label>
-            <div className="relative">
-              <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" aria-hidden="true" />
-              <Input
-                id="app-password"
-                type="password"
-                inputMode="numeric"
-                autoComplete="off"
-                autoFocus
-                value={pin}
-                onChange={(e) => setPin(e.target.value)}
-                className="pl-10 h-14 rounded-2xl text-base"
-              />
-            </div>
-          </div>
+        <div className="max-w-md mx-auto w-full flex flex-col gap-3">
+          <GoogleSignInButton onClick={handleGoogle} loading={googleLoading} />
           <Button
-            type="submit"
             className="h-16 rounded-2xl text-lg font-bold shadow-lg"
-            disabled={loading || !pin.trim()}
+            onClick={() => navigate('/account/create')}
           >
-            {loading ? (
-              <>
-                <Loader2 className="w-5 h-5 mr-2 animate-spin" />
-                Unlocking…
-              </>
-            ) : (
-              'Unlock'
-            )}
+            Create an account
           </Button>
-        </form>
+          <button
+            type="button"
+            className="text-sm text-muted-foreground hover:text-foreground underline-offset-4 hover:underline self-center py-1"
+            onClick={() => navigate('/account/signin')}
+          >
+            Sign in with email
+          </button>
+        </div>
       </footer>
     </div>
   );

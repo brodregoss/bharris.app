@@ -36,6 +36,10 @@ export default defineConfig(({ mode }) => {
           changeOrigin: true,
           rewrite: (path) => path.replace(/^\/openai-proxy/, ''),
         },
+        '/v1': {
+          target: 'http://127.0.0.1:8787',
+          changeOrigin: true,
+        },
       },
     },
   }

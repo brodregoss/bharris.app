@@ -12,5 +12,11 @@
     "contentInset": "never",
     "preferredContentMode": "mobile",
     "backgroundColor": "#f8fafc"
+  },
+  "plugins": {
+    "FirebaseAuthentication": {
+      "skipNativeAuth": true,
+      "providers": ["google.com"]
+    }
   }
 }

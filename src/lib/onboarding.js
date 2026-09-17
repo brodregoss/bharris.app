@@ -1,11 +1,22 @@
 import { loadSession } from '@/lib/sessionStore';
+import { userStorageKey } from '@/lib/userStorage';
 
-// Bump this when the first-run screen changes so existing browsers
-// see the new welcome once instead of the old landing.
 export const ONBOARDING_FLAG = 'lms_onboarded_v2';
+
+export function isOnboarded() {
+  if (typeof window === 'undefined') return false;
+  const key = userStorageKey(ONBOARDING_FLAG);
+  if (!key) return false;
+  return !!localStorage.getItem(key) || !!loadSession();
+}
+
+export function markOnboarded() {
+  const key = userStorageKey(ONBOARDING_FLAG);
+  if (!key) return;
+  localStorage.setItem(key, '1');
+}
 
 export function afterAuthPath() {
   if (typeof window === 'undefined') return '/';
-  const onboarded = !!localStorage.getItem(ONBOARDING_FLAG) || !!loadSession();
-  return onboarded ? '/' : '/welcome';
+  return isOnboarded() ? '/' : '/welcome';
 }

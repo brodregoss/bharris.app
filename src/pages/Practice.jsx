@@ -1,6 +1,6 @@
 import React from 'react';
-import { useNavigate } from 'react-router-dom';
-import { ArrowLeft, BookOpen, ClipboardList, GraduationCap, Lock } from 'lucide-react';
+import { useLocation, useNavigate } from 'react-router-dom';
+import { ArrowLeft, BookOpen, ClipboardList, GraduationCap, Lock, PenLine } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
   Sheet,
@@ -11,6 +11,7 @@ import {
 } from '@/components/ui/sheet';
 import PracticeTest from '@/components/study/PracticeTest';
 import PracticeFlashcards from '@/components/practice/PracticeFlashcards';
+import SmartDefMode from '@/components/practice/SmartDefMode';
 import ExplainIt from '@/components/practice/ExplainIt';
 import UnderstandingPyramid from '@/components/practice/UnderstandingPyramid';
 import { loadPracticeSource, savePracticeTerms } from '@/lib/sessionStore';
@@ -23,6 +24,7 @@ import {
   clampMastery,
 } from '@/lib/mastery';
 import { cn } from '@/lib/utils';
+import { sessionRankMode } from '@/lib/studyUtils';
 
 const MODES = [
   {
@@ -30,6 +32,12 @@ const MODES = [
     title: 'Flashcards',
     sub: 'Flip a term, then mark got it or needs work.',
     icon: BookOpen,
+  },
+  {
+    id: 'smartdef',
+    title: 'Smart def',
+    sub: 'Stumped on a couple of terms? Write your own definition to lock them in.',
+    icon: PenLine,
   },
   {
     id: 'test',
@@ -47,9 +55,13 @@ const MODES = [
 
 export default function Practice() {
   const navigate = useNavigate();
+  const location = useLocation();
   const sourceRef = React.useRef(null);
   const [terms, setTerms] = React.useState(() => {
-    const src = loadPracticeSource();
+    const fromHistory = location.state?.session;
+    const src = fromHistory?.terms?.length
+      ? { kind: location.state?.kind || 'history', session: fromHistory }
+      : loadPracticeSource();
     sourceRef.current = src;
     return withInferredMastery(src?.session?.terms || []);
   });
@@ -76,6 +88,10 @@ export default function Practice() {
   const mastered = terms.filter((t) => clampMastery(t.mastery) >= MASTERY.MASTERED);
   const workOn = terms.filter((t) => clampMastery(t.mastery) > MASTERY.NONE && clampMastery(t.mastery) < MASTERY.MASTERED);
   const unstarted = terms.filter((t) => clampMastery(t.mastery) <= MASTERY.NONE);
+
+  const rankMode = sessionRankMode(sourceRef.current?.session?.setup, terms, {
+    title: sourceRef.current?.session?.title,
+  });
 
   if (!terms.length) {
     return (
@@ -121,12 +137,22 @@ export default function Practice() {
     );
   }
 
+  if (mode === 'smartdef') {
+    return (
+      <div className="min-h-[100dvh] bg-background text-foreground flex flex-col">
+        {header}
+        <SmartDefMode terms={terms} rankMode={rankMode} onUpdateTerm={updateTerm} onDone={() => setMode('hub')} />
+      </div>
+    );
+  }
+
   if (mode === 'test') {
     return (
       <div className="min-h-[100dvh] bg-background text-foreground flex flex-col">
         {header}
         <PracticeTest
           terms={terms}
+          rankMode={rankMode}
           examType={sourceRef.current?.session?.setup?.examType || 'mixed'}
           budgetMs={12 * 60 * 1000}
           priorMissed={workOn.concat(unstarted).map((t) => t.id)}

@@ -15,6 +15,95 @@ export const TIER_HINTS = {
   passive: 'Easier terms you only skimmed.',
 };
 
+export const RANK_MODE = {
+  IMPORTANCE: 'importance',
+  DIFFICULTY: 'difficulty',
+};
+
+const DIFFICULTY_TIER_LABELS = {
+  critical: 'Difficult concepts',
+  core: 'Tougher concepts',
+  passive: 'Easier concepts',
+};
+
+const DIFFICULTY_TIER_HINTS = {
+  critical: 'Obscure, easy to mix up, or slow to stick — give these extra reps.',
+  core: 'Still take some work, but they are less slippery than the top group.',
+  passive: 'Shorter or more familiar ideas that usually come back faster.',
+};
+
+export function normalizeRankMode(mode) {
+  return mode === RANK_MODE.DIFFICULTY ? RANK_MODE.DIFFICULTY : RANK_MODE.IMPORTANCE;
+}
+
+export function tierLabelsFor(rankMode) {
+  return normalizeRankMode(rankMode) === RANK_MODE.DIFFICULTY ? DIFFICULTY_TIER_LABELS : TIER_LABELS;
+}
+
+export function tierHintsFor(rankMode) {
+  return normalizeRankMode(rankMode) === RANK_MODE.DIFFICULTY ? DIFFICULTY_TIER_HINTS : TIER_HINTS;
+}
+
+export function rankModeSkimHint(rankMode) {
+  if (normalizeRankMode(rankMode) === RANK_MODE.DIFFICULTY) {
+    return 'Every term is needed, so these are grouped by how hard they are to learn — Difficult concepts, Tougher concepts, then Easier concepts. Scroll through, then start flashcards when you’re ready.';
+  }
+  return 'Grouped by how much they matter on the exam — Must know, Should know, then Nice to know. Scroll through, then start flashcards when you’re ready.';
+}
+
+const LIST_STOP = new Set(['the', 'and', 'for', 'with', 'from', 'that', 'this', 'into', 'about', 'your']);
+
+function sharedListToken(names) {
+  const counts = {};
+  names.forEach((name) => {
+    String(name)
+      .split(/[\s/-]+/)
+      .forEach((raw) => {
+        const w = raw.toLowerCase().replace(/[^a-z0-9]/g, '');
+        if (w.length < 4 || LIST_STOP.has(w)) return;
+        counts[w] = (counts[w] || 0) + 1;
+      });
+  });
+  const n = names.length;
+  return Object.values(counts).some((c) => c >= Math.max(4, Math.ceil(n * 0.6)));
+}
+
+function numberedClosedList(list) {
+  const n = list.length;
+  if (n < 5) return false;
+  const hits = list.filter((t) =>
+    /\b(amendment|article|commandment)\s*#?\d|\d+(st|nd|rd|th)\s+(amendment|article|commandment)/i.test(
+      t.term || ''
+    )
+  ).length;
+  return hits / n >= 0.6;
+}
+
+export function inferRankMode(terms, meta = {}) {
+  if (meta.rankMode === RANK_MODE.DIFFICULTY || meta.rankMode === RANK_MODE.IMPORTANCE) {
+    return meta.rankMode;
+  }
+  const title = `${meta.title || ''} ${meta.id || ''} ${meta.sourceId || ''}`.toLowerCase();
+  if (/bill of rights|amendments?\b|cranial nerv|ten commandments|periodic table/.test(title)) {
+    return RANK_MODE.DIFFICULTY;
+  }
+  const list = Array.isArray(terms) ? terms.filter((t) => t?.term) : [];
+  if (list.length < 5) return RANK_MODE.IMPORTANCE;
+  if (numberedClosedList(list)) return RANK_MODE.DIFFICULTY;
+  const depShare = list.filter((t) => (t.depends_on || []).length > 0).length / list.length;
+  if (depShare > 0.25) return RANK_MODE.IMPORTANCE;
+  if (sharedListToken(list.map((t) => t.term))) return RANK_MODE.DIFFICULTY;
+  return RANK_MODE.IMPORTANCE;
+}
+
+export function sessionRankMode(setup, terms, extra = {}) {
+  return inferRankMode(terms, {
+    title: extra.title || setup?.title,
+    id: extra.id || extra.sourceId || setup?.sourceId,
+    rankMode: extra.rankMode || setup?.rankMode,
+  });
+}
+
 export const BLOCK_BUDGET_RATIO = {
   critical: 0.4,
   core: 0.3,
@@ -70,6 +159,19 @@ export function priority(term) {
   const tw = TIER_WEIGHT[term?.tier] || 0;
   const cw = CONF_WEIGHT[term?.confidence] || 0;
   return tw * cw;
+}
+
+export const SKIM_TIER_ORDER = ['critical', 'core', 'passive'];
+
+export function orderLikeSkim(terms) {
+  const list = Array.isArray(terms) ? terms : [];
+  const byPri = (a, b) => priority(b) - priority(a);
+  const out = [];
+  for (const id of SKIM_TIER_ORDER) {
+    out.push(...list.filter((t) => t.tier === id).sort(byPri));
+  }
+  out.push(...list.filter((t) => !SKIM_TIER_ORDER.includes(t.tier)).sort(byPri));
+  return out;
 }
 
 // How many terms we can reasonably flashcard in the time left.
@@ -164,6 +266,12 @@ export function withinStopWindow(examTiming, stopTime, now) {
 }
 
 export const WIND_DOWN_BUDGET_MS = 12 * 60 * 1000;
+
+// User-written wording for flashcard faces only. Tests and grading keep term.definition.
+export function flashcardDef(term) {
+  const own = String(term?.ownDefinition || '').trim();
+  return own || String(term?.definition || '');
+}
 
 export function fmtTime(ms) {
   if (ms < 0) ms = 0;

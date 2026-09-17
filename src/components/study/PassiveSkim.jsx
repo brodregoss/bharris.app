@@ -1,13 +1,22 @@
 import React from 'react';
 import { Button } from '@/components/ui/button';
 import { ArrowRight, AlertTriangle } from 'lucide-react';
+import TypeDefMode from '@/components/study/TypeDefMode';
+import { inferRankMode, tierLabelsFor, RANK_MODE } from '@/lib/studyUtils';
 
 // Screen C — exposure-only scrollable list. No grading.
-export default function PassiveSkim({ terms, behind, onUpdateTerm, onDone }) {
+export default function PassiveSkim({ terms, allTerms, behind, onUpdateTerm, onDone, rankMode }) {
   const [seenIds, setSeenIds] = React.useState(new Set());
+  const [extra, setExtra] = React.useState(null);
+  const closeExtra = React.useCallback(() => setExtra(null), []);
   const listRef = React.useRef(null);
+  const pool = allTerms?.length ? allTerms : terms;
+  const mode = inferRankMode(terms, { rankMode });
+  const labels = tierLabelsFor(mode);
+  const difficulty = mode === RANK_MODE.DIFFICULTY;
 
   React.useEffect(() => {
+    if (extra) return undefined;
     const obs = new IntersectionObserver(
       (entries) => {
         entries.forEach((e) => {
@@ -30,14 +39,36 @@ export default function PassiveSkim({ terms, behind, onUpdateTerm, onDone }) {
     const els = listRef.current?.querySelectorAll('[data-id]');
     els?.forEach((el) => obs.observe(el));
     return () => obs.disconnect();
-  }, [terms, onUpdateTerm]);
+  }, [terms, onUpdateTerm, extra]);
+
+  if (extra) {
+    return (
+      <TypeDefMode
+        terms={pool}
+        startIn={extra}
+        onUpdateTerm={onUpdateTerm}
+        onClose={closeExtra}
+      />
+    );
+  }
 
   return (
     <div className="flex-1 flex flex-col px-5 pt-4">
       <div className="max-w-md mx-auto w-full flex-1 flex flex-col">
-        <h2 className="text-xl font-bold tracking-tight mb-1">Passive skim</h2>
+        <div className="flex items-start justify-between gap-3 mb-1">
+          <h2 className="text-xl font-bold tracking-tight">{difficulty ? labels.passive : 'Passive skim'}</h2>
+          <button
+            type="button"
+            onClick={() => setExtra('flash')}
+            className="text-sm font-medium text-foreground underline-offset-4 hover:underline shrink-0 pt-1"
+          >
+            Flash cards
+          </button>
+        </div>
         <p className="text-xs text-muted-foreground mb-3">
-          Quick exposure — no grading. Scroll through to review.
+          {difficulty
+            ? 'These are the easier or more familiar ideas. Quick exposure — no grading.'
+            : 'Quick exposure — no grading. Scroll through to review.'}
         </p>
         {behind && (
           <div className="rounded-xl bg-amber-50 dark:bg-amber-500/15 border border-amber-200 dark:border-amber-500/30 p-3 mb-3 text-xs text-amber-800 dark:text-amber-200 flex gap-2">
@@ -65,13 +96,22 @@ export default function PassiveSkim({ terms, behind, onUpdateTerm, onDone }) {
             <p className="text-sm text-muted-foreground text-center py-8">Nothing to skim — nice.</p>
           )}
         </div>
-        <Button
-          onClick={onDone}
-          className="w-full h-12 rounded-2xl font-semibold"
-        >
-          Continue
-          <ArrowRight className="w-4 h-4 ml-2" />
-        </Button>
+        <div className="flex flex-col gap-2">
+          <Button
+            variant="outline"
+            onClick={() => setExtra('type')}
+            className="w-full h-12 rounded-2xl font-semibold"
+          >
+            Type the defs
+          </Button>
+          <Button
+            onClick={onDone}
+            className="w-full h-12 rounded-2xl font-semibold"
+          >
+            Continue
+            <ArrowRight className="w-4 h-4 ml-2" />
+          </Button>
+        </div>
       </div>
     </div>
   );

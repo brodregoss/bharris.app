@@ -1,0 +1,37 @@
+export const PLANS = {
+  free: {
+    id: 'free',
+    name: 'Free',
+    quota: 30,
+    blurb: 'Enough AI to get one real cram done.',
+    features: [
+      'Photo notes → terms and definitions',
+      'Triage, recall, and a practice test',
+      'Sessions saved to your account',
+      '30 AI calls each month',
+    ],
+  },
+  pro: {
+    id: 'pro',
+    name: 'Study Pro',
+    quota: 500,
+    blurb: 'Keep going when the night gets long.',
+    monthlyPrice: '$4.99',
+    yearlyPrice: '$39.99',
+    yearlyNote: 'About 2 months free',
+    features: [
+      'Everything in Free',
+      '500 AI calls each month',
+      'Extract, grade, explain, and panic notes',
+      'Restore on any iPhone with this Apple ID',
+    ],
+  },
+};
+
+export function planForUser(user) {
+  return user?.subscriptionTier === 'pro' ? PLANS.pro : PLANS.free;
+}
+
+export function planLabel(user) {
+  return planForUser(user).name;
+}

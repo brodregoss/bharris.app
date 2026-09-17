@@ -13,5 +13,16 @@
 		"preferredContentMode": "mobile",
 		"backgroundColor": "#f8fafc"
 	},
-	"packageClassList": []
+	"plugins": {
+		"FirebaseAuthentication": {
+			"skipNativeAuth": true,
+			"providers": [
+				"google.com"
+			]
+		}
+	},
+	"packageClassList": [
+		"FirebaseAuthenticationPlugin",
+		"PurchasesPlugin"
+	]
 }

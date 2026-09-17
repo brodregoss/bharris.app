@@ -63,6 +63,7 @@ export default function ExplainIt({ terms, onUpdateTerm, onDone }) {
           `3 Solid — would help a classmate; a few gaps.\n` +
           `4 Mastered — teaches it fully: what it is, why it matters, and the key related points, as if explaining to a beginner. Do not give 4 for a short paraphrase of the definition.\n` +
           `Return JSON { "level": 1-4, "points_hit": ["..."], "points_missed": ["..."], "feedback": "one or two sentences" }.`,
+        feature: 'explain',
         response_json_schema: {
           type: 'object',
           properties: {

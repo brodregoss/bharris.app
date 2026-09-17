@@ -6,6 +6,7 @@ import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { extractTermsFromPhotos, generateDefinitions, regenerateDefinition } from '@/lib/extractNotes';
 import { peekPhotos, peekPhoto, clearPhoto } from '@/lib/imageData';
+import { patchNote } from '@/lib/notesUpload';
 
 function photosFor(source) {
   const stashed = peekPhotos();
@@ -64,6 +65,7 @@ export default function ReviewNotes() {
       title: rest.title || 'Your notes',
       terms: nextItems.length,
       items: nextItems,
+      noteId: rest.noteId || source?.noteId,
     };
   };
 
@@ -82,10 +84,16 @@ export default function ReviewNotes() {
       setExtractHint('Writing definitions…');
       const withDefs = await generateDefinitions(found, setExtractHint);
       setItems(withDefs);
+      if (source?.noteId) {
+        const transcript = found
+          .map((t) => `${t.term}${t.notes ? `: ${t.notes}` : ''}`)
+          .join('\n');
+        patchNote(source.noteId, { transcript }).catch(() => {});
+      }
       setExtracting(false);
     } catch (err) {
       const message = err instanceof Error ? err.message : '';
-      if (/password|limit is used|isn’t available/i.test(message)) {
+      if (/password|limit is used|isn’t available|upgrade|quota|sign in/i.test(message)) {
         setExtractError(message);
       } else if (message === 'empty terms') {
         setExtractError('No terms turned up on that page. Try a clearer shot, or add them by hand.');

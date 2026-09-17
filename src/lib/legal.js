@@ -12,22 +12,22 @@ export const ABOUT_SECTIONS = [
   },
   {
     title: 'AI',
-    body: 'Term extraction from photos, definition writing, panic notes, and answer grading go through a small server that calls OpenAI. Those features count toward a monthly AI limit. They can be wrong. Treat them as a study aid, not the answer key.',
+    body: 'Term extraction from photos, definition writing, panic notes, and answer grading go through a Cloudflare Worker that calls OpenAI. Those features count toward a monthly AI quota. They can be wrong. Treat them as a study aid, not the answer key.',
   },
 ];
 
 export const PRIVACY_SECTIONS = [
   {
-    title: 'Password',
-    body: 'The app is password protected on this device. Notes are not used as a cloud backup.',
+    title: 'Account',
+    body: 'You sign in with Firebase (email and password). That account id is how notes, study progress, and AI quota are stored on the server.',
   },
   {
-    title: 'What stays on your device',
-    body: 'Your notes, study sessions, practice progress, and appearance settings are stored locally on this phone or browser.',
+    title: 'What stays with your account',
+    body: 'Study sessions, term definitions, grades, and uploaded note files are stored for your account so you can pick up on another device. Original photos go to private object storage; the app only sees them through signed-in requests.',
   },
   {
     title: 'What leaves your device',
-    body: 'If you photograph notes (up to two pages), those images are sent to our server so terms and definitions can be extracted. Panic notes, definition generation, and practice-test grading send the relevant terms and answers to the same server, which forwards them to OpenAI to produce a response. We do not sell this content.',
+    body: 'If you photograph notes (up to two pages), those images are uploaded so terms and definitions can be extracted. Panic notes, definition generation, and practice-test grading send the relevant terms and answers to the same server, which forwards them to OpenAI. We do not sell this content.',
   },
   {
     title: 'Camera and photos',
@@ -35,14 +35,14 @@ export const PRIVACY_SECTIONS = [
   },
   {
     title: 'Deleting your data',
-    body: 'Clearing this app’s data, or starting a new cram, removes the local session from this device. Content already sent for an AI request cannot be pulled back from that provider.',
+    body: 'Signing out leaves your cloud data in place. Starting a new cram replaces the active session. Content already sent for an AI request cannot be pulled back from that provider.',
   },
 ];
 
 export const TERMS_SECTIONS = [
   {
     title: 'Using the app',
-    body: 'Last Minute Study is for personal studying. A password is required to open the app. Built-in sample notes are for trying the app, not a complete course.',
+    body: 'Last Minute Study is for personal studying. An account is required. Built-in sample notes are for trying the app, not a complete course.',
   },
   {
     title: 'No academic guarantee',

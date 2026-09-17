@@ -10,15 +10,17 @@ import {
   Shield,
   FileText,
   ChevronRight,
-  Wallet,
-  Lock,
+  Sparkles,
+  LogOut,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Switch } from '@/components/ui/switch';
 import { Label } from '@/components/ui/label';
 import { Progress } from '@/components/ui/progress';
 import { useAuth } from '@/lib/AuthContext';
-import { formatUsd, getUsage } from '@/lib/accountStore';
+import { getUsage } from '@/lib/accountStore';
+import { usePaywall } from '@/lib/PaywallContext';
+import { planLabel } from '@/lib/plans';
 import {
   Sheet,
   SheetContent,
@@ -84,38 +86,46 @@ function Row({ icon: Icon, label, value, onClick }) {
 }
 
 function usedPct(person) {
-  if (!person || person.unlimited || !person.monthlyLimitUsd) return 0;
-  return Math.min(100, ((person.spentUsd || 0) / person.monthlyLimitUsd) * 100);
+  if (!person || person.unlimited || !person.aiQuotaLimit) return 0;
+  return Math.min(100, ((person.aiQuotaUsed || 0) / person.aiQuotaLimit) * 100);
 }
 
-function UsageBlock({ heading, person }) {
+function UsageBlock({ heading, person, onUpgrade }) {
+  const remaining = person?.remainingQuota ?? 0;
+  const used = person?.aiQuotaUsed || 0;
+  const limit = person?.aiQuotaLimit || 0;
   return (
     <div className="p-5 space-y-3">
       <div className="flex items-center gap-2">
-        <Wallet className="w-4 h-4 text-muted-foreground shrink-0" />
+        <Sparkles className="w-4 h-4 text-muted-foreground shrink-0" />
         <p className="text-sm font-bold tracking-tight">{heading}</p>
       </div>
       {person?.unlimited ? (
         <p className="text-sm text-muted-foreground">No monthly limit.</p>
-      ) : person?.hasBudget ? (
+      ) : person?.hasBudget || remaining > 0 ? (
         <>
           <div className="flex items-baseline justify-between gap-3">
             <p className="text-2xl font-bold tracking-tight">
-              {formatUsd(person?.spentUsd || 0)}
+              {remaining}
             </p>
             <p className="text-xs text-muted-foreground">
-              of {formatUsd(person?.monthlyLimitUsd)} this month
+              of {limit} AI calls left this month
             </p>
           </div>
           <Progress value={usedPct(person)} className="h-2" />
           <p className="text-xs text-muted-foreground">
-            {formatUsd(person?.remainingUsd || 0)} left this month.
+            {used} used · {person?.subscriptionTier === 'pro' ? 'Study Pro' : 'Free'}
           </p>
         </>
       ) : (
         <p className="text-sm text-muted-foreground">
-          Study AI isn’t available right now.
+          This month’s AI limit is used up.
         </p>
+      )}
+      {person?.subscriptionTier !== 'pro' && onUpgrade && (
+        <Button className="w-full h-11 rounded-2xl" onClick={onUpgrade}>
+          Upgrade to Pro
+        </Button>
       )}
     </div>
   );
@@ -123,7 +133,8 @@ function UsageBlock({ heading, person }) {
 
 export default function Settings() {
   const navigate = useNavigate();
-  const { user, isAdmin, lock } = useAuth();
+  const { user, logout } = useAuth();
+  const { openPaywall } = usePaywall();
   const { theme, setTheme, resolvedTheme } = useTheme();
   const [ready, setReady] = React.useState(false);
   const [doc, setDoc] = React.useState(null);
@@ -144,12 +155,11 @@ export default function Settings() {
       }
     })();
     return () => { cancelled = true; };
-  }, [isAdmin]);
+  }, [user]);
 
   const dark = ready && (resolvedTheme || theme) === 'dark';
   const open = DOCS[doc];
-  const me = usage?.me || user;
-  const guests = usage?.guests;
+  const me = usage?.me || usage?.user || user;
 
   return (
     <div className="min-h-[100dvh] bg-background text-foreground flex flex-col">
@@ -168,25 +178,24 @@ export default function Settings() {
               </div>
               <div className="min-w-0">
                 <p className="text-sm font-bold tracking-tight truncate">
-                  {isAdmin ? 'Admin' : APP_NAME}
+                  {me?.displayName || me?.email || APP_NAME}
                 </p>
-                <p className="text-xs text-muted-foreground mt-0.5">
-                  Notes and sessions stay on this device.
+                <p className="text-xs text-muted-foreground mt-0.5 truncate">
+                  {me?.email || 'Notes sync to this account.'}
                 </p>
               </div>
             </div>
           </section>
 
-          {isAdmin ? (
-            <section className="rounded-2xl border border-border bg-card overflow-hidden divide-y divide-border">
-              <UsageBlock heading="Admin usage" person={me} />
-              <UsageBlock heading="Guests usage" person={guests} />
-            </section>
-          ) : (
-            <section className="rounded-2xl border border-border bg-card overflow-hidden">
-              <UsageBlock heading="AI usage" person={me} />
-            </section>
-          )}
+          <section className="rounded-2xl border border-border bg-card overflow-hidden divide-y divide-border">
+            <Row
+              icon={Sparkles}
+              label="Plan"
+              value={planLabel(me)}
+              onClick={openPaywall}
+            />
+            <UsageBlock heading="AI this month" person={me} onUpgrade={openPaywall} />
+          </section>
 
           <section className="rounded-2xl border border-border bg-card p-5">
             <div className="flex items-center justify-between gap-4">
@@ -223,14 +232,14 @@ export default function Settings() {
 
           <button
             type="button"
-            onClick={() => {
-              lock();
+            onClick={async () => {
+              await logout();
               navigate('/account', { replace: true });
             }}
             className="flex items-center justify-center gap-2 text-sm text-muted-foreground hover:text-foreground"
           >
-            <Lock className="w-4 h-4" />
-            Lock
+            <LogOut className="w-4 h-4" />
+            Sign out
           </button>
 
           <p className="mt-auto pt-8 text-center text-xs font-bold text-muted-foreground">

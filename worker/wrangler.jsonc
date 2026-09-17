@@ -1,0 +1,87 @@
+{
+  "name": "last-minute-study",
+  "main": "src/index.js",
+  "compatibility_date": "2025-09-01",
+  "vars": {
+    "REVENUECAT_ENTITLEMENT_ID": "Study Pro",
+    "FREE_AI_QUOTA": "30",
+    "PRO_AI_QUOTA": "500"
+  },
+  "d1_databases": [
+    {
+      "binding": "APP",
+      "database_name": "studyapp-app",
+      "database_id": "182645c1-078a-4cb3-b8fd-55baea22641a",
+      "migrations_dir": "migrations/app",
+      "remote": true
+    },
+    {
+      "binding": "USER_00",
+      "database_name": "studyapp-user-00",
+      "database_id": "3c59acd6-511a-4978-ae52-bc8fd973e180",
+      "remote": true
+    },
+    {
+      "binding": "USER_01",
+      "database_name": "studyapp-user-01",
+      "database_id": "a92b284a-977b-4446-bb5c-def22f022dde",
+      "remote": true
+    },
+    {
+      "binding": "USER_02",
+      "database_name": "studyapp-user-02",
+      "database_id": "b469f14e-b31a-46aa-b019-207fca1d92ff",
+      "remote": true
+    },
+    {
+      "binding": "USER_03",
+      "database_name": "studyapp-user-03",
+      "database_id": "233f871b-202d-4c1a-8058-f4c972c28cf6",
+      "remote": true
+    },
+    {
+      "binding": "USER_04",
+      "database_name": "studyapp-user-04",
+      "database_id": "f20dc293-1bc0-48ff-9b51-29eb5446b0bb",
+      "remote": true
+    },
+    {
+      "binding": "USER_05",
+      "database_name": "studyapp-user-05",
+      "database_id": "d6df4d51-3c23-47e9-834d-1a3745b903f3",
+      "remote": true
+    },
+    {
+      "binding": "USER_06",
+      "database_name": "studyapp-user-06",
+      "database_id": "fe1e6786-8a4e-4fd6-98c4-5965d7ad0506",
+      "remote": true
+    },
+    {
+      "binding": "USER_07",
+      "database_name": "studyapp-user-07",
+      "database_id": "7b59b447-877f-4cb7-9908-14243ef0c66c",
+      "remote": true
+    }
+  ],
+  "durable_objects": {
+    "bindings": [
+      {
+        "name": "USER_STUDY",
+        "class_name": "UserStudyDO"
+      }
+    ]
+  },
+  "migrations": [
+    {
+      "tag": "v1",
+      "new_sqlite_classes": ["UserStudyDO"]
+    }
+  ],
+  "r2_buckets": [
+    {
+      "binding": "NOTES",
+      "bucket_name": "studyapp-notes"
+    }
+  ]
+}

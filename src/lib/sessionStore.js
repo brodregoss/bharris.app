@@ -1,62 +1,138 @@
-// Persists the in-progress study session so a user can resume where they left off.
-const KEY = 'lms_session_v1';
+import { workerRequest } from '@/lib/workerClient';
+import { getActiveUid, userStorageKey } from '@/lib/userStorage';
 
-export function loadSession() {
+const KEY = 'lms_session_v1';
+const FINISHED_KEY = 'lms_finished_v1';
+
+function newId() {
+  if (typeof crypto !== 'undefined' && crypto.randomUUID) return crypto.randomUUID();
+  return `s${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
+}
+
+function emit() {
+  if (typeof window !== 'undefined') window.dispatchEvent(new Event('lms:session'));
+}
+
+function ownedByActiveUser(data) {
+  const uid = getActiveUid();
+  if (!uid || !data) return null;
+  if (data.ownerUid && data.ownerUid !== uid) return null;
+  return { ...data, ownerUid: uid };
+}
+
+function readJson(baseKey) {
+  const key = userStorageKey(baseKey);
+  if (!key) return null;
   try {
-    const raw = localStorage.getItem(KEY);
+    const raw = localStorage.getItem(key);
     if (!raw) return null;
     const data = JSON.parse(raw);
     if (!data || !data.terms || !data.terms.length) return null;
-    return data;
+    return ownedByActiveUser(data);
   } catch {
     return null;
   }
 }
 
-export function saveSession(data) {
+function writeJson(baseKey, data) {
+  const key = userStorageKey(baseKey);
+  if (!key) return;
+  localStorage.setItem(key, JSON.stringify(data));
+}
+
+export function loadSession() {
+  return readJson(KEY);
+}
+
+function withId(data) {
+  if (!data) return data;
+  return data.id ? data : { ...data, id: newId() };
+}
+
+let syncTimer;
+let syncUid = '';
+
+export function cancelPendingCloudSave() {
+  clearTimeout(syncTimer);
+  syncTimer = null;
+  syncUid = '';
+}
+
+function scheduleCloudSave(session, uid) {
+  if (!session?.id || !uid) return;
+  clearTimeout(syncTimer);
+  syncUid = uid;
+  syncTimer = setTimeout(() => {
+    if (!syncUid || getActiveUid() !== uid) return;
+    workerRequest('PUT', '/v1/sessions/current', { session }).catch(() => {});
+  }, 400);
+}
+
+function persistActive(data, { replaceId = false } = {}) {
+  const uid = getActiveUid();
+  if (!uid) return null;
+  if (data?.ownerUid && data.ownerUid !== uid) return loadSession();
+  const existing = replaceId ? null : loadSession();
+  const next = withId({
+    ...data,
+    id: replaceId ? newId() : (data.id || existing?.id),
+    status: data?.status || 'active',
+    savedAt: Date.now(),
+    ownerUid: uid,
+  });
   try {
-    localStorage.setItem(KEY, JSON.stringify(data));
-    window.dispatchEvent(new Event('lms:session'));
+    writeJson(KEY, next);
+    emit();
   } catch {
     // ignore quota / serialization errors
   }
+  scheduleCloudSave(next, uid);
+  return next;
+}
+
+export function saveSession(data) {
+  return persistActive(data);
+}
+
+export function beginSession(data) {
+  return persistActive(data, { replaceId: true });
 }
 
 export function clearSession() {
+  cancelPendingCloudSave();
+  const key = userStorageKey(KEY);
   try {
-    localStorage.removeItem(KEY);
-    window.dispatchEvent(new Event('lms:session'));
+    if (key) localStorage.removeItem(key);
+    emit();
   } catch {
     // ignore
   }
 }
 
-// Snapshot of the most recently finished cram — kept so the home screen can
-// offer "restart cram" / "practice" on the same terms after the active session
-// is cleared.
-const FINISHED_KEY = 'lms_finished_v1';
-
 export function loadFinishedSession() {
-  try {
-    const raw = localStorage.getItem(FINISHED_KEY);
-    if (!raw) return null;
-    const data = JSON.parse(raw);
-    if (!data || !data.terms || !data.terms.length) return null;
-    return data;
-  } catch {
-    return null;
-  }
+  return readJson(FINISHED_KEY);
 }
 
 export function saveFinishedSession(data) {
+  const uid = getActiveUid();
+  if (!uid) return null;
+  if (data?.ownerUid && data.ownerUid !== uid) return loadFinishedSession();
+  const next = withId({
+    ...data,
+    status: 'finished',
+    finishedAt: data?.finishedAt || Date.now(),
+    savedAt: Date.now(),
+    ownerUid: uid,
+  });
   try {
-    localStorage.setItem(FINISHED_KEY, JSON.stringify(data));
+    writeJson(FINISHED_KEY, next);
   } catch {
     // ignore
   }
+  workerRequest('PUT', `/v1/sessions/${next.id}`, { session: next }).catch(() => {});
+  return next;
 }
 
-// Practice uses the in-progress cram if one exists, otherwise the last finished set.
 export function loadPracticeSource() {
   const active = loadSession();
   if (active?.terms?.length) return { kind: 'active', session: active };
@@ -69,7 +145,51 @@ export function savePracticeTerms(source, terms) {
   if (!source?.session) return;
   if (source.kind === 'active') {
     saveSession({ ...source.session, terms });
-  } else {
-    saveFinishedSession({ ...source.session, terms });
+    return;
   }
+  if (source.kind === 'history') {
+    const uid = getActiveUid();
+    if (!uid) return;
+    const next = {
+      ...source.session,
+      terms,
+      savedAt: Date.now(),
+      ownerUid: uid,
+    };
+    workerRequest('PUT', `/v1/sessions/${next.id}`, { session: next }).catch(() => {});
+    return;
+  }
+  saveFinishedSession({ ...source.session, terms });
+}
+
+export async function hydrateRemoteSession() {
+  const uid = getActiveUid();
+  if (!uid) return null;
+  try {
+    const data = await workerRequest('GET', '/v1/sessions/current');
+    const remote = ownedByActiveUser(data?.session);
+    if (!remote?.terms?.length) {
+      emit();
+      return loadSession();
+    }
+    const local = loadSession();
+    if (!local || (remote.savedAt || 0) >= (local.savedAt || 0)) {
+      writeJson(KEY, { ...remote, ownerUid: uid });
+      emit();
+      return loadSession();
+    }
+    return local;
+  } catch {
+    return loadSession();
+  }
+}
+
+export async function listRemoteSessions() {
+  const data = await workerRequest('GET', '/v1/sessions');
+  return Array.isArray(data?.sessions) ? data.sessions : [];
+}
+
+export async function loadRemoteSession(id) {
+  const data = await workerRequest('GET', `/v1/sessions/${id}`);
+  return ownedByActiveUser(data?.session);
 }

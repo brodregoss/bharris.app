@@ -2,7 +2,7 @@ import React from 'react';
 import { X } from 'lucide-react';
 import TermDefList from './TermDefList';
 
-export default function CheatSheet({ terms, open, onClose }) {
+export default function CheatSheet({ terms, open, onClose, rankMode }) {
   React.useEffect(() => {
     if (!open) return undefined;
     const onKey = (e) => {
@@ -32,7 +32,7 @@ export default function CheatSheet({ terms, open, onClose }) {
       </header>
       <main className="flex-1 overflow-y-auto px-5 pt-3 pb-safe">
         <div className="max-w-md mx-auto w-full pb-8">
-          <TermDefList terms={terms} />
+          <TermDefList terms={terms} rankMode={rankMode} />
         </div>
       </main>
     </div>

@@ -1,11 +1,11 @@
 import React from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
-import { tierFromDifficulty, confidenceFromTriage, normalizeExamType } from '@/lib/studyUtils';
+import { tierFromDifficulty, confidenceFromTriage, normalizeExamType, inferRankMode, RANK_MODE } from '@/lib/studyUtils';
 import { Moon, Loader2, Check } from 'lucide-react';
 import { invokeLlm } from '@/api/invokeLlm';
 import { Button } from '@/components/ui/button';
 import TriageCard from '@/components/triage/TriageCard';
-import { saveSession } from '@/lib/sessionStore';
+import { beginSession } from '@/lib/sessionStore';
 
 const TIERS = [
   { id: 'blank', label: 'Blank', sub: "Don't know", bg: '#FF8A8A' },
@@ -63,19 +63,34 @@ function needsPriorityRank(source, items) {
   return items.some((t) => clampDifficulty(t.difficulty) == null);
 }
 
-async function rankChunk(chunk, allNames) {
+function extractRanking(res) {
+  const candidates = [res?.ranking, res?.output?.ranking, res?.rankMode, res?.output?.rankMode];
+  for (const value of candidates) {
+    if (value === RANK_MODE.DIFFICULTY || value === RANK_MODE.IMPORTANCE) return value;
+  }
+  return null;
+}
+
+async function rankChunk(chunk, allNames, forcedRanking) {
   const res = await invokeLlm({
     prompt:
       `You are ranking a student's own study terms for a last-minute exam cram.\n` +
       `Do not add, remove, or rename terms. Rank each one from the list below.\n` +
-      `difficulty: integer 1–10 (10 = hardest / most important to know).\n` +
+      `First pick ranking:\n` +
+      `- "difficulty" if this is a closed list where EVERY term is required (Bill of Rights, cranial nerves, a complete vocab quiz). Then score difficulty 1–10 by how hard it is to learn or remember: obscure, easy to mix up, or arbitrary details rank high; short, familiar, or obvious ones rank low. Do not treat any term as optional.\n` +
+      `- "importance" if some terms matter more for the exam than others. Then difficulty 1–10 means hardest / most important to know.\n` +
+      (forcedRanking
+        ? `Use ranking "${forcedRanking}" for this batch.\n`
+        : '') +
       `depends_on: array of OTHER term names from the full deck that this concept builds on (empty if none).\n` +
       `Full deck names: ${allNames.join(', ')}\n\n` +
       `Terms to rank:\n` +
       chunk.map((t, i) => `${i + 1}. ${t.term}: ${t.definition}`).join('\n'),
+    feature: 'triage',
     response_json_schema: {
       type: 'object',
       properties: {
+        ranking: { type: 'string', enum: ['difficulty', 'importance'] },
         terms: {
           type: 'array',
           items: {
@@ -89,7 +104,7 @@ async function rankChunk(chunk, allNames) {
           },
         },
       },
-      required: ['terms'],
+      required: ['ranking', 'terms'],
     },
   });
   const ranked = extractTermList(res);
@@ -98,25 +113,38 @@ async function rankChunk(chunk, allNames) {
     const key = normalizeName(r.term);
     if (key && !byName.has(key)) byName.set(key, r);
   });
-  return chunk.map((t) => {
-    const hit = byName.get(normalizeName(t.term));
-    return {
-      ...t,
-      difficulty: clampDifficulty(hit?.difficulty) ?? 5,
-      depends_on: Array.isArray(hit?.depends_on) ? hit.depends_on : t.depends_on || [],
-    };
-  });
+  return {
+    ranking: forcedRanking || extractRanking(res),
+    items: chunk.map((t) => {
+      const hit = byName.get(normalizeName(t.term));
+      return {
+        ...t,
+        difficulty: clampDifficulty(hit?.difficulty) ?? 5,
+        depends_on: Array.isArray(hit?.depends_on) ? hit.depends_on : t.depends_on || [],
+      };
+    }),
+  };
 }
 
-async function rankUserTerms(terms, onProgress) {
+async function rankUserTerms(terms, onProgress, meta = {}) {
   const allNames = terms.map((t) => t.term).filter(Boolean);
   const out = [];
+  let forcedRanking = null;
   for (let i = 0; i < terms.length; i += RANK_BATCH) {
     const chunk = terms.slice(i, i + RANK_BATCH);
     onProgress?.(`Ranking your terms… ${Math.min(i + chunk.length, terms.length)}/${terms.length}`);
-    out.push(...(await rankChunk(chunk, allNames)));
+    const { items, ranking } = await rankChunk(chunk, allNames, forcedRanking);
+    if (!forcedRanking && (ranking === RANK_MODE.DIFFICULTY || ranking === RANK_MODE.IMPORTANCE)) {
+      forcedRanking = ranking;
+    }
+    out.push(...items);
   }
-  return out;
+  return {
+    terms: out,
+    rankMode:
+      forcedRanking ||
+      inferRankMode(out, { title: meta.title, id: meta.id, rankMode: meta.rankMode }),
+  };
 }
 
 function prepareItems(raw) {
@@ -148,6 +176,18 @@ function Triage() {
   const [loadError, setLoadError] = React.useState(false);
   const [retryTick, setRetryTick] = React.useState(0);
   const [dragOver, setDragOver] = React.useState(null);
+  const [detectedRankMode, setDetectedRankMode] = React.useState(() => {
+    const incoming = (source?.items || []).filter((t) => t?.term && t?.definition);
+    if (!incoming.length) return null;
+    if (isPreloadedSource(source) || !needsPriorityRank(source, incoming)) {
+      return inferRankMode(incoming, {
+        title: source?.title || source?.name,
+        id: source?.id,
+        rankMode: source?.rankMode,
+      });
+    }
+    return null;
+  });
 
   const lockIn = () => {
     if (!ranked.length) return;
@@ -164,8 +204,19 @@ function Triage() {
       seen: false,
       testResult: null,
     }));
-    saveSession({
-      setup,
+    const rankMode = inferRankMode(studyTerms, {
+      title: source?.title || source?.name || setup?.title,
+      id: source?.id,
+      rankMode: detectedRankMode || source?.rankMode,
+    });
+    const nextSetup = {
+      ...setup,
+      title: source?.title || source?.name || setup?.title,
+      sourceId: source?.id || setup?.sourceId,
+      rankMode,
+    };
+    const saved = beginSession({
+      setup: nextSetup,
       terms: studyTerms,
       phase: 'notes_offer',
       blockStats: {},
@@ -175,8 +226,10 @@ function Triage() {
       windDownAcknowledged: false,
       elapsedMs: 0,
       savedAt: Date.now(),
+      noteId: source?.noteId || null,
+      title: source?.title || setup?.title || 'Cram',
     });
-    navigate('/study', { state: { terms: studyTerms, setup } });
+    navigate('/study', { state: { terms: studyTerms, setup: nextSetup, sessionId: saved?.id } });
   };
 
   React.useEffect(() => {
@@ -190,6 +243,13 @@ function Triage() {
         if (retryTick > 0) {
           setRanked(dealIntoColumns(prepareItems(incoming)));
         }
+        setDetectedRankMode(
+          inferRankMode(incoming, {
+            title: source?.title || source?.name,
+            id: source?.id,
+            rankMode: source?.rankMode,
+          })
+        );
         setLoadError(false);
         setLoading(false);
         return;
@@ -198,9 +258,14 @@ function Triage() {
       if (incoming.length && needsPriorityRank(source, incoming)) {
         setLoadingHint('Ranking your terms…');
         try {
-          const rankedItems = await rankUserTerms(prepareItems(incoming), setLoadingHint);
+          const rankedResult = await rankUserTerms(prepareItems(incoming), setLoadingHint, {
+            title: source?.title || source?.name,
+            id: source?.id,
+            rankMode: source?.rankMode,
+          });
           if (!mounted) return;
-          setRanked(dealIntoColumns(rankedItems));
+          setRanked(dealIntoColumns(rankedResult.terms));
+          setDetectedRankMode(rankedResult.rankMode);
           setLoadError(false);
           setLoading(false);
         } catch {

@@ -2,13 +2,14 @@ export const SAMPLE_NOTES = [
   {
     id: 'bill-of-rights',
     title: 'Bill of Rights',
+    rankMode: 'difficulty',
     meta: 'The first 10 amendments — speech, search, due process, reserved powers',
     terms: 10,
     items: [
       {
         term: '1st Amendment',
         definition: 'Freedom of speech, religion, press, assembly, and petition — Tinker v. Des Moines',
-        difficulty: 4,
+        difficulty: 3,
         depends_on: [],
       },
       {
@@ -56,13 +57,13 @@ export const SAMPLE_NOTES = [
       {
         term: '9th Amendment',
         definition: 'Protects rights not specifically listed in the Constitution — Griswold v. Connecticut',
-        difficulty: 7,
+        difficulty: 8,
         depends_on: [],
       },
       {
         term: '10th Amendment',
         definition: 'Powers not given to the federal government belong to the states or people — United States v. Lopez',
-        difficulty: 6,
+        difficulty: 7,
         depends_on: [],
       },
     ],

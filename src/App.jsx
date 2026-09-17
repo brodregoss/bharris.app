@@ -20,7 +20,11 @@ import PastSessions from './pages/PastSessions';
 import Settings from './pages/Settings';
 import Practice from './pages/Practice';
 import Account from './pages/Account';
+import AccountCreate from './pages/AccountCreate';
+import AccountSignIn from './pages/AccountSignIn';
+import ForgotPassword from './pages/ForgotPassword';
 import RequireAccount from '@/components/RequireAccount';
+import { PaywallProvider } from '@/lib/PaywallContext';
 import { DebugProvider } from '@/lib/DebugContext';
 import DebugPanel from '@/components/dev/DebugPanel';
 
@@ -30,14 +34,16 @@ function App() {
     <ThemeProvider attribute="class" defaultTheme="light" enableSystem={false} storageKey="lms-theme">
       <NativeChrome />
       <AuthProvider>
+        <PaywallProvider>
         <QueryClientProvider client={queryClientInstance}>
           <DebugProvider>
             <Router>
               <ScrollToTop />
               <Routes>
                 <Route path="/account" element={<Account />} />
-                <Route path="/account/signin" element={<Navigate to="/account" replace />} />
-                <Route path="/account/create" element={<Navigate to="/account" replace />} />
+                <Route path="/account/signin" element={<AccountSignIn />} />
+                <Route path="/account/create" element={<AccountCreate />} />
+                <Route path="/account/forgot" element={<ForgotPassword />} />
                 <Route element={<RequireAccount />}>
                   <Route path="/" element={<Landing />} />
                   <Route path="/welcome" element={<Welcome />} />
@@ -60,6 +66,7 @@ function App() {
             <Toaster />
           </DebugProvider>
         </QueryClientProvider>
+        </PaywallProvider>
       </AuthProvider>
     </ThemeProvider>
   )

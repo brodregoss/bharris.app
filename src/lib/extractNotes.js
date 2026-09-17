@@ -51,6 +51,7 @@ async function extractPass(image, already) {
   const res = await invokeLlm({
     prompt,
     image,
+    feature: 'extract',
     response_json_schema: {
       type: 'object',
       properties: {
@@ -104,6 +105,7 @@ async function defineChunk(terms) {
       `Write a concise one-sentence exam definition for each study term.\n` +
       `Use the student's notes when they help. Do not add or remove terms.\n\n` +
       terms.map((t, i) => `${i + 1}. ${t.term}${t.notes ? ` — notes: ${t.notes}` : ''}`).join('\n'),
+    feature: 'definitions',
     response_json_schema: {
       type: 'object',
       properties: {
@@ -157,6 +159,7 @@ export async function regenerateDefinition({ term, definition }) {
       `Write one concise exam-ready sentence defining "${term}".\n` +
       (definition ? `The current definition is: "${definition}". Improve it if needed; keep the same meaning if it is already right.\n` : '') +
       `Return only the definition.`,
+    feature: 'definitions',
     response_json_schema: {
       type: 'object',
       properties: { definition: { type: 'string' } },

@@ -1,8 +1,13 @@
 import React from 'react';
 import { Button } from '@/components/ui/button';
 import { Eye, Check, X, ArrowRight } from 'lucide-react';
-import { fmtTime, normalizeExamType } from '@/lib/studyUtils';
+import { fmtTime, normalizeExamType, flashcardDef } from '@/lib/studyUtils';
 import { useDebug } from '@/lib/DebugContext';
+import WriteOwnDef, {
+  STUCK_AFTER_ROTATIONS,
+  cardsAtStuckThreshold,
+  writtenDefsFrom,
+} from '@/components/study/WriteOwnDef';
 
 function shuffle(a) {
   const b = [...a];
@@ -74,6 +79,11 @@ export default function RecallBlock({
   const idsKeyRef = React.useRef(idsKey);
   const skipFinishRef = React.useRef(false);
   const advancingRef = React.useRef(false);
+  const missCountRef = React.useRef({});
+  const deferredRef = React.useRef(new Set());
+  const [stuck, setStuck] = React.useState(null);
+  const [defMode, setDefMode] = React.useState(false);
+  const [skipped, setSkipped] = React.useState(false);
 
   const finish = React.useCallback(
     (reason) => {
@@ -93,6 +103,11 @@ export default function RecallBlock({
     gotRef.current = 0;
     skipFinishRef.current = true;
     setGotCount(0);
+    setStuck(null);
+    setDefMode(false);
+    setSkipped(false);
+    missCountRef.current = {};
+    deferredRef.current = new Set();
     setSt({ queue: ids, pos: 0, round: 1 });
     setTimeLeftMs(blockBudgetMs);
   }, [idsKey, terms, blockBudgetMs]);
@@ -118,9 +133,10 @@ export default function RecallBlock({
       return;
     }
     if (doneRef.current) return;
+    if (stuck || defMode) return;
     if (!singlePass && st.queue.length === 0) finish('retired');
     else if (singlePass && st.pos >= st.queue.length) finish('pass');
-  }, [st.queue.length, st.pos, singlePass, finish]);
+  }, [st.queue.length, st.pos, singlePass, finish, stuck, defMode]);
 
   const currentId = st.queue[st.pos];
   const current = currentId != null ? byId[currentId] : null;
@@ -142,20 +158,26 @@ export default function RecallBlock({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [currentId, st.pos, st.round, cardSeq]);
 
-  if (!current) {
-    return (
-      <div className="flex items-center justify-center px-8 py-16">
-        <p className="text-sm text-muted-foreground">Wrapping up…</p>
-      </div>
-    );
-  }
+  React.useLayoutEffect(() => {
+    if (singlePass || stuck || defMode || !current) return;
+    if (deferredRef.current.has(current.id)) return;
+    if ((missCountRef.current[current.id] || 0) < STUCK_AFTER_ROTATIONS) return;
+    const batch = cardsAtStuckThreshold(st.queue, byId, missCountRef.current, deferredRef.current);
+    if (batch.length) {
+      setRevealed(false);
+      setRecogSelected(null);
+      setStuck(batch);
+    }
+  }, [currentId, st.queue, stuck, defMode, singlePass, current, byId]);
 
   const handleGot = () => {
-    if (advancingRef.current) return;
+    if (!current || advancingRef.current) return;
     advancingRef.current = true;
     const newStreak = (current.correctStreak || 0) + 1;
     onUpdateTerm(current.id, { correctStreak: newStreak });
     onLogAttempt(current.id, 'got_it');
+    missCountRef.current[current.id] = 0;
+    deferredRef.current.delete(current.id);
     setRevealed(false);
     setRecogSelected(null);
     setCardSeq((n) => n + 1);
@@ -183,22 +205,7 @@ export default function RecallBlock({
     }
   };
 
-  const handleMissed = () => {
-    const lastInRotation = !singlePass && st.queue.length === 1;
-    if (advancingRef.current && !lastInRotation) return;
-    const missedId = current.id;
-    onUpdateTerm(missedId, { correctStreak: 0 });
-    onLogAttempt(missedId, 'missed');
-    logEvent?.(`Term "${current.term}" missed${singlePass ? '' : ', requeued'}`);
-
-    // Last card in rotation: stay on it and flip back over so they can try again.
-    if (lastInRotation) {
-      advancingRef.current = false;
-      setRevealed(false);
-      setRecogSelected(null);
-      return;
-    }
-
+  const requeueMissed = (missedId) => {
     advancingRef.current = true;
     setRevealed(false);
     setRecogSelected(null);
@@ -209,22 +216,76 @@ export default function RecallBlock({
       return;
     }
 
-    // Remove the missed card, then show the next one. Reinsert later so a miss
-    // on the last card doesn't leave Continue stuck on the same selected answer.
     setSt((s) => {
       const nq = [...s.queue];
-      nq.splice(s.pos, 1);
+      const at = nq.indexOf(missedId);
+      if (at >= 0) nq.splice(at, 1);
       if (nq.length === 0) {
         return { queue: [missedId], pos: 0, round: s.round + 1 };
       }
-      const nextPos = s.pos >= nq.length ? 0 : s.pos;
+      const nextPos = at < 0 ? s.pos : (at >= nq.length ? 0 : at);
       const offset = 3 + Math.floor(Math.random() * 4);
       const insertAt = Math.min(nextPos + offset, nq.length);
       nq.splice(insertAt, 0, missedId);
       const pos = insertAt <= nextPos ? nextPos + 1 : nextPos;
-      const wrapped = nextPos === 0 && s.pos !== 0;
+      const wrapped = nextPos === 0 && at !== 0;
       return { queue: nq, pos, round: wrapped ? s.round + 1 : s.round };
     });
+  };
+
+  const handleMissed = () => {
+    if (!current) return;
+    const lastInRotation = !singlePass && st.queue.length === 1;
+    if (advancingRef.current && !lastInRotation) return;
+    const missedId = current.id;
+    onUpdateTerm(missedId, { correctStreak: 0 });
+    onLogAttempt(missedId, 'missed');
+    logEvent?.(`Term "${current.term}" missed${singlePass ? '' : ', requeued'}`);
+    const misses = (missCountRef.current[missedId] || 0) + 1;
+    missCountRef.current[missedId] = misses;
+
+    if (lastInRotation) {
+      advancingRef.current = false;
+      setRevealed(false);
+      setRecogSelected(null);
+      if (!singlePass && misses >= STUCK_AFTER_ROTATIONS && !deferredRef.current.has(missedId) && !stuck) {
+        const batch = cardsAtStuckThreshold(st.queue, byId, missCountRef.current, deferredRef.current);
+        if (batch.length) setStuck(batch);
+      }
+      return;
+    }
+
+    requeueMissed(missedId);
+  };
+
+  const retireWritten = (entries) => {
+    const { ids, defs } = writtenDefsFrom(entries);
+    const idSet = new Set(ids);
+    advancingRef.current = true;
+    idSet.forEach((id) => {
+      missCountRef.current[id] = 0;
+      deferredRef.current.delete(id);
+      const t = byId[id];
+      if (t) {
+        const patch = { correctStreak: Math.max(t.correctStreak || 0, retireThreshold) };
+        if (defs[id]) patch.ownDefinition = defs[id];
+        onUpdateTerm(id, patch);
+        onLogAttempt(id, 'got_it');
+      }
+    });
+    const removed = st.queue.filter((id) => idSet.has(id)).length;
+    gotRef.current += removed;
+    setGotCount(gotRef.current);
+    setStuck(null);
+    setDefMode(false);
+    setSt((s) => {
+      const nq = s.queue.filter((id) => !idSet.has(id));
+      const removedBefore = s.queue.slice(0, s.pos).filter((id) => idSet.has(id)).length;
+      let pos = s.pos - removedBefore;
+      if (pos >= nq.length) pos = 0;
+      return { queue: nq, pos, round: s.round };
+    });
+    setCardSeq((n) => n + 1);
   };
 
   const promptLabel =
@@ -233,6 +294,39 @@ export default function RecallBlock({
       : style === 'recognition'
       ? 'Pick the correct definition'
       : 'Term';
+
+  const defCards = cardsAtStuckThreshold(st.queue, byId, missCountRef.current, new Set());
+  const writeCards = stuck?.length ? stuck : defMode ? defCards : null;
+
+  if (writeCards?.length) {
+    return (
+      <div className="flex-1 flex flex-col">
+        <WriteOwnDef
+          cards={writeCards}
+          allTerms={defMode ? terms : undefined}
+          variant={defMode ? 'defMode' : 'stuck'}
+          onComplete={retireWritten}
+          onSkip={() => {
+            if (defMode) {
+              setDefMode(false);
+              return;
+            }
+            (stuck || []).forEach((c) => deferredRef.current.add(c.id));
+            setSkipped(true);
+            setStuck(null);
+          }}
+        />
+      </div>
+    );
+  }
+
+  if (!current) {
+    return (
+      <div className="flex items-center justify-center px-8 py-16">
+        <p className="text-sm text-muted-foreground">Wrapping up…</p>
+      </div>
+    );
+  }
 
   return (
     <div className="flex-1 flex flex-col px-5 pt-4">
@@ -272,7 +366,7 @@ export default function RecallBlock({
               })}
             </div>
           ) : revealed ? (
-            <p className="mt-5 text-lg text-muted-foreground leading-relaxed">{current.definition}</p>
+            <p className="mt-5 text-lg text-muted-foreground leading-relaxed">{flashcardDef(current)}</p>
           ) : (
             <p className="mt-5 text-xs text-muted-foreground">
               {style === 'explain'
@@ -328,6 +422,15 @@ export default function RecallBlock({
             ? `${Math.min(st.pos + 1, st.queue.length)}/${st.queue.length} seen`
             : `${gotCount} retired · ${st.queue.length} in rotation`}
         </p>
+        {defCards.length > 0 && skipped && !singlePass && (
+          <button
+            type="button"
+            onClick={() => setDefMode(true)}
+            className="mt-3 text-sm text-muted-foreground hover:text-foreground underline-offset-4 hover:underline"
+          >
+            Def mode · {defCards.length}
+          </button>
+        )}
         {onOpenCheat && (
           <button
             type="button"

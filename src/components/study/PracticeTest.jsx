@@ -2,7 +2,7 @@ import React from 'react';
 import { Button } from '@/components/ui/button';
 import { Check, X, Timer, RotateCcw, ArrowRight, Loader2, ChevronDown } from 'lucide-react';
 import { invokeLlm } from '@/api/invokeLlm';
-import { fmtTime, localGradeShortAnswer, parseGradeResponse, TIER_LABELS, TIER_HINTS } from '@/lib/studyUtils';
+import { fmtTime, localGradeShortAnswer, parseGradeResponse, inferRankMode, tierLabelsFor, tierHintsFor } from '@/lib/studyUtils';
 import { fillMcqWrongAnswers, mcqNeedsGeneratedWrongs } from '@/lib/distractors';
 
 function shuffle(a) {
@@ -73,7 +73,10 @@ function hintFromDefinition(definition) {
 }
 
 // Screen D — timed self-test weighted toward previously-missed items.
-export default function PracticeTest({ terms, examType, budgetMs, priorMissed, onDone }) {
+export default function PracticeTest({ terms, examType, budgetMs, priorMissed, onDone, rankMode }) {
+  const mode = inferRankMode(terms, { rankMode });
+  const labels = tierLabelsFor(mode);
+  const hints = tierHintsFor(mode);
   const [questions, setQuestions] = React.useState(() => buildQuestions(terms, examType, priorMissed));
   const [idx, setIdx] = React.useState(0);
   const [answers, setAnswers] = React.useState({}); // qid -> { selected?, correct }
@@ -197,6 +200,7 @@ export default function PracticeTest({ terms, examType, budgetMs, priorMissed, o
           `Mark correct if the student shows the same meaning — ignore case, punctuation, extra words, and wording. ` +
           `If they restated the term or the definition, that is correct. Only mark incorrect when the meaning is wrong.\n` +
           `Respond with JSON { "correct": boolean, "feedback": "one short sentence" }.`,
+        feature: 'grade',
         response_json_schema: {
           type: 'object',
           properties: { correct: { type: 'boolean' }, feedback: { type: 'string' } },
@@ -222,6 +226,7 @@ export default function PracticeTest({ terms, examType, budgetMs, priorMissed, o
           `A student is studying the term "${q.term}". The correct definition is: "${q.definition}". ` +
           `The student answered: "${clampChars(shortAnswer, MAX_SHORT_ANSWER_CHARS)}". ` +
           `In 2-3 short sentences, explain the concept clearly so the student understands why the correct definition is the right answer. Focus on helping them understand the correct answer.`,
+        feature: 'explain',
       });
       setExplanation(typeof res === 'string' ? res : String(res));
     } catch {
@@ -365,7 +370,7 @@ export default function PracticeTest({ terms, examType, budgetMs, priorMissed, o
                       className="w-full flex items-center justify-between gap-3 px-4 py-3 text-left"
                       aria-expanded={open}
                     >
-                      <span className="text-sm font-semibold">{TIER_LABELS[t]}</span>
+                      <span className="text-sm font-semibold">{labels[t]}</span>
                       <span className="flex items-center gap-2 shrink-0">
                         <span className="text-sm text-muted-foreground">
                           {byTier[t].correct}/{byTier[t].total}
@@ -377,7 +382,7 @@ export default function PracticeTest({ terms, examType, budgetMs, priorMissed, o
                     </button>
                     {open && (
                       <div className="border-t border-border px-4 py-3 space-y-2">
-                        <p className="text-xs text-muted-foreground">{TIER_HINTS[t]}</p>
+                        <p className="text-xs text-muted-foreground">{hints[t]}</p>
                         {ranked.map((term) => {
                           const tested = questions.some((qq) => qq.id === term.id);
                           const gotIt = answers[term.id]?.correct;
@@ -441,7 +446,7 @@ export default function PracticeTest({ terms, examType, budgetMs, priorMissed, o
       <div className="max-w-md mx-auto w-full flex-1 flex flex-col">
         <div className="rounded-3xl border border-border bg-card p-6 shadow-sm min-h-[260px] flex flex-col">
           <p className="text-[11px] uppercase tracking-wide text-muted-foreground mb-2">
-            {q.type === 'mcq' ? 'Multiple choice' : 'Short answer'} · {TIER_LABELS[q.tier] || q.tier}
+            {q.type === 'mcq' ? 'Multiple choice' : 'Short answer'} · {labels[q.tier] || q.tier}
           </p>
           <p className="text-3xl font-bold tracking-tight">{q.term}</p>
           {q.type === 'mcq' ? (

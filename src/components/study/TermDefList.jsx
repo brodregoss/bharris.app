@@ -1,17 +1,15 @@
 import React from 'react';
+import { SKIM_TIER_ORDER, inferRankMode, tierLabelsFor } from '@/lib/studyUtils';
 
-const GROUPS = [
-  { id: 'critical', title: 'Critical' },
-  { id: 'core', title: 'Core' },
-  { id: 'passive', title: 'Passive' },
-];
-
-export default function TermDefList({ terms }) {
-  const grouped = GROUPS.map((g) => ({
-    ...g,
-    items: (terms || []).filter((t) => t.tier === g.id),
+export default function TermDefList({ terms, rankMode }) {
+  const mode = inferRankMode(terms, { rankMode });
+  const labels = tierLabelsFor(mode);
+  const grouped = SKIM_TIER_ORDER.map((id) => ({
+    id,
+    title: labels[id],
+    items: (terms || []).filter((t) => t.tier === id),
   })).filter((g) => g.items.length);
-  const leftover = (terms || []).filter((t) => !GROUPS.some((g) => g.id === t.tier));
+  const leftover = (terms || []).filter((t) => !SKIM_TIER_ORDER.includes(t.tier));
   const sections = leftover.length
     ? [...grouped, { id: 'other', title: grouped.length ? 'Other' : null, items: leftover }]
     : grouped;
@@ -37,8 +35,9 @@ export default function TermDefList({ terms }) {
       {sections.map((g) => (
         <div key={g.id}>
           {g.title && (
-            <p className="text-[11px] uppercase tracking-wide text-muted-foreground font-semibold mb-2">
-              {g.title} · {g.items.length}
+            <p className="text-sm font-bold tracking-tight mb-2">
+              {g.title}
+              <span className="text-muted-foreground font-semibold"> · {g.items.length}</span>
             </p>
           )}
           <div className="space-y-2">{cards(g.items)}</div>

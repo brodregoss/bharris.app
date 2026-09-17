@@ -1,8 +1,9 @@
+import { workerRequest } from '@/lib/workerClient';
+import { loadSession } from '@/lib/sessionStore';
+import { userStorageKey } from '@/lib/userStorage';
+
 const KEY = 'lms_panic_summary_v1';
 
-// Signature captures identity + learning state for Critical/Core terms.
-// When any of these change (new terms, confidence shifts, recall updates,
-// test results), the signature changes → triggers a regenerate prompt.
 export function panicSignature(terms) {
   return terms
     .filter((t) => t.tier === 'critical' || t.tier === 'core')
@@ -14,19 +15,27 @@ export function panicSignature(terms) {
 }
 
 export function loadPanicSummary() {
+  const key = userStorageKey(KEY);
+  if (!key) return null;
   try {
-    const raw = localStorage.getItem(KEY);
+    const raw = localStorage.getItem(key);
     if (!raw) return null;
-    return JSON.parse(raw); // { signature, text, generatedAt }
+    return JSON.parse(raw);
   } catch {
     return null;
   }
 }
 
 export function savePanicSummary(signature, text) {
+  const key = userStorageKey(KEY);
+  const record = { signature, text, generatedAt: Date.now() };
   try {
-    localStorage.setItem(KEY, JSON.stringify({ signature, text, generatedAt: Date.now() }));
+    if (key) localStorage.setItem(key, JSON.stringify(record));
   } catch {
     // ignore
+  }
+  const session = loadSession();
+  if (session?.id) {
+    workerRequest('POST', `/v1/sessions/panic/${session.id}`, record).catch(() => {});
   }
 }

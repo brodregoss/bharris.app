@@ -161,6 +161,7 @@ export default function PanicReview() {
           `- Casual language. Short sentences. Breathing room over packing everything in.\n` +
           `- No pep talks, no "you must", no walls of text.\n\n` +
           `Terms (JSON):\n${JSON.stringify(payload)}`,
+        feature: 'panic',
       });
       const text = typeof res === 'string' ? res : String(res);
       savePanicSummary(signature, text);

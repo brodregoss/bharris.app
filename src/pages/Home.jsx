@@ -12,7 +12,7 @@ import {
 } from '@/components/ui/select';
 import { cn } from '@/lib/utils';
 import { termCount, setupReturnPath } from '@/lib/notesSource';
-import { ONBOARDING_FLAG } from '@/lib/onboarding';
+import { markOnboarded } from '@/lib/onboarding';
 import { recallTermCap } from '@/lib/studyUtils';
 
 const STEPPER = ({ value, onChange, min = 0, step = 1, suffix }) => {
@@ -208,7 +208,7 @@ export default function Home() {
             size="lg"
             disabled={!canStart}
             onClick={() => {
-              localStorage.setItem(ONBOARDING_FLAG, '1');
+              markOnboarded();
               navigate('/triage', {
                 state: {
                   source,

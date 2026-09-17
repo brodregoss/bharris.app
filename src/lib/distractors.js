@@ -66,6 +66,7 @@ export async function fillMcqWrongAnswers(questions) {
             `   Write exactly ${p.need} more wrong answers.`
         )
         .join('\n\n'),
+    feature: 'distractors',
     response_json_schema: {
       type: 'object',
       properties: {
