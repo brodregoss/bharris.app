@@ -1,12 +1,12 @@
 import React from 'react';
-import { ArrowRight, Check, Eye, X } from 'lucide-react';
+import { ArrowLeft, ArrowRight, Check, Eye, X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import { flashcardDef } from '@/lib/studyUtils';
 import WriteOwnDef, {
   STUCK_AFTER_ROTATIONS,
   cardsAtStuckThreshold,
-  writtenDefsFrom,
+  writtenReviewPlan,
 } from '@/components/study/WriteOwnDef';
 
 const COLUMNS = [
@@ -130,24 +130,39 @@ function FlashRound({ queue, byId, allTerms, onUpdateTerm, onDone, onBack }) {
   const [stuck, setStuck] = React.useState(null);
   const [defMode, setDefMode] = React.useState(false);
   const [skipped, setSkipped] = React.useState(false);
+  const [reviewing, setReviewing] = React.useState(false);
   const deferredRef = React.useRef(new Set());
   const writtenRef = React.useRef(new Set());
+  const leftoverRef = React.useRef(null);
   const stuckHistoryRef = React.useRef(new Set());
   const current = byId[items[pos]];
   const pool = allTerms || Object.values(byId);
   const defCards = items.length
-    ? cardsAtStuckThreshold(items, byId, misses, new Set())
-    : pool.filter((t) => stuckHistoryRef.current.has(t.id) && !writtenRef.current.has(t.id));
+    ? cardsAtStuckThreshold(items, byId, misses, writtenRef.current)
+    : pool.filter((t) => stuckHistoryRef.current.has(t.id) && !writtenRef.current.has(t.id) && !String(t.ownDefinition || '').trim());
 
   React.useEffect(() => {
     setRevealed(false);
   }, [pos, items]);
 
+  React.useEffect(() => {
+    if (stuck || defMode) return;
+    if (items.length > 0) return;
+    if (!leftoverRef.current?.length) return;
+    const rest = leftoverRef.current;
+    leftoverRef.current = null;
+    setReviewing(false);
+    setItems(rest);
+    setPos(0);
+  }, [stuck, defMode, items.length]);
+
   React.useLayoutEffect(() => {
     if (stuck || defMode || !current) return;
-    if (deferredRef.current.has(current.id)) return;
+    if (deferredRef.current.has(current.id) || writtenRef.current.has(current.id)) return;
+    if (String(current.ownDefinition || '').trim()) return;
     if ((misses[current.id] || 0) < STUCK_AFTER_ROTATIONS) return;
-    const batch = cardsAtStuckThreshold(items, byId, misses, deferredRef.current);
+    const skip = new Set([...deferredRef.current, ...writtenRef.current]);
+    const batch = cardsAtStuckThreshold(items, byId, misses, skip);
     if (batch.length) setStuck(batch);
   }, [current, items, misses, stuck, defMode, byId]);
 
@@ -176,6 +191,36 @@ function FlashRound({ queue, byId, allTerms, onUpdateTerm, onDone, onBack }) {
       return nextPos >= nextLen ? 0 : nextPos;
     });
     setRevealed(false);
+  };
+
+  const startWrittenReview = (entries, fallbackCards) => {
+    const { ids, defs, leftover } = writtenReviewPlan(entries, fallbackCards, items);
+    if (!ids.length) {
+      setStuck(null);
+      setDefMode(false);
+      return;
+    }
+    ids.forEach((id) => {
+      const patch = { seen: true };
+      if (defs[id]) patch.ownDefinition = defs[id];
+      onUpdateTerm(id, patch);
+      writtenRef.current.add(id);
+      deferredRef.current.delete(id);
+    });
+    leftoverRef.current = leftover;
+    setMisses((prev) => {
+      const next = { ...prev };
+      ids.forEach((id) => {
+        next[id] = 0;
+      });
+      return next;
+    });
+    setReviewing(true);
+    setItems(ids);
+    setPos(0);
+    setRevealed(false);
+    setStuck(null);
+    setDefMode(false);
   };
 
   const rotateMiss = (id) => {
@@ -213,12 +258,7 @@ function FlashRound({ queue, byId, allTerms, onUpdateTerm, onDone, onBack }) {
         cards={writeCards}
         allTerms={defMode ? pool : undefined}
         variant={defMode ? 'defMode' : 'stuck'}
-        onComplete={(entries) => {
-          const { ids, defs } = writtenDefsFrom(entries);
-          retireIds(ids.length ? ids : writeCards.map((c) => c.id), defs);
-          setStuck(null);
-          setDefMode(false);
-        }}
+        onComplete={(entries) => startWrittenReview(entries, writeCards)}
         onSkip={() => {
           if (defMode) {
             setDefMode(false);
@@ -245,6 +285,13 @@ function FlashRound({ queue, byId, allTerms, onUpdateTerm, onDone, onBack }) {
   );
 
   if (!current) {
+    if (leftoverRef.current?.length) {
+      return (
+        <div className="flex-1 flex items-center justify-center">
+          <p className="text-sm text-muted-foreground">Wrapping up…</p>
+        </div>
+      );
+    }
     return (
       <div className="flex-1 flex flex-col px-5 pt-6">
         <div className="max-w-md mx-auto w-full flex-1 flex flex-col items-center text-center pt-8">
@@ -271,7 +318,7 @@ function FlashRound({ queue, byId, allTerms, onUpdateTerm, onDone, onBack }) {
           >
             Back
           </button>
-          <p className="text-xs text-muted-foreground">{pos + 1}/{items.length}</p>
+          <p className="text-xs text-muted-foreground">{reviewing ? 'Practice your wording · ' : ''}{pos + 1}/{items.length}</p>
         </div>
         <button
           type="button"
@@ -320,6 +367,7 @@ export default function TypeDefMode({ terms, onUpdateTerm, onClose, startIn = 't
   const [queue, setQueue] = React.useState([]);
   const [pos, setPos] = React.useState(0);
   const [typed, setTyped] = React.useState('');
+  const typedById = React.useRef({});
   const inputRef = React.useRef(null);
   const byId = React.useMemo(() => Object.fromEntries(usable.map((t) => [t.id, t])), [usable]);
 
@@ -381,12 +429,21 @@ export default function TypeDefMode({ terms, onUpdateTerm, onClose, startIn = 't
   const last = pos + 1 >= queue.length;
   const goNext = () => {
     onUpdateTerm(current.id, { seen: true });
+    typedById.current[current.id] = typed;
     if (last) {
       onClose();
       return;
     }
-    setTyped('');
-    setPos((p) => p + 1);
+    const nextPos = pos + 1;
+    setTyped(typedById.current[queue[nextPos]] || '');
+    setPos(nextPos);
+  };
+  const goPrev = () => {
+    if (pos <= 0) return;
+    typedById.current[current.id] = typed;
+    const prev = pos - 1;
+    setTyped(typedById.current[queue[prev]] || '');
+    setPos(prev);
   };
 
   return (
@@ -417,10 +474,17 @@ export default function TypeDefMode({ terms, onUpdateTerm, onClose, startIn = 't
           onChange={setTyped}
           inputRef={inputRef}
         />
-        <Button onClick={goNext} className="w-full h-12 rounded-2xl font-semibold mt-4">
-          {last ? 'Done' : 'Next'}
-          <ArrowRight className="w-4 h-4 ml-2" />
-        </Button>
+        <div className={cn('mt-4', pos > 0 && 'grid grid-cols-2 gap-3')}>
+          {pos > 0 && (
+            <Button variant="outline" onClick={goPrev} className="h-12 rounded-2xl font-semibold">
+              <ArrowLeft className="w-4 h-4 mr-2" /> Back
+            </Button>
+          )}
+          <Button onClick={goNext} className="w-full h-12 rounded-2xl font-semibold">
+            {last ? 'Done' : 'Next'}
+            <ArrowRight className="w-4 h-4 ml-2" />
+          </Button>
+        </div>
       </div>
     </div>
   );

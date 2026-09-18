@@ -161,8 +161,16 @@ export class UserStudyDO extends DurableObject {
   async listNotes() {
     await this.ready;
     return this.ctx.storage.sql
-      .exec('SELECT id, title, kind, page_count, created_at, updated_at FROM notes ORDER BY created_at DESC')
+      .exec('SELECT id, title, kind, page_count, transcript, created_at, updated_at FROM notes ORDER BY updated_at DESC')
       .toArray();
+  }
+
+  async deleteNote(id) {
+    await this.ready;
+    if (!id) return { ok: false };
+    this.ctx.storage.sql.exec('DELETE FROM note_pages WHERE note_id = ?', id);
+    this.ctx.storage.sql.exec('DELETE FROM notes WHERE id = ?', id);
+    return { ok: true };
   }
 
   async putSession(session) {
@@ -262,12 +270,56 @@ export class UserStudyDO extends DurableObject {
     await this.ready;
     return this.ctx.storage.sql
       .exec(
-        `SELECT s.id, s.status, s.title, s.phase, s.created_at, s.updated_at, s.finished_at,
+        `SELECT s.id, s.status, s.title, s.phase, s.note_id, s.created_at, s.updated_at, s.finished_at,
                 (SELECT COUNT(*) FROM terms t WHERE t.session_id = s.id) AS term_count
          FROM sessions s
          ORDER BY COALESCE(s.finished_at, s.updated_at) DESC`,
       )
       .toArray();
+  }
+
+  async listFinishedSessions() {
+    await this.ready;
+    return this.ctx.storage.sql
+      .exec(
+        `SELECT s.id, s.status, s.title, s.phase, s.note_id, s.created_at, s.updated_at, s.finished_at,
+                (SELECT COUNT(*) FROM terms t WHERE t.session_id = s.id) AS term_count
+         FROM sessions s
+         WHERE s.status = 'finished' OR s.finished_at IS NOT NULL
+         ORDER BY COALESCE(s.finished_at, s.updated_at) DESC`,
+      )
+      .toArray();
+  }
+
+  async deleteSession(id) {
+    await this.ready;
+    if (!id) return { ok: false };
+    this.ctx.storage.sql.exec('DELETE FROM terms WHERE session_id = ?', id);
+    this.ctx.storage.sql.exec('DELETE FROM panic_summaries WHERE session_id = ?', id);
+    this.ctx.storage.sql.exec('DELETE FROM sessions WHERE id = ?', id);
+    if (this.metaGet('current_session_id') === id) {
+      this.ctx.storage.sql.exec('DELETE FROM meta WHERE key = ?', 'current_session_id');
+    }
+    return { ok: true };
+  }
+
+  async trimFinishedSessions(limit) {
+    await this.ready;
+    const cap = Math.max(0, Number(limit) || 0);
+    const rows = this.ctx.storage.sql
+      .exec(
+        `SELECT id FROM sessions
+         WHERE status = 'finished' OR finished_at IS NOT NULL
+         ORDER BY COALESCE(finished_at, updated_at) DESC`,
+      )
+      .toArray();
+    const extra = rows.slice(cap);
+    extra.forEach((row) => {
+      this.ctx.storage.sql.exec('DELETE FROM terms WHERE session_id = ?', row.id);
+      this.ctx.storage.sql.exec('DELETE FROM panic_summaries WHERE session_id = ?', row.id);
+      this.ctx.storage.sql.exec('DELETE FROM sessions WHERE id = ?', row.id);
+    });
+    return { kept: Math.min(rows.length, cap), removed: extra.length };
   }
 
   async putPanic(record) {

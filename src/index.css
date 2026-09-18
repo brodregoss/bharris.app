@@ -43,39 +43,40 @@
     --sidebar-ring: 217.2 91.2% 59.8%;
   }
 
+  /* Warm charcoal instead of near-black / near-white so contrast matches light mode. */
   .dark {
-    --background: 0 0% 3.9%;
-    --foreground: 0 0% 98%;
-    --card: 0 0% 3.9%;
-    --card-foreground: 0 0% 98%;
-    --popover: 0 0% 3.9%;
-    --popover-foreground: 0 0% 98%;
-    --primary: 0 0% 98%;
-    --primary-foreground: 0 0% 9%;
-    --secondary: 0 0% 14.9%;
-    --secondary-foreground: 0 0% 98%;
-    --muted: 0 0% 14.9%;
-    --muted-foreground: 0 0% 63.9%;
-    --accent: 0 0% 14.9%;
-    --accent-foreground: 0 0% 98%;
-    --destructive: 0 62.8% 30.6%;
+    --background: 30 6% 11%;
+    --foreground: 36 10% 92%;
+    --card: 30 5% 14.5%;
+    --card-foreground: 36 10% 92%;
+    --popover: 30 5% 15%;
+    --popover-foreground: 36 10% 92%;
+    --primary: 36 10% 92%;
+    --primary-foreground: 30 8% 14%;
+    --secondary: 30 5% 18%;
+    --secondary-foreground: 36 10% 92%;
+    --muted: 30 4% 17.5%;
+    --muted-foreground: 30 6% 66%;
+    --accent: 30 5% 19%;
+    --accent-foreground: 36 10% 92%;
+    --destructive: 6 48% 55%;
     --destructive-foreground: 0 0% 98%;
-    --border: 0 0% 14.9%;
-    --input: 0 0% 14.9%;
-    --ring: 0 0% 83.1%;
-    --chart-1: 220 70% 50%;
-    --chart-2: 160 60% 45%;
-    --chart-3: 30 80% 55%;
-    --chart-4: 280 65% 60%;
-    --chart-5: 340 75% 55%;
-    --sidebar-background: 240 5.9% 10%;
-    --sidebar-foreground: 240 4.8% 95.9%;
-    --sidebar-primary: 224.3 76.3% 48%;
-    --sidebar-primary-foreground: 0 0% 100%;
-    --sidebar-accent: 240 3.7% 15.9%;
-    --sidebar-accent-foreground: 240 4.8% 95.9%;
-    --sidebar-border: 240 3.7% 15.9%;
-    --sidebar-ring: 217.2 91.2% 59.8%;
+    --border: 30 5% 23%;
+    --input: 30 5% 22%;
+    --ring: 36 8% 70%;
+    --chart-1: 220 42% 62%;
+    --chart-2: 160 32% 52%;
+    --chart-3: 32 42% 60%;
+    --chart-4: 280 30% 64%;
+    --chart-5: 340 32% 62%;
+    --sidebar-background: 30 6% 11%;
+    --sidebar-foreground: 36 10% 92%;
+    --sidebar-primary: 36 10% 92%;
+    --sidebar-primary-foreground: 30 8% 14%;
+    --sidebar-accent: 30 5% 18%;
+    --sidebar-accent-foreground: 36 10% 92%;
+    --sidebar-border: 30 5% 23%;
+    --sidebar-ring: 36 8% 70%;
   }
 }
 
@@ -106,6 +107,24 @@
 
   html.dark {
     color-scheme: dark;
+  }
+
+  /* Keep drop shadows from turning into hard black blobs on dark surfaces. */
+  html.dark .shadow {
+    --tw-shadow: 0 1px 3px 0 hsl(30 10% 4% / 0.28), 0 1px 2px -1px hsl(30 10% 4% / 0.22);
+    --tw-shadow-colored: 0 1px 3px 0 var(--tw-shadow-color), 0 1px 2px -1px var(--tw-shadow-color);
+  }
+  html.dark .shadow-sm {
+    --tw-shadow: 0 1px 2px 0 hsl(30 10% 4% / 0.22);
+    --tw-shadow-colored: 0 1px 2px 0 var(--tw-shadow-color);
+  }
+  html.dark .shadow-md {
+    --tw-shadow: 0 4px 6px -1px hsl(30 10% 4% / 0.28), 0 2px 4px -2px hsl(30 10% 4% / 0.22);
+    --tw-shadow-colored: 0 4px 6px -1px var(--tw-shadow-color), 0 2px 4px -2px var(--tw-shadow-color);
+  }
+  html.dark .shadow-lg {
+    --tw-shadow: 0 10px 15px -3px hsl(30 10% 4% / 0.32), 0 4px 6px -4px hsl(30 10% 4% / 0.22);
+    --tw-shadow-colored: 0 10px 15px -3px var(--tw-shadow-color), 0 4px 6px -4px var(--tw-shadow-color);
   }
 
   html,

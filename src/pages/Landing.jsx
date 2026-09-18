@@ -2,7 +2,7 @@ import React from 'react';
 import { useNavigate, Navigate } from 'react-router-dom';
 import { Timer, History, Settings, ArrowRight, RotateCcw } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { loadSession, loadFinishedSession } from '@/lib/sessionStore';
+import { loadSession, loadFinishedSession, loadLatestCram } from '@/lib/sessionStore';
 import { isOnboarded } from '@/lib/onboarding';
 
 // Persistent home base. The only job here is getting the user into a session
@@ -22,6 +22,7 @@ export default function Landing() {
   const hasSession = typeof window !== 'undefined' ? !!loadSession() : false;
   const onboarded = typeof window !== 'undefined' ? isOnboarded() : false;
   const finishedSession = typeof window !== 'undefined' ? loadFinishedSession() : null;
+  const latestCram = typeof window !== 'undefined' ? loadLatestCram() : null;
 
   const restartCram = () => {
     if (!finishedSession) return;
@@ -74,7 +75,7 @@ export default function Landing() {
         </div>
         <h1 className="text-xl font-bold tracking-tight">Last Minute Study</h1>
         <p className="text-sm text-muted-foreground mt-1">Ready when you are.</p>
-        {hasSession && (
+        {latestCram && (
           <button
             type="button"
             onClick={() => navigate('/panic')}

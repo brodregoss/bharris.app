@@ -300,7 +300,7 @@ export default function Practice() {
                           'rounded-xl border px-3 py-3 text-sm font-semibold flex items-center justify-center gap-1.5',
                           locked && 'opacity-50 cursor-not-allowed',
                           active && !locked ? 'border-primary bg-primary text-primary-foreground' : 'border-border bg-card',
-                          locked && active && 'border-emerald-500 bg-emerald-50 text-emerald-800 dark:bg-emerald-500/20 dark:text-emerald-200 opacity-100'
+                          locked && active && 'border-emerald-500 bg-emerald-50 text-emerald-800 dark:border-emerald-400/40 dark:bg-emerald-400/10 dark:text-emerald-200 opacity-100'
                         )}
                       >
                         {locked && <Lock className="w-3.5 h-3.5" />}

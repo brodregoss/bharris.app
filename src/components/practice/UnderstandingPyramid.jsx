@@ -3,10 +3,10 @@ import { cn } from '@/lib/utils';
 import { MASTERY_LEVELS } from '@/lib/mastery';
 
 const FILL = {
-  1: 'bg-amber-300',
-  2: 'bg-amber-400',
-  3: 'bg-lime-400',
-  4: 'bg-emerald-500',
+  1: 'bg-amber-300 dark:bg-amber-600',
+  2: 'bg-amber-400 dark:bg-amber-500',
+  3: 'bg-lime-400 dark:bg-lime-600',
+  4: 'bg-emerald-500 dark:bg-emerald-600',
 };
 
 export default function UnderstandingPyramid({
@@ -24,7 +24,7 @@ export default function UnderstandingPyramid({
         <p
           className={cn(
             'text-[11px] font-bold tracking-wide uppercase mb-1.5',
-            level >= 4 ? 'text-emerald-600 dark:text-emerald-400' : 'text-muted-foreground'
+            level >= 4 ? 'text-emerald-600 dark:text-emerald-300' : 'text-muted-foreground'
           )}
         >
           Mastered

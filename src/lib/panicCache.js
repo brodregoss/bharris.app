@@ -1,5 +1,5 @@
 import { workerRequest } from '@/lib/workerClient';
-import { loadSession } from '@/lib/sessionStore';
+import { loadLatestCram } from '@/lib/sessionStore';
 import { userStorageKey } from '@/lib/userStorage';
 
 const KEY = 'lms_panic_summary_v1';
@@ -34,7 +34,7 @@ export function savePanicSummary(signature, text) {
   } catch {
     // ignore
   }
-  const session = loadSession();
+  const session = loadLatestCram();
   if (session?.id) {
     workerRequest('POST', `/v1/sessions/panic/${session.id}`, record).catch(() => {});
   }

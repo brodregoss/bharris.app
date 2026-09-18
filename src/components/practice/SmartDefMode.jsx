@@ -3,7 +3,8 @@ import { ArrowRight } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import { SKIM_TIER_ORDER, orderLikeSkim, inferRankMode, tierLabelsFor, RANK_MODE } from '@/lib/studyUtils';
-import WriteOwnDef, { writtenDefsFrom } from '@/components/study/WriteOwnDef';
+import WriteOwnDef, { writtenReviewPlan } from '@/components/study/WriteOwnDef';
+import PracticeFlashcards from '@/components/practice/PracticeFlashcards';
 
 export default function SmartDefMode({ terms, onUpdateTerm, onDone, rankMode }) {
   const mode = inferRankMode(terms, { rankMode });
@@ -11,6 +12,19 @@ export default function SmartDefMode({ terms, onUpdateTerm, onDone, rankMode }) 
   const ordered = React.useMemo(() => orderLikeSkim(terms), [terms]);
   const [selected, setSelected] = React.useState(() => new Set());
   const [stage, setStage] = React.useState('pick');
+  const [reviewIds, setReviewIds] = React.useState([]);
+  const [reviewDefs, setReviewDefs] = React.useState({});
+  const reviewTerms = React.useMemo(
+    () =>
+      reviewIds
+        .map((id) => {
+          const t = ordered.find((term) => term.id === id);
+          if (!t) return null;
+          return { ...t, ownDefinition: reviewDefs[id] || t.ownDefinition };
+        })
+        .filter(Boolean),
+    [reviewIds, ordered, reviewDefs],
+  );
 
   const sections = React.useMemo(() => {
     const groups = SKIM_TIER_ORDER.map((id) => ({
@@ -47,6 +61,17 @@ export default function SmartDefMode({ terms, onUpdateTerm, onDone, rankMode }) 
 
   const cards = ordered.filter((t) => selected.has(t.id));
 
+  if (stage === 'practice') {
+    return (
+      <PracticeFlashcards
+        terms={reviewTerms}
+        heading="Practice your wording"
+        onUpdateTerm={onUpdateTerm}
+        onDone={onDone}
+      />
+    );
+  }
+
   if (stage === 'write') {
     return (
       <WriteOwnDef
@@ -54,11 +79,17 @@ export default function SmartDefMode({ terms, onUpdateTerm, onDone, rankMode }) 
         allTerms={ordered}
         variant="defMode"
         onComplete={(entries) => {
-          const { ids, defs } = writtenDefsFrom(entries);
-          (ids.length ? ids : cards.map((c) => c.id)).forEach((id) => {
+          const { ids, defs } = writtenReviewPlan(entries, cards);
+          ids.forEach((id) => {
             if (defs[id]) onUpdateTerm(id, { ownDefinition: defs[id] });
           });
-          onDone();
+          if (!ids.length) {
+            onDone();
+            return;
+          }
+          setReviewDefs(defs);
+          setReviewIds(ids);
+          setStage('practice');
         }}
         onSkip={() => setStage('pick')}
       />

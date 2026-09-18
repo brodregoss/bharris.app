@@ -94,6 +94,8 @@ function StudyFlow() {
         stopTime: null,
         windDownAcknowledged: false,
         sessionStart: Date.now(),
+        title: incomingSetup?.title || existing?.title,
+        noteId: existing?.noteId || null,
       };
     }
     const saved = loadSession();
@@ -110,6 +112,8 @@ function StudyFlow() {
         stopTime: saved.stopTime || null,
         windDownAcknowledged: !!saved.windDownAcknowledged,
         sessionStart: Date.now() - (saved.elapsedMs || 0),
+        title: saved.title || saved.setup?.title,
+        noteId: saved.noteId || null,
       };
     }
     return null;
@@ -184,6 +188,8 @@ function StudyFlow() {
       windDownAcknowledged,
       elapsedMs: Date.now() - sessionStart,
       savedAt: Date.now(),
+      title: init?.title || setup?.title,
+      noteId: init?.noteId || null,
     });
     if (saved?.id) sessionIdRef.current = saved.id;
   }, [init, setup, terms, phase, blockStats, stillShaky, behind, stopTime, windDownAcknowledged, sessionStart, navigate]);
@@ -353,7 +359,14 @@ function StudyFlow() {
       break;
     case 'notes_skim':
       blockLabel = 'Your notes';
-      content = <NotesSkim terms={terms} rankMode={rankMode} onDone={startRecall} />;
+      content = (
+        <NotesSkim
+          terms={terms}
+          rankMode={rankMode}
+          onUpdateTerm={updateTerm}
+          onDone={startRecall}
+        />
+      );
       break;
     case 'critical':
       blockLabel = windDown ? 'Wind-down drill' : difficultyRank ? labels.critical : 'Critical recall';
@@ -491,6 +504,7 @@ function StudyFlow() {
               id: sessionIdRef.current,
               terms: withInferredMastery(terms),
               setup,
+              title: setup?.title,
               finishedAt: Date.now(),
             });
             clearSession();
@@ -511,22 +525,22 @@ function StudyFlow() {
         blockLabel={blockLabel}
       />
       {windDownActive && !windDownAcknowledged && (
-        <div className="px-5 py-3 bg-amber-50 dark:bg-amber-500/15 border-b border-amber-200 dark:border-amber-500/30 flex items-start gap-2">
-          <Moon className="w-4 h-4 text-amber-700 dark:text-amber-300 shrink-0 mt-0.5" />
-          <p className="text-xs text-amber-800 dark:text-amber-200 flex-1 leading-relaxed">
+        <div className="px-5 py-3 bg-amber-50 dark:bg-amber-400/10 border-b border-amber-200 dark:border-amber-400/20 flex items-start gap-2">
+          <Moon className="w-4 h-4 text-amber-700 dark:text-amber-200 shrink-0 mt-0.5" />
+          <p className="text-xs text-amber-800 dark:text-amber-100/80 flex-1 leading-relaxed">
             You're close to your stop time — here's your last quick pass, then get some sleep. Recall locks in
             better after sleep than more cramming right now.
           </p>
           <button
             type="button"
             onClick={() => setWindDownAcknowledged(true)}
-            className="text-xs text-amber-700 dark:text-amber-300 font-semibold underline-offset-4 hover:underline shrink-0"
+            className="text-xs text-amber-700 dark:text-amber-200 font-semibold underline-offset-4 hover:underline shrink-0"
           >
             Got it
           </button>
         </div>
       )}
-      <div className="flex-1">
+      <div className="flex-1 flex flex-col min-h-0">
         {content || (
           <div className="px-8 py-16 text-center">
             <p className="text-sm text-muted-foreground">Nothing to show for this step.</p>

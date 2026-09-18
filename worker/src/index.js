@@ -1,4 +1,4 @@
-import { errorJson, json, readJson } from './util.js';
+import { errorJson, json, readJson, sessionHistoryLimit } from './util.js';
 import { verifyFirebaseToken } from './auth.js';
 import { withCors, corsHeaders } from './cors.js';
 import {
@@ -14,6 +14,8 @@ import {
   handleGetNote,
   handleGetNotePage,
   handlePatchNote,
+  handleListNotes,
+  handleDeleteNote,
 } from './notes.js';
 import { handleRevenueCatWebhook, handleSubscriptionRefresh } from './billing.js';
 import { UserStudyDO } from './user-do.js';
@@ -53,13 +55,31 @@ async function handleUsage(env, identity) {
   return json({ me: user, user });
 }
 
+async function sessionLimitFor(env, uid) {
+  const row = await getUserRow(env, uid);
+  return sessionHistoryLimit(row?.subscription_tier);
+}
+
 async function handleSessions(request, env, identity, id) {
   const { stub } = userStudyStub(env, identity.uid);
+  if (request.method === 'DELETE') {
+    if (!id || id === 'current' || id === 'list') return errorJson('Session not found', 404);
+    const session = await stub.getSession(id);
+    if (!session) return errorJson('Session not found', 404);
+    const current = await stub.getCurrentSession();
+    if (current?.id === id && (session.status === 'active' || (!session.status && !session.finishedAt))) {
+      return errorJson('Finish this cram before deleting it', 400);
+    }
+    await stub.deleteSession(id);
+    return json({ ok: true });
+  }
   if (request.method === 'GET' && (id === 'current' || !id)) {
     const session = await stub.getCurrentSession();
     return json({ session: session || null });
   }
   if (request.method === 'GET' && id === 'list') {
+    const limit = await sessionLimitFor(env, identity.uid);
+    await stub.trimFinishedSessions(limit);
     const sessions = await stub.listSessions();
     return json({ sessions });
   }
@@ -74,6 +94,8 @@ async function handleSessions(request, env, identity, id) {
     if (id && id !== 'current') incoming.id = incoming.id || id;
     if (!incoming.id) incoming.id = crypto.randomUUID();
     const session = await stub.putSession(incoming);
+    const limit = await sessionLimitFor(env, identity.uid);
+    await stub.trimFinishedSessions(limit);
     return json({ session });
   }
   return errorJson('Method not allowed', 405);
@@ -133,6 +155,8 @@ export default {
         response = await handleSubscriptionRefresh(env, identity);
       } else if (parts[1] === 'ai' && request.method === 'POST') {
         response = await handleAi(request, env, identity, parts[2] || 'complete');
+      } else if (parts[1] === 'notes' && request.method === 'GET' && !parts[2]) {
+        response = await handleListNotes(env, identity);
       } else if (parts[1] === 'notes' && request.method === 'POST' && !parts[2]) {
         response = await handleCreateNote(request, env, identity);
       } else if (parts[1] === 'notes' && parts[2] && parts[3] === 'pages' && request.method === 'GET') {
@@ -141,12 +165,16 @@ export default {
         response = await handleGetNote(env, identity, parts[2]);
       } else if (parts[1] === 'notes' && parts[2] && request.method === 'PATCH') {
         response = await handlePatchNote(request, env, identity, parts[2]);
+      } else if (parts[1] === 'notes' && parts[2] && request.method === 'DELETE') {
+        response = await handleDeleteNote(env, identity, parts[2]);
       } else if (parts[1] === 'sessions' && parts[2] === 'panic' && parts[3]) {
         response = await handlePanic(request, env, identity, parts[3]);
       } else if (parts[1] === 'sessions') {
         const id = parts[2] || (url.searchParams.get('id') || '');
         if (request.method === 'GET' && !parts[2] && url.searchParams.get('list') !== '0') {
           const { stub } = userStudyStub(env, identity.uid);
+          const limit = await sessionLimitFor(env, identity.uid);
+          await stub.trimFinishedSessions(limit);
           response = json({ sessions: await stub.listSessions() });
         } else {
           response = await handleSessions(request, env, identity, id);

@@ -6,7 +6,7 @@ import { useDebug } from '@/lib/DebugContext';
 import WriteOwnDef, {
   STUCK_AFTER_ROTATIONS,
   cardsAtStuckThreshold,
-  writtenDefsFrom,
+  writtenReviewPlan,
 } from '@/components/study/WriteOwnDef';
 
 function shuffle(a) {
@@ -81,9 +81,12 @@ export default function RecallBlock({
   const advancingRef = React.useRef(false);
   const missCountRef = React.useRef({});
   const deferredRef = React.useRef(new Set());
+  const writtenRef = React.useRef(new Set());
+  const leftoverRef = React.useRef(null);
   const [stuck, setStuck] = React.useState(null);
   const [defMode, setDefMode] = React.useState(false);
   const [skipped, setSkipped] = React.useState(false);
+  const [reviewing, setReviewing] = React.useState(false);
 
   const finish = React.useCallback(
     (reason) => {
@@ -106,8 +109,11 @@ export default function RecallBlock({
     setStuck(null);
     setDefMode(false);
     setSkipped(false);
+    setReviewing(false);
     missCountRef.current = {};
     deferredRef.current = new Set();
+    writtenRef.current = new Set();
+    leftoverRef.current = null;
     setSt({ queue: ids, pos: 0, round: 1 });
     setTimeLeftMs(blockBudgetMs);
   }, [idsKey, terms, blockBudgetMs]);
@@ -134,8 +140,17 @@ export default function RecallBlock({
     }
     if (doneRef.current) return;
     if (stuck || defMode) return;
-    if (!singlePass && st.queue.length === 0) finish('retired');
-    else if (singlePass && st.pos >= st.queue.length) finish('pass');
+    if (!singlePass && st.queue.length === 0) {
+      if (leftoverRef.current?.length) {
+        const rest = leftoverRef.current;
+        leftoverRef.current = null;
+        skipFinishRef.current = true;
+        setReviewing(false);
+        setSt((s) => ({ ...s, queue: rest, pos: 0 }));
+        return;
+      }
+      finish('retired');
+    } else if (singlePass && st.pos >= st.queue.length) finish('pass');
   }, [st.queue.length, st.pos, singlePass, finish, stuck, defMode]);
 
   const currentId = st.queue[st.pos];
@@ -160,9 +175,11 @@ export default function RecallBlock({
 
   React.useLayoutEffect(() => {
     if (singlePass || stuck || defMode || !current) return;
-    if (deferredRef.current.has(current.id)) return;
+    if (deferredRef.current.has(current.id) || writtenRef.current.has(current.id)) return;
+    if (String(current.ownDefinition || '').trim()) return;
     if ((missCountRef.current[current.id] || 0) < STUCK_AFTER_ROTATIONS) return;
-    const batch = cardsAtStuckThreshold(st.queue, byId, missCountRef.current, deferredRef.current);
+    const skip = new Set([...deferredRef.current, ...writtenRef.current]);
+    const batch = cardsAtStuckThreshold(st.queue, byId, missCountRef.current, skip);
     if (batch.length) {
       setRevealed(false);
       setRecogSelected(null);
@@ -248,8 +265,16 @@ export default function RecallBlock({
       advancingRef.current = false;
       setRevealed(false);
       setRecogSelected(null);
-      if (!singlePass && misses >= STUCK_AFTER_ROTATIONS && !deferredRef.current.has(missedId) && !stuck) {
-        const batch = cardsAtStuckThreshold(st.queue, byId, missCountRef.current, deferredRef.current);
+      if (
+        !singlePass &&
+        misses >= STUCK_AFTER_ROTATIONS &&
+        !deferredRef.current.has(missedId) &&
+        !writtenRef.current.has(missedId) &&
+        !String(byId[missedId]?.ownDefinition || '').trim() &&
+        !stuck
+      ) {
+        const skip = new Set([...deferredRef.current, ...writtenRef.current]);
+        const batch = cardsAtStuckThreshold(st.queue, byId, missCountRef.current, skip);
         if (batch.length) setStuck(batch);
       }
       return;
@@ -258,33 +283,27 @@ export default function RecallBlock({
     requeueMissed(missedId);
   };
 
-  const retireWritten = (entries) => {
-    const { ids, defs } = writtenDefsFrom(entries);
-    const idSet = new Set(ids);
-    advancingRef.current = true;
-    idSet.forEach((id) => {
+  const startWrittenReview = (entries, fallbackCards) => {
+    const { ids, defs, leftover } = writtenReviewPlan(entries, fallbackCards || [], st.queue);
+    if (!ids.length) {
+      setStuck(null);
+      setDefMode(false);
+      return;
+    }
+    ids.forEach((id) => {
       missCountRef.current[id] = 0;
       deferredRef.current.delete(id);
-      const t = byId[id];
-      if (t) {
-        const patch = { correctStreak: Math.max(t.correctStreak || 0, retireThreshold) };
-        if (defs[id]) patch.ownDefinition = defs[id];
-        onUpdateTerm(id, patch);
-        onLogAttempt(id, 'got_it');
-      }
+      writtenRef.current.add(id);
+      if (defs[id]) onUpdateTerm(id, { ownDefinition: defs[id] });
     });
-    const removed = st.queue.filter((id) => idSet.has(id)).length;
-    gotRef.current += removed;
-    setGotCount(gotRef.current);
+    leftoverRef.current = leftover;
+    skipFinishRef.current = true;
+    setReviewing(true);
     setStuck(null);
     setDefMode(false);
-    setSt((s) => {
-      const nq = s.queue.filter((id) => !idSet.has(id));
-      const removedBefore = s.queue.slice(0, s.pos).filter((id) => idSet.has(id)).length;
-      let pos = s.pos - removedBefore;
-      if (pos >= nq.length) pos = 0;
-      return { queue: nq, pos, round: s.round };
-    });
+    setRevealed(false);
+    setRecogSelected(null);
+    setSt((s) => ({ queue: ids, pos: 0, round: s.round }));
     setCardSeq((n) => n + 1);
   };
 
@@ -295,7 +314,7 @@ export default function RecallBlock({
       ? 'Pick the correct definition'
       : 'Term';
 
-  const defCards = cardsAtStuckThreshold(st.queue, byId, missCountRef.current, new Set());
+  const defCards = cardsAtStuckThreshold(st.queue, byId, missCountRef.current, writtenRef.current);
   const writeCards = stuck?.length ? stuck : defMode ? defCards : null;
 
   if (writeCards?.length) {
@@ -305,7 +324,7 @@ export default function RecallBlock({
           cards={writeCards}
           allTerms={defMode ? terms : undefined}
           variant={defMode ? 'defMode' : 'stuck'}
-          onComplete={retireWritten}
+          onComplete={(entries) => startWrittenReview(entries, writeCards)}
           onSkip={() => {
             if (defMode) {
               setDefMode(false);
@@ -331,7 +350,7 @@ export default function RecallBlock({
   return (
     <div className="flex-1 flex flex-col px-5 pt-4">
       <div className="flex items-center justify-between mb-3 text-xs text-muted-foreground">
-        <span>{blockLabel}</span>
+        <span>{reviewing ? 'Practice your wording' : blockLabel}</span>
         <span>
           {fmtTime(timeLeftMs)} left · round {st.round}
         </span>
@@ -353,9 +372,9 @@ export default function RecallBlock({
                     className={`w-full text-left rounded-xl border px-4 py-3 text-lg leading-relaxed transition ${
                       recogSelected
                         ? isCorrect
-                          ? 'border-emerald-500 bg-emerald-50 text-emerald-950 dark:bg-emerald-500/20 dark:text-emerald-100'
+                          ? 'border-emerald-500 bg-emerald-50 text-emerald-950 dark:border-emerald-400/40 dark:bg-emerald-400/10 dark:text-emerald-100'
                           : selected
-                          ? 'border-rose-500 bg-rose-50 text-rose-950 dark:bg-rose-500/20 dark:text-rose-100'
+                          ? 'border-rose-500 bg-rose-50 text-rose-950 dark:border-rose-400/40 dark:bg-rose-400/10 dark:text-rose-100'
                           : 'border-border'
                         : 'border-border hover:border-muted-foreground bg-card'
                     }`}

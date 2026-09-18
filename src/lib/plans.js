@@ -7,9 +7,10 @@ export const PLANS = {
     features: [
       'Photo notes → terms and definitions',
       'Triage, recall, and a practice test',
-      'Sessions saved to your account',
+      '10 past sessions saved',
       '30 AI calls each month',
     ],
+    sessionLimit: 10,
   },
   pro: {
     id: 'pro',
@@ -22,9 +23,11 @@ export const PLANS = {
     features: [
       'Everything in Free',
       '500 AI calls each month',
+      '30 past sessions saved',
       'Extract, grade, explain, and panic notes',
       'Restore on any iPhone with this Apple ID',
     ],
+    sessionLimit: 30,
   },
 };
 
@@ -34,4 +37,8 @@ export function planForUser(user) {
 
 export function planLabel(user) {
   return planForUser(user).name;
+}
+
+export function sessionLimitForUser(user) {
+  return planForUser(user).sessionLimit;
 }

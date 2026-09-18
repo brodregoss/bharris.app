@@ -15,12 +15,14 @@
           if (t === 'dark') {
             document.documentElement.classList.add('dark');
             document.documentElement.style.colorScheme = 'dark';
+            var meta = document.querySelector('meta[name="theme-color"]');
+            if (meta) meta.setAttribute('content', '#1e1c1a');
           }
         } catch (e) {}
       })();
     </script>
-    <script type="module" crossorigin src="./assets/index-BkJBot8H.js"></script>
-    <link rel="stylesheet" crossorigin href="./assets/index-DAD621wL.css">
+    <script type="module" crossorigin src="./assets/index-lR8cZi-F.js"></script>
+    <link rel="stylesheet" crossorigin href="./assets/index-DDlmFMrI.css">
   </head>
   <body>
     <div id="root"></div>

@@ -6,7 +6,7 @@ import { invokeLlm } from '@/api/invokeLlm';
 import { Button } from '@/components/ui/button';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Slider } from '@/components/ui/slider';
-import { loadSession } from '@/lib/sessionStore';
+import { loadLatestCram } from '@/lib/sessionStore';
 import { panicSignature, loadPanicSummary, savePanicSummary } from '@/lib/panicCache';
 
 const TEXT_KEY = 'lms_panic_text_px';
@@ -96,7 +96,7 @@ export default function PanicReview() {
   const [error, setError] = React.useState(false);
   const [textPx, setTextPx] = React.useState(TEXT_DEFAULT);
 
-  const session = loadSession();
+  const session = loadLatestCram();
 
   React.useEffect(() => {
     setSummary(loadPanicSummary());
@@ -116,7 +116,7 @@ export default function PanicReview() {
   if (!session || !session.terms?.length) {
     return (
       <div className="min-h-[100dvh] bg-background text-foreground flex flex-col items-center justify-center px-8 text-center">
-        <p className="text-sm text-muted-foreground mb-4">No terms to review yet.</p>
+        <p className="text-sm text-muted-foreground mb-4">No cram to build notes from yet.</p>
         <Button onClick={() => navigate('/')} className="rounded-2xl">Back to start</Button>
       </div>
     );
@@ -195,7 +195,7 @@ export default function PanicReview() {
               </div>
               <h2 className="text-base font-bold mb-1">Generate your panic notes?</h2>
               <p className="text-sm text-muted-foreground mb-5">
-                A one-page summary of what to know — built from your terms, weakest concepts first.
+                A one-page summary of what to know — built from {session.title || session.setup?.title || 'your last cram'}, weakest concepts first.
               </p>
               <Button
                 onClick={generate}

@@ -394,8 +394,8 @@ export default function PracticeTest({ terms, examType, budgetMs, priorMissed, o
                                   <span
                                     className={`flex h-5 w-5 shrink-0 items-center justify-center rounded-full ${
                                       gotIt
-                                        ? 'bg-emerald-500 text-white'
-                                        : 'bg-rose-500 text-white'
+                                        ? 'bg-emerald-500 text-white dark:bg-emerald-600'
+                                        : 'bg-rose-500 text-white dark:bg-rose-600'
                                     }`}
                                     aria-label={gotIt ? 'Got it' : 'Missed'}
                                   >
@@ -413,9 +413,11 @@ export default function PracticeTest({ terms, examType, budgetMs, priorMissed, o
                 );
               })}
           </div>
-          <Button variant="outline" onClick={retake} className="h-11 rounded-2xl mb-2 font-semibold">
-            <RotateCcw className="w-4 h-4 mr-2" /> Retake weak areas
-          </Button>
+          {missedIds.length > 0 && (
+            <Button variant="outline" onClick={retake} className="h-11 rounded-2xl mb-2 font-semibold">
+              <RotateCcw className="w-4 h-4 mr-2" /> Retake weak areas
+            </Button>
+          )}
           <Button
             onClick={() => onDone({ missedIds, questionIds })}
             className="h-12 rounded-2xl font-semibold"
@@ -461,9 +463,9 @@ export default function PracticeTest({ terms, examType, budgetMs, priorMissed, o
                     className={`w-full text-left rounded-xl border px-4 py-3 text-lg leading-relaxed transition ${
                       answered
                         ? isCorrect
-                          ? 'border-emerald-500 bg-emerald-50 text-emerald-950 dark:bg-emerald-500/20 dark:text-emerald-100'
+                          ? 'border-emerald-500 bg-emerald-50 text-emerald-950 dark:border-emerald-400/40 dark:bg-emerald-400/10 dark:text-emerald-100'
                           : selected
-                          ? 'border-rose-500 bg-rose-50 text-rose-950 dark:bg-rose-500/20 dark:text-rose-100'
+                          ? 'border-rose-500 bg-rose-50 text-rose-950 dark:border-rose-400/40 dark:bg-rose-400/10 dark:text-rose-100'
                           : 'border-border'
                         : 'border-border hover:border-muted-foreground bg-card'
                     }`}
@@ -515,8 +517,8 @@ export default function PracticeTest({ terms, examType, budgetMs, priorMissed, o
                     <div
                       className={`rounded-xl p-3 text-sm ${
                         gradeResult.correct
-                          ? 'bg-emerald-50 border border-emerald-300 text-emerald-950 dark:bg-emerald-500/15 dark:border-emerald-500 dark:text-emerald-100'
-                          : 'bg-rose-50 border border-rose-300 text-rose-950 dark:bg-rose-500/15 dark:border-rose-500 dark:text-rose-100'
+                          ? 'bg-emerald-50 border border-emerald-300 text-emerald-950 dark:bg-emerald-400/10 dark:border-emerald-400/30 dark:text-emerald-100'
+                          : 'bg-rose-50 border border-rose-300 text-rose-950 dark:bg-rose-400/10 dark:border-rose-400/30 dark:text-rose-100'
                       }`}
                     >
                       <p className={`font-semibold ${gradeResult.correct ? 'text-emerald-700 dark:text-emerald-300' : 'text-rose-700 dark:text-rose-300'}`}>

@@ -162,6 +162,25 @@ export function priority(term) {
 }
 
 export const SKIM_TIER_ORDER = ['critical', 'core', 'passive'];
+export const OWN_DEF_RECOMMEND_MAX = 10;
+export const OWN_DEF_ADD_MORE_BELOW = 5;
+
+export function topTierTerms(terms) {
+  return (Array.isArray(terms) ? terms : []).filter((t) => t?.tier === 'critical' && t?.id);
+}
+
+export function recommendedOwnDefTerms(terms, limit = OWN_DEF_RECOMMEND_MAX) {
+  const cap = Number.isFinite(limit) ? Math.max(0, limit) : OWN_DEF_RECOMMEND_MAX;
+  return topTierTerms(terms)
+    .filter((t) => !String(t.ownDefinition || '').trim())
+    .slice()
+    .sort((a, b) => {
+      const dd = (Number(b.difficulty) || 0) - (Number(a.difficulty) || 0);
+      if (dd) return dd;
+      return priority(b) - priority(a);
+    })
+    .slice(0, cap);
+}
 
 export function orderLikeSkim(terms) {
   const list = Array.isArray(terms) ? terms : [];

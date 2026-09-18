@@ -6,7 +6,7 @@ import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { extractTermsFromPhotos, generateDefinitions, regenerateDefinition } from '@/lib/extractNotes';
 import { peekPhotos, peekPhoto, clearPhoto } from '@/lib/imageData';
-import { patchNote } from '@/lib/notesUpload';
+import { patchNote, saveManualNote } from '@/lib/notesUpload';
 
 function photosFor(source) {
   const stashed = peekPhotos();
@@ -22,6 +22,10 @@ export default function ReviewNotes() {
   const location = useLocation();
   const source = location.state?.source;
   const setup = location.state?.setup;
+  const [title, setTitle] = React.useState(() => (
+    source?.title && source.title !== 'Your notes' ? source.title : ''
+  ));
+  const [saving, setSaving] = React.useState(false);
 
   const [items, setItems] = React.useState(() => {
     if (!source?.items?.length) return [];
@@ -62,7 +66,7 @@ export default function ReviewNotes() {
     return {
       ...rest,
       kind: rest.kind || 'photo',
-      title: rest.title || 'Your notes',
+      title: (title || rest.title || '').trim(),
       terms: nextItems.length,
       items: nextItems,
       noteId: rest.noteId || source?.noteId,
@@ -118,9 +122,11 @@ export default function ReviewNotes() {
   }
 
   const filled = items.filter((t) => t.term.trim() && t.definition.trim());
+  const trimmedTitle = title.trim();
 
-  const continueSetup = () => {
-    if (!filled.length) return;
+  const continueSetup = async () => {
+    if (!filled.length || !trimmedTitle || extracting || saving) return;
+    setSaving(true);
     const nextItems = filled.map((t, i) => ({
       id: t.id || `r${i}`,
       term: t.term.trim(),
@@ -128,7 +134,30 @@ export default function ReviewNotes() {
       difficulty: t.difficulty,
       depends_on: t.depends_on,
     }));
-    navigate('/setup', { state: { setup, source: strippedSource(nextItems) } });
+    let noteId = source?.noteId || '';
+    try {
+      if (noteId) {
+        await patchNote(noteId, {
+          title: trimmedTitle,
+          transcript: JSON.stringify({ terms: nextItems }),
+        });
+      } else {
+        const note = await saveManualNote({ title: trimmedTitle, terms: nextItems });
+        noteId = note?.id || '';
+      }
+    } catch {
+      // Setup still works from in-memory terms if the note doesn't persist.
+    }
+    navigate('/setup', {
+      state: {
+        setup,
+        source: {
+          ...strippedSource(nextItems),
+          title: trimmedTitle,
+          noteId,
+        },
+      },
+    });
     clearPhoto();
   };
 
@@ -176,15 +205,15 @@ export default function ReviewNotes() {
         >
           <ArrowLeft className="w-5 h-5" />
         </button>
-        <div className="min-w-0">
+        <div className="min-w-0 flex-1">
           <h1 className="text-base font-bold tracking-tight leading-none truncate">
-            {source.title || 'Your notes'}
+            Review notes
           </h1>
           <p className="text-[11px] text-muted-foreground leading-none mt-1">
             {extracting
               ? extractHint
               : items.length
-                ? `${items.length} terms — edit anything that looks off`
+                ? `${items.length} terms — name the set, then edit anything that looks off`
                 : 'No terms to look over yet'}
           </p>
         </div>
@@ -227,6 +256,16 @@ export default function ReviewNotes() {
             </div>
           ) : (
             <>
+              <div className="rounded-2xl border border-border bg-card p-4 space-y-2 shadow-sm">
+                <p className="text-xs font-medium text-muted-foreground">Title</p>
+                <Input
+                  value={title}
+                  onChange={(e) => setTitle(e.target.value)}
+                  placeholder="e.g. Bio lecture 3"
+                  className="h-11 rounded-xl font-semibold"
+                  autoComplete="off"
+                />
+              </div>
               {items.length === 0 && (
                 <p className="text-sm text-muted-foreground text-center py-10">
                   No terms to look over yet.
@@ -285,12 +324,12 @@ export default function ReviewNotes() {
         <div className="max-w-md mx-auto w-full">
           <Button
             size="lg"
-            disabled={!filled.length || extracting}
+            disabled={!filled.length || !trimmedTitle || extracting || saving}
             onClick={continueSetup}
             className="w-full h-14 rounded-2xl text-base font-semibold shadow-lg"
           >
             <Check className="w-5 h-5 mr-2" />
-            Looks good
+            {saving ? 'Saving…' : 'Looks good'}
           </Button>
         </div>
       </footer>

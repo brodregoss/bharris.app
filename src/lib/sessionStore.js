@@ -74,9 +74,12 @@ function persistActive(data, { replaceId = false } = {}) {
   if (data?.ownerUid && data.ownerUid !== uid) return loadSession();
   const existing = replaceId ? null : loadSession();
   const next = withId({
+    ...(existing || {}),
     ...data,
     id: replaceId ? newId() : (data.id || existing?.id),
-    status: data?.status || 'active',
+    status: data?.status || existing?.status || 'active',
+    title: data?.title || existing?.title || data?.setup?.title || existing?.setup?.title,
+    noteId: data?.noteId || existing?.noteId || null,
     savedAt: Date.now(),
     ownerUid: uid,
   });
@@ -95,6 +98,10 @@ export function saveSession(data) {
 }
 
 export function beginSession(data) {
+  const previous = loadSession();
+  if (previous?.id && previous.terms?.length && previous.id !== data?.id) {
+    saveFinishedSession(previous);
+  }
   return persistActive(data, { replaceId: true });
 }
 
@@ -111,6 +118,19 @@ export function clearSession() {
 
 export function loadFinishedSession() {
   return readJson(FINISHED_KEY);
+}
+
+export function clearFinishedSession(id) {
+  const current = loadFinishedSession();
+  if (id && current?.id && current.id !== id) return current;
+  const key = userStorageKey(FINISHED_KEY);
+  try {
+    if (key) localStorage.removeItem(key);
+    emit();
+  } catch {
+    // ignore
+  }
+  return null;
 }
 
 export function saveFinishedSession(data) {
@@ -139,6 +159,10 @@ export function loadPracticeSource() {
   const finished = loadFinishedSession();
   if (finished?.terms?.length) return { kind: 'finished', session: finished };
   return null;
+}
+
+export function loadLatestCram() {
+  return loadPracticeSource()?.session || null;
 }
 
 export function savePracticeTerms(source, terms) {
@@ -192,4 +216,9 @@ export async function listRemoteSessions() {
 export async function loadRemoteSession(id) {
   const data = await workerRequest('GET', `/v1/sessions/${id}`);
   return ownedByActiveUser(data?.session);
+}
+
+export async function deleteRemoteSession(id) {
+  await workerRequest('DELETE', `/v1/sessions/${id}`);
+  clearFinishedSession(id);
 }

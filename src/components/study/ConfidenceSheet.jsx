@@ -86,8 +86,8 @@ export default function ConfidenceSheet({
     return (
       <div className="flex-1 flex flex-col px-5 pt-4 overflow-y-auto">
         <div className="max-w-md mx-auto w-full flex-1 flex flex-col items-center text-center pt-4">
-          <div className="w-14 h-14 rounded-full bg-emerald-100 dark:bg-emerald-500/20 flex items-center justify-center mb-5">
-            <CheckCircle2 className="w-7 h-7 text-emerald-600 dark:text-emerald-400" />
+          <div className="w-14 h-14 rounded-full bg-emerald-100 dark:bg-emerald-400/10 flex items-center justify-center mb-5">
+            <CheckCircle2 className="w-7 h-7 text-emerald-600 dark:text-emerald-300" />
           </div>
           <h2 className="text-2xl font-bold tracking-tight mb-2">{title}</h2>
           <p className="text-sm text-muted-foreground max-w-sm mb-6">{body}</p>
@@ -125,7 +125,7 @@ export default function ConfidenceSheet({
       <div className="max-w-md mx-auto w-full flex-1 flex flex-col">
         <div className="flex items-center justify-between mb-1">
           <h2 className="text-xl font-bold tracking-tight">Confidence sheet</h2>
-          <span className="text-sm font-bold text-emerald-600 dark:text-emerald-400">{readiness}%</span>
+          <span className="text-sm font-bold text-emerald-600 dark:text-emerald-300">{readiness}%</span>
         </div>
         <p className="text-xs text-muted-foreground mb-3">
           {shakyTerms.length} terms still shaky — no new material, just these.

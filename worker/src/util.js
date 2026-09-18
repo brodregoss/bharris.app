@@ -31,6 +31,10 @@ export function quotaLimit(env, tier) {
   return tier === 'pro' ? pro : free;
 }
 
+export function sessionHistoryLimit(tier) {
+  return tier === 'pro' ? 30 : 10;
+}
+
 export function publicUser(row, { isAdmin = false } = {}) {
   const used = Number(row.ai_quota_used) || 0;
   const limit = Number(row.ai_quota_limit) || 0;

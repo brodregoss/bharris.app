@@ -36,13 +36,13 @@ export default function Welcome() {
         : `${checked.files.length} photos`;
       let noteId = '';
       try {
-        const note = await uploadNoteImages(images, { title: name });
+        const note = await uploadNoteImages(images, { title: 'Untitled' });
         noteId = note?.id || '';
       } catch {
         // Extract still runs from the in-memory photos; R2 persist can retry later.
       }
       navigate('/review-notes', {
-        state: { source: { ...makePhotoSource({ name }), noteId } },
+        state: { source: { ...makePhotoSource({ name, title: '', noteId }), noteId } },
       });
     } catch {
       setReadError('Could not read that photo. Try another one.');
@@ -124,7 +124,7 @@ export default function Welcome() {
             </button>
           </div>
           {readError && (
-            <p className="text-xs text-rose-600 dark:text-rose-400 text-center mt-3">{readError}</p>
+            <p className="text-xs text-rose-600 dark:text-rose-300 text-center mt-3">{readError}</p>
           )}
           <input
             ref={inputRef}

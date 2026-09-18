@@ -87,9 +87,7 @@ export default function Home() {
     : perTerm
       ? `≈ ${perTerm} min per term`
       : 'Time until the exam';
-  const notesLabel = source.kind === 'photo'
-    ? (source.name || 'Photo notes')
-    : (source.title || 'Your notes');
+  const notesLabel = source.title || source.name || 'Your notes';
 
   const goBack = () => {
     navigate(setupReturnPath(source), {
@@ -113,7 +111,7 @@ export default function Home() {
         <button
           type="button"
           onClick={goBack}
-          aria-label="Back to notes"
+          aria-label={source.returnTo === '/history' ? 'Back' : 'Back to notes'}
           className="w-11 h-11 rounded-full flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-accent transition"
         >
           <ArrowLeft className="w-5 h-5" />

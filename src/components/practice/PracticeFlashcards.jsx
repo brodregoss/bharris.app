@@ -6,10 +6,10 @@ import { flashcardDef } from '@/lib/studyUtils';
 import WriteOwnDef, {
   STUCK_AFTER_ROTATIONS,
   cardsAtStuckThreshold,
-  writtenDefsFrom,
+  writtenReviewPlan,
 } from '@/components/study/WriteOwnDef';
 
-export default function PracticeFlashcards({ terms, onUpdateTerm, onDone }) {
+export default function PracticeFlashcards({ terms, onUpdateTerm, onDone, heading = 'Flashcards' }) {
   const byId = React.useMemo(() => Object.fromEntries(terms.map((t) => [t.id, t])), [terms]);
   const [items, setItems] = React.useState(() => sortForPractice(terms).map((t) => t.id));
   const [pos, setPos] = React.useState(0);
@@ -19,29 +19,43 @@ export default function PracticeFlashcards({ terms, onUpdateTerm, onDone }) {
   const [defMode, setDefMode] = React.useState(false);
   const [skipped, setSkipped] = React.useState(false);
   const [finished, setFinished] = React.useState(false);
+  const [reviewing, setReviewing] = React.useState(false);
   const deferredRef = React.useRef(new Set());
   const writtenRef = React.useRef(new Set());
   const stuckHistoryRef = React.useRef(new Set());
+  const leftoverRef = React.useRef(null);
   const penalizedRef = React.useRef({});
 
   const current = byId[items[pos]];
   const defCards = items.length
-    ? cardsAtStuckThreshold(items, byId, misses, new Set())
-    : terms.filter((t) => stuckHistoryRef.current.has(t.id) && !writtenRef.current.has(t.id));
+    ? cardsAtStuckThreshold(items, byId, misses, writtenRef.current)
+    : terms.filter((t) => stuckHistoryRef.current.has(t.id) && !writtenRef.current.has(t.id) && !String(t.ownDefinition || '').trim());
 
   React.useEffect(() => {
     setRevealed(false);
   }, [pos, items]);
 
   React.useEffect(() => {
-    if (!stuck && !defMode && !current && items.length === 0) setFinished(true);
-  }, [stuck, defMode, current, items.length]);
+    if (stuck || defMode) return;
+    if (items.length > 0) return;
+    if (leftoverRef.current?.length) {
+      const rest = leftoverRef.current;
+      leftoverRef.current = null;
+      setReviewing(false);
+      setItems(rest);
+      setPos(0);
+      return;
+    }
+    setFinished(true);
+  }, [stuck, defMode, items.length]);
 
   React.useLayoutEffect(() => {
     if (stuck || defMode || finished || !current) return;
-    if (deferredRef.current.has(current.id)) return;
+    if (deferredRef.current.has(current.id) || writtenRef.current.has(current.id)) return;
+    if (String(current.ownDefinition || '').trim()) return;
     if ((misses[current.id] || 0) < STUCK_AFTER_ROTATIONS) return;
-    const batch = cardsAtStuckThreshold(items, byId, misses, deferredRef.current);
+    const skip = new Set([...deferredRef.current, ...writtenRef.current]);
+    const batch = cardsAtStuckThreshold(items, byId, misses, skip);
     if (batch.length) setStuck(batch);
   }, [current, items, misses, stuck, defMode, finished, byId]);
 
@@ -78,6 +92,35 @@ export default function PracticeFlashcards({ terms, onUpdateTerm, onDone }) {
       return nextPos >= nextLen ? 0 : nextPos;
     });
     setRevealed(false);
+  };
+
+  const startWrittenReview = (entries, fallbackCards) => {
+    const { ids, defs, leftover } = writtenReviewPlan(entries, fallbackCards, items);
+    if (!ids.length) {
+      setStuck(null);
+      setDefMode(false);
+      return;
+    }
+    ids.forEach((id) => {
+      if (defs[id]) onUpdateTerm(id, { ownDefinition: defs[id] });
+      writtenRef.current.add(id);
+      deferredRef.current.delete(id);
+    });
+    leftoverRef.current = leftover;
+    setMisses((prev) => {
+      const next = { ...prev };
+      ids.forEach((id) => {
+        next[id] = 0;
+      });
+      return next;
+    });
+    setFinished(false);
+    setReviewing(true);
+    setItems(ids);
+    setPos(0);
+    setRevealed(false);
+    setStuck(null);
+    setDefMode(false);
   };
 
   const rotateMiss = (id) => {
@@ -117,12 +160,7 @@ export default function PracticeFlashcards({ terms, onUpdateTerm, onDone }) {
         cards={writeCards}
         allTerms={defMode ? terms : undefined}
         variant={defMode ? 'defMode' : 'stuck'}
-        onComplete={(entries) => {
-          const { ids, defs } = writtenDefsFrom(entries);
-          retireIds(ids.length ? ids : writeCards.map((c) => c.id), defs);
-          setStuck(null);
-          setDefMode(false);
-        }}
+        onComplete={(entries) => startWrittenReview(entries, writeCards)}
         onSkip={
           defMode
             ? () => setDefMode(false)
@@ -137,6 +175,14 @@ export default function PracticeFlashcards({ terms, onUpdateTerm, onDone }) {
   ) : null;
 
   if (writeFlow) return writeFlow;
+
+  if (items.length === 0 && leftoverRef.current?.length) {
+    return (
+      <div className="flex-1 flex items-center justify-center">
+        <p className="text-sm text-muted-foreground">Wrapping up…</p>
+      </div>
+    );
+  }
 
   const defModeButton = defCards.length > 0 && (skipped || items.length === 0) && (
     <button
@@ -180,7 +226,7 @@ export default function PracticeFlashcards({ terms, onUpdateTerm, onDone }) {
   return (
     <div className="flex-1 flex flex-col px-5 pt-4">
       <p className="text-xs text-muted-foreground mb-3">
-        Flashcards · {pos + 1}/{items.length}
+        {reviewing ? 'Practice your wording' : heading} · {pos + 1}/{items.length}
       </p>
       <div className="flex-1 flex flex-col items-center">
         <button

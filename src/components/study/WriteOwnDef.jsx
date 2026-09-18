@@ -20,6 +20,7 @@ export function cardsAtStuckThreshold(ids, byId, missCount, skipIds) {
   for (const id of ids) {
     if (!id || seen.has(id) || skip.has(id)) continue;
     seen.add(id);
+    if (String(byId[id]?.ownDefinition || '').trim()) continue;
     if ((missCount[id] || 0) >= STUCK_AFTER_ROTATIONS && byId[id]) out.push(byId[id]);
   }
   return out;
@@ -38,24 +39,33 @@ export function writtenDefsFrom(entries) {
   return { ids, defs };
 }
 
+export function writtenReviewPlan(entries, fallbackCards, currentQueue = []) {
+  const { ids, defs } = writtenDefsFrom(entries);
+  const written = [...new Set(ids.length ? ids : (fallbackCards || []).map((c) => c.id).filter(Boolean))];
+  const drop = new Set(written);
+  const leftover = (currentQueue || []).filter((id) => !drop.has(id));
+  return { ids: written, defs, leftover };
+}
+
 export default function WriteOwnDef({
   cards: initialCards,
   allTerms,
   variant = 'stuck',
+  skipLabel,
   onComplete,
   onSkip,
 }) {
   const [list, setList] = React.useState(() => uniqueCards(initialCards));
   const [step, setStep] = React.useState('intro');
   const [idx, setIdx] = React.useState(0);
-  const [showHint, setShowHint] = React.useState(false);
+  const [typing, setTyping] = React.useState(false);
+  const [peeking, setPeeking] = React.useState(false);
   const [picked, setPicked] = React.useState(() => new Set((initialCards || []).map((c) => c.id)));
   const [drafts, setDrafts] = React.useState({});
   const writtenRef = React.useRef([]);
 
   const current = list[idx];
   const own = current ? (drafts[current.id] ?? current.ownDefinition ?? '') : '';
-  const hint = React.useMemo(() => definitionHint(current?.definition), [current?.definition]);
   const baseIds = React.useMemo(
     () => new Set((initialCards || []).map((c) => c.id).filter(Boolean)),
     [initialCards],
@@ -73,8 +83,14 @@ export default function WriteOwnDef({
     }
     setList(cards);
     setIdx(0);
-    setShowHint(false);
-    setStep('review');
+    setTyping(false);
+    setPeeking(false);
+    setStep('card');
+  };
+
+  const resetCardView = () => {
+    setTyping(false);
+    setPeeking(false);
   };
 
   const finishCard = () => {
@@ -86,9 +102,23 @@ export default function WriteOwnDef({
       return;
     }
     setIdx((i) => i + 1);
-    setShowHint(false);
-    setStep('review');
+    resetCardView();
   };
+
+  const goPrevCard = () => {
+    if (idx <= 0) return;
+    resetCardView();
+    setIdx((i) => i - 1);
+  };
+
+  const beginPeek = (e) => {
+    if (!typing) return;
+    e.preventDefault();
+    e.currentTarget.setPointerCapture?.(e.pointerId);
+    setPeeking(true);
+  };
+
+  const endPeek = () => setPeeking(false);
 
   if (step === 'add') {
     return (
@@ -176,7 +206,7 @@ export default function WriteOwnDef({
               onClick={() => setStep('add')}
               className="mb-3 text-sm text-muted-foreground hover:text-foreground underline-offset-4 hover:underline self-start"
             >
-              Add others
+              Add more terms
             </button>
           )}
           <Button onClick={() => startWriting(list)} className="w-full h-12 rounded-2xl font-semibold">
@@ -189,7 +219,7 @@ export default function WriteOwnDef({
               onClick={onSkip}
               className="mt-3 mb-2 text-sm text-muted-foreground hover:text-foreground underline-offset-4 hover:underline"
             >
-              Keep going
+              {skipLabel || 'Keep going'}
             </button>
           )}
         </div>
@@ -198,39 +228,6 @@ export default function WriteOwnDef({
   }
 
   if (!current) return null;
-
-  if (step === 'review') {
-    return (
-      <div className="flex-1 flex flex-col px-5 pt-4">
-        <div className="max-w-md mx-auto w-full flex-1 flex flex-col">
-          {list.length > 1 && (
-            <p className="text-xs text-muted-foreground mb-2">
-              {idx + 1}/{list.length}
-            </p>
-          )}
-          <p className="text-[11px] uppercase tracking-wide text-muted-foreground mb-1">Term</p>
-          <h3 className="text-2xl font-bold tracking-tight mb-4">{current.term}</h3>
-          <div className="flex-1 rounded-2xl border border-border bg-card p-5">
-            <p className="text-xs uppercase tracking-wide text-muted-foreground mb-2">Definition</p>
-            <p className="text-base leading-relaxed">{current.definition}</p>
-          </div>
-          <div className="grid grid-cols-2 gap-3 mt-4">
-            <Button
-              variant="outline"
-              onClick={() => setStep('intro')}
-              className="h-12 rounded-2xl font-semibold"
-            >
-              <ArrowLeft className="w-4 h-4 mr-2" /> Back
-            </Button>
-            <Button onClick={() => setStep('write')} className="h-12 rounded-2xl font-semibold">
-              Next
-              <ArrowRight className="w-4 h-4 ml-2" />
-            </Button>
-          </div>
-        </div>
-      </div>
-    );
-  }
 
   return (
     <div className="flex-1 flex flex-col px-5 pt-4">
@@ -241,49 +238,72 @@ export default function WriteOwnDef({
           </p>
         )}
         <p className="text-[11px] uppercase tracking-wide text-muted-foreground mb-1">Term</p>
-        <h2 className="text-2xl font-bold tracking-tight mb-4">{current.term}</h2>
-        <div className="flex-1" />
-        <p className="text-sm text-muted-foreground mb-2">Make your own definition</p>
-        <Textarea
-          value={own}
-          onChange={(e) => {
-            const id = current.id;
-            const value = e.target.value;
-            setDrafts((prev) => ({ ...prev, [id]: value }));
-          }}
-          autoFocus
-          rows={4}
-          placeholder="Say it in your words…"
-          className="rounded-2xl text-base min-h-[120px]"
-        />
-        <div className="mt-2 min-h-[1.5rem]">
-          {showHint ? (
-            <p className="text-sm text-muted-foreground">{hint}</p>
-          ) : (
-            <button
-              type="button"
-              onClick={() => setShowHint(true)}
-              className="text-sm text-muted-foreground hover:text-foreground underline-offset-4 hover:underline"
-            >
-              Hint
-            </button>
+        <h3 className="text-2xl font-bold tracking-tight mb-2">{current.term}</h3>
+        <p className="text-sm text-muted-foreground leading-relaxed mb-3">
+          {typing
+            ? 'Hold the definition to peek. Let go, then type your own version.'
+            : 'Look at the definition. Try to memorize it. Don’t just rewrite — paraphrase and recall information to build a definition you will remember.'}
+        </p>
+        <div
+          className={cn(
+            'relative flex-1 min-h-[8.5rem] rounded-2xl border border-border bg-card p-5 select-none',
+            typing && 'touch-none cursor-pointer',
+          )}
+          style={typing ? { WebkitTouchCallout: 'none' } : undefined}
+          onPointerDown={typing ? beginPeek : undefined}
+          onPointerUp={typing ? endPeek : undefined}
+          onPointerCancel={typing ? endPeek : undefined}
+          onLostPointerCapture={typing ? endPeek : undefined}
+          onContextMenu={typing ? (e) => e.preventDefault() : undefined}
+        >
+          <p className="text-xs uppercase tracking-wide text-muted-foreground mb-2">Definition</p>
+          <p className={cn('text-base leading-relaxed', typing && !peeking && 'invisible')}>
+            {current.definition}
+          </p>
+          {typing && !peeking && (
+            <div className="absolute inset-0 rounded-2xl bg-muted flex items-center justify-center px-6">
+              <p className="text-sm font-medium text-muted-foreground text-center">Hold to peek</p>
+            </div>
           )}
         </div>
-        <div className="grid grid-cols-2 gap-3 mt-4">
-          <Button
-            variant="outline"
-            onClick={() => {
-              setShowHint(false);
-              setStep('review');
-            }}
-            className="h-12 rounded-2xl font-semibold"
-          >
-            <ArrowLeft className="w-4 h-4 mr-2" /> Back
-          </Button>
+        <div className="mt-4">
+          {typing ? (
+            <Textarea
+              value={own}
+              onChange={(e) => {
+                const id = current.id;
+                const value = e.target.value;
+                setDrafts((prev) => ({ ...prev, [id]: value }));
+              }}
+              autoFocus
+              rows={4}
+              placeholder="Don’t just rewrite — paraphrase and recall information to build a definition you will remember"
+              className="rounded-2xl text-base min-h-[120px]"
+            />
+          ) : (
+            <Button
+              type="button"
+              onClick={() => setTyping(true)}
+              className="w-full h-12 rounded-2xl font-semibold"
+            >
+              Start typing
+            </Button>
+          )}
+        </div>
+        <div className={cn('mt-4', idx > 0 && 'grid grid-cols-2 gap-3')}>
+          {idx > 0 && (
+            <Button
+              variant="outline"
+              onClick={goPrevCard}
+              className="h-12 rounded-2xl font-semibold"
+            >
+              <ArrowLeft className="w-4 h-4 mr-2" /> Back
+            </Button>
+          )}
           <Button
             onClick={finishCard}
             disabled={!own.trim()}
-            className="h-12 rounded-2xl font-semibold"
+            className="h-12 rounded-2xl font-semibold w-full"
           >
             Next
             <ArrowRight className="w-4 h-4 ml-2" />
