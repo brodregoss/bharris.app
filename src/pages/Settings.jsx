@@ -12,12 +12,14 @@ import {
   ChevronRight,
   Sparkles,
   LogOut,
+  KeyRound,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Switch } from '@/components/ui/switch';
 import { Label } from '@/components/ui/label';
 import { Progress } from '@/components/ui/progress';
 import { useAuth } from '@/lib/AuthContext';
+import ChangePasswordSheet from '@/components/account/ChangePasswordSheet';
 import { getUsage } from '@/lib/accountStore';
 import { usePaywall } from '@/lib/PaywallContext';
 import { planLabel } from '@/lib/plans';
@@ -133,11 +135,12 @@ function UsageBlock({ heading, person, onUpgrade }) {
 
 export default function Settings() {
   const navigate = useNavigate();
-  const { user, logout } = useAuth();
+  const { user, firebaseUser, logout } = useAuth();
   const { openPaywall } = usePaywall();
   const { theme, setTheme, resolvedTheme } = useTheme();
   const [ready, setReady] = React.useState(false);
   const [doc, setDoc] = React.useState(null);
+  const [changePasswordOpen, setChangePasswordOpen] = React.useState(false);
   const [usage, setUsage] = React.useState(null);
 
   React.useEffect(() => {
@@ -171,7 +174,7 @@ export default function Settings() {
       </header>
       <div className="flex-1 overflow-y-auto px-5 pb-24 flex flex-col">
         <div className="max-w-md mx-auto w-full flex-1 flex flex-col gap-4">
-          <section className="rounded-2xl border border-border bg-card overflow-hidden">
+          <section className="rounded-2xl border border-border bg-card overflow-hidden divide-y divide-border">
             <div className="flex items-center gap-3 p-5">
               <div className="w-11 h-11 rounded-full bg-muted flex items-center justify-center shrink-0">
                 <User className="w-5 h-5 text-muted-foreground" />
@@ -185,6 +188,11 @@ export default function Settings() {
                 </p>
               </div>
             </div>
+            <Row
+              icon={KeyRound}
+              label="Change password"
+              onClick={() => setChangePasswordOpen(true)}
+            />
           </section>
 
           <section className="rounded-2xl border border-border bg-card overflow-hidden divide-y divide-border">
@@ -247,6 +255,12 @@ export default function Settings() {
           </p>
         </div>
       </div>
+
+      <ChangePasswordSheet
+        open={changePasswordOpen}
+        onOpenChange={setChangePasswordOpen}
+        firebaseUser={firebaseUser}
+      />
 
       <Sheet open={!!doc} onOpenChange={(on) => { if (!on) setDoc(null); }}>
         <SheetContent side="bottom" className="rounded-t-3xl max-h-[85dvh] overflow-y-auto">

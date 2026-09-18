@@ -19,9 +19,21 @@
             if (meta) meta.setAttribute('content', '#1e1c1a');
           }
         } catch (e) {}
+        try {
+          var params = new URLSearchParams(window.location.search);
+          var mode = params.get('mode');
+          var code = params.get('oobCode');
+          if (mode === 'resetPassword' && code && window.location.hash.indexOf('/account/reset') === -1) {
+            window.location.replace(
+              window.location.pathname
+              + '#/account/reset?mode=' + encodeURIComponent(mode)
+              + '&oobCode=' + encodeURIComponent(code)
+            );
+          }
+        } catch (e) {}
       })();
     </script>
-    <script type="module" crossorigin src="./assets/index-lR8cZi-F.js"></script>
+    <script type="module" crossorigin src="./assets/index-C4OGal2x.js"></script>
     <link rel="stylesheet" crossorigin href="./assets/index-DDlmFMrI.css">
   </head>
   <body>

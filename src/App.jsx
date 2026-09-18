@@ -23,6 +23,7 @@ import Account from './pages/Account';
 import AccountCreate from './pages/AccountCreate';
 import AccountSignIn from './pages/AccountSignIn';
 import ForgotPassword from './pages/ForgotPassword';
+import AccountResetPassword from './pages/AccountResetPassword';
 import RequireAccount from '@/components/RequireAccount';
 import { PaywallProvider } from '@/lib/PaywallContext';
 import { DebugProvider } from '@/lib/DebugContext';
@@ -44,6 +45,7 @@ function App() {
                 <Route path="/account/signin" element={<AccountSignIn />} />
                 <Route path="/account/create" element={<AccountCreate />} />
                 <Route path="/account/forgot" element={<ForgotPassword />} />
+                <Route path="/account/reset" element={<AccountResetPassword />} />
                 <Route element={<RequireAccount />}>
                   <Route path="/" element={<Landing />} />
                   <Route path="/welcome" element={<Welcome />} />

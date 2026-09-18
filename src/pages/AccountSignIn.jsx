@@ -82,7 +82,16 @@ export default function AccountSignIn() {
           </div>
         </div>
         <div className="space-y-2">
-          <Label htmlFor="password">Password</Label>
+          <div className="flex items-center justify-between gap-3">
+            <Label htmlFor="password">Password</Label>
+            <Link
+              to="/account/forgot"
+              state={{ email }}
+              className="text-xs font-medium text-foreground underline underline-offset-4"
+            >
+              Forgot password?
+            </Link>
+          </div>
           <div className="relative">
             <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" aria-hidden="true" />
             <Input
@@ -108,11 +117,6 @@ export default function AccountSignIn() {
           )}
         </Button>
       </form>
-      <p className="text-center text-sm text-muted-foreground mt-4">
-        <Link to="/account/forgot" className="text-foreground font-medium underline underline-offset-4">
-          Forgot password?
-        </Link>
-      </p>
       <p className="text-center text-sm text-muted-foreground mt-6">
         New here?{' '}
         <Link to="/account/create" className="text-foreground font-medium underline underline-offset-4">

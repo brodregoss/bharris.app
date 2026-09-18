@@ -2,17 +2,22 @@ import { initializeApp, getApps } from 'firebase/app';
 import {
   browserLocalPersistence,
   createUserWithEmailAndPassword,
+  EmailAuthProvider,
   getAuth,
   GoogleAuthProvider,
   indexedDBLocalPersistence,
   initializeAuth,
   onAuthStateChanged,
+  reauthenticateWithCredential,
   sendPasswordResetEmail,
+  confirmPasswordReset,
+  verifyPasswordResetCode,
   setPersistence,
   signInWithCredential,
   signInWithEmailAndPassword,
   signInWithPopup,
   signOut,
+  updatePassword,
 } from 'firebase/auth';
 import { Capacitor } from '@capacitor/core';
 import { APP_CONFIG, firebaseConfigured } from '@/lib/appConfig';
@@ -96,9 +101,67 @@ export async function firebaseSignOut() {
   }
 }
 
+export function passwordResetContinueUrl() {
+  if (typeof window !== 'undefined') {
+    const origin = window.location.origin;
+    if (/^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/i.test(origin)) {
+      return `${origin}/`;
+    }
+  }
+  return 'https://enthusiastic-cram-genius-flow.base44.app/';
+}
+
 export async function firebaseResetPassword(email) {
   const auth = await getFirebaseAuth();
-  await sendPasswordResetEmail(auth, email.trim());
+  const trimmed = email.trim();
+  try {
+    await sendPasswordResetEmail(auth, trimmed, {
+      url: passwordResetContinueUrl(),
+      handleCodeInApp: false,
+    });
+  } catch (err) {
+    if (err?.code === 'auth/user-not-found') {
+      throw new Error('No account exists with that email.');
+    }
+    if (err?.code === 'auth/unauthorized-continue-uri' || err?.code === 'auth/invalid-continue-uri') {
+      await sendPasswordResetEmail(auth, trimmed);
+      return;
+    }
+    throw err;
+  }
+}
+
+export async function firebaseVerifyResetCode(oobCode) {
+  const auth = await getFirebaseAuth();
+  return verifyPasswordResetCode(auth, oobCode);
+}
+
+export async function firebaseConfirmResetPassword(oobCode, newPassword) {
+  const auth = await getFirebaseAuth();
+  await confirmPasswordReset(auth, oobCode, newPassword);
+}
+
+export function firebaseHasPasswordProvider(user) {
+  return Array.isArray(user?.providerData)
+    && user.providerData.some((provider) => provider.providerId === 'password');
+}
+
+export async function firebaseChangePassword(currentPassword, newPassword) {
+  const auth = await getFirebaseAuth();
+  const user = auth.currentUser;
+  if (!user?.email) {
+    throw new Error('Sign in with email to change your password.');
+  }
+  try {
+    const credential = EmailAuthProvider.credential(user.email, currentPassword);
+    await reauthenticateWithCredential(user, credential);
+    await updatePassword(user, newPassword);
+  } catch (err) {
+    if (err?.code === 'auth/wrong-password' || err?.code === 'auth/invalid-credential') {
+      throw new Error('Current password is wrong.');
+    }
+    throw err;
+  }
 }
 
 export async function getIdToken(forceRefresh = false) {
@@ -119,8 +182,12 @@ export function firebaseErrorMessage(err) {
   if (code === 'auth/email-already-in-use') return 'That email already has an account.';
   if (code === 'auth/invalid-email') return 'Enter a valid email.';
   if (code === 'auth/weak-password') return 'Use at least 6 characters.';
+  if (code === 'auth/requires-recent-login') return 'Enter your current password again.';
   if (code === 'auth/user-not-found' || code === 'auth/wrong-password' || code === 'auth/invalid-credential') {
     return 'Email or password is wrong.';
+  }
+  if (code === 'auth/expired-action-code' || code === 'auth/invalid-action-code') {
+    return 'This reset link expired or was already used. Request a new one.';
   }
   if (code === 'auth/too-many-requests') return 'Too many tries. Wait a minute and try again.';
   if (code === 'auth/network-request-failed') return 'Network error. Check your connection.';
