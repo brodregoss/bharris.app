@@ -1,10 +1,11 @@
 import React from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
-import { tierFromDifficulty, confidenceFromTriage, normalizeExamType, inferRankMode, RANK_MODE } from '@/lib/studyUtils';
+import { tierFromDifficulty, confidenceFromTriage, normalizeExamType, inferRankMode, RANK_MODE, normalizeStudyMode, continueStudyPath, STUDY_MODE } from '@/lib/studyUtils';
 import { Moon, Loader2, Check } from 'lucide-react';
 import { invokeLlm } from '@/api/invokeLlm';
 import { Button } from '@/components/ui/button';
 import TriageCard from '@/components/triage/TriageCard';
+import { emptySrs } from '@/lib/spacedCram';
 import { beginSession } from '@/lib/sessionStore';
 
 const TIERS = [
@@ -191,6 +192,7 @@ function Triage() {
 
   const lockIn = () => {
     if (!ranked.length) return;
+    const studyMode = normalizeStudyMode(setup?.studyMode);
     const studyTerms = ranked.map((t) => ({
       id: t.id,
       term: t.term,
@@ -203,6 +205,7 @@ function Triage() {
       correctStreak: 0,
       seen: false,
       testResult: null,
+      ...(studyMode === STUDY_MODE.SPACED_CRAM ? { srs: emptySrs() } : {}),
     }));
     const rankMode = inferRankMode(studyTerms, {
       title: source?.title || source?.name || setup?.title,
@@ -211,14 +214,21 @@ function Triage() {
     });
     const nextSetup = {
       ...setup,
+      studyMode,
       title: source?.title || source?.name || setup?.title,
       sourceId: source?.id || setup?.sourceId,
       rankMode,
     };
+    const phase =
+      studyMode === STUDY_MODE.TRUE_CRAM
+        ? 'true_cram'
+        : studyMode === STUDY_MODE.SPACED_CRAM
+          ? 'spaced_plan'
+          : 'notes_offer';
     const saved = beginSession({
       setup: nextSetup,
       terms: studyTerms,
-      phase: 'notes_offer',
+      phase,
       blockStats: {},
       stillShaky: [],
       behind: false,
@@ -228,8 +238,9 @@ function Triage() {
       savedAt: Date.now(),
       noteId: source?.noteId || null,
       title: source?.title || setup?.title || 'Cram',
+      flaggedTermIds: [],
     });
-    navigate('/study', { state: { terms: studyTerms, setup: nextSetup, sessionId: saved?.id } });
+    navigate(continueStudyPath(nextSetup), { state: { terms: studyTerms, setup: nextSetup, sessionId: saved?.id } });
   };
 
   React.useEffect(() => {

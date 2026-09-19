@@ -1,30 +1,15 @@
 import React from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
-import { ArrowLeft, BookOpen, ClipboardList, GraduationCap, Lock, PenLine } from 'lucide-react';
+import { ArrowLeft, BookOpen, ChevronDown, ClipboardList, GraduationCap, PenLine } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import {
-  Sheet,
-  SheetContent,
-  SheetHeader,
-  SheetTitle,
-  SheetDescription,
-} from '@/components/ui/sheet';
 import PracticeTest from '@/components/study/PracticeTest';
 import PracticeFlashcards from '@/components/practice/PracticeFlashcards';
 import SmartDefMode from '@/components/practice/SmartDefMode';
 import ExplainIt from '@/components/practice/ExplainIt';
-import UnderstandingPyramid from '@/components/practice/UnderstandingPyramid';
 import { loadPracticeSource, savePracticeTerms } from '@/lib/sessionStore';
-import {
-  withInferredMastery,
-  userSetMastery,
-  bumpFromPractice,
-  MASTERY,
-  MASTERY_LEVELS,
-  clampMastery,
-} from '@/lib/mastery';
+import { withInferredMastery, bumpFromPractice, MASTERY, clampMastery } from '@/lib/mastery';
 import { cn } from '@/lib/utils';
-import { sessionRankMode } from '@/lib/studyUtils';
+import { sessionRankMode, flashcardDef, trueCramPracticeState } from '@/lib/studyUtils';
 
 const MODES = [
   {
@@ -65,8 +50,26 @@ export default function Practice() {
     sourceRef.current = src;
     return withInferredMastery(src?.session?.terms || []);
   });
+  const flaggedOnly = !!location.state?.flaggedOnly;
+  const flaggedTermIds = location.state?.flaggedTermIds
+    || sourceRef.current?.session?.flaggedTermIds
+    || sourceRef.current?.session?.trueCram?.flaggedTermIds;
+  const coveredIds = location.state?.coveredIds
+    || sourceRef.current?.session?.coveredIds
+    || sourceRef.current?.session?.trueCram?.coveredIds;
+  const isTrueCramSession =
+    flaggedOnly || !!trueCramPracticeState(sourceRef.current?.session);
   const [mode, setMode] = React.useState('hub');
-  const [adjusting, setAdjusting] = React.useState(null);
+  const [openTermId, setOpenTermId] = React.useState(null);
+  const [practiceAll, setPracticeAll] = React.useState(() => {
+    const flags =
+      location.state?.flaggedTermIds
+      || sourceRef.current?.session?.flaggedTermIds
+      || sourceRef.current?.session?.trueCram?.flaggedTermIds;
+    if (Array.isArray(flags) && flags.length) return false;
+    const list = withInferredMastery(sourceRef.current?.session?.terms || []);
+    return !list.some((t) => clampMastery(t.mastery) < MASTERY.SOLID);
+  });
 
   const commit = React.useCallback((updater) => {
     setTerms((prev) => {
@@ -85,9 +88,25 @@ export default function Practice() {
     [commit]
   );
 
-  const mastered = terms.filter((t) => clampMastery(t.mastery) >= MASTERY.MASTERED);
-  const workOn = terms.filter((t) => clampMastery(t.mastery) > MASTERY.NONE && clampMastery(t.mastery) < MASTERY.MASTERED);
-  const unstarted = terms.filter((t) => clampMastery(t.mastery) <= MASTERY.NONE);
+  const flagSet = React.useMemo(
+    () => new Set(Array.isArray(flaggedTermIds) ? flaggedTermIds : []),
+    [flaggedTermIds]
+  );
+  const coveredSet = React.useMemo(
+    () => new Set(Array.isArray(coveredIds) ? coveredIds : []),
+    [coveredIds]
+  );
+  const workTerms = isTrueCramSession
+    ? terms.filter((t) => flagSet.has(t.id))
+    : terms.filter((t) => clampMastery(t.mastery) < MASTERY.SOLID);
+  const knownTerms = isTrueCramSession
+    ? terms.filter((t) => {
+        if (flagSet.has(t.id)) return false;
+        if (coveredSet.size) return coveredSet.has(t.id);
+        return true;
+      })
+    : terms.filter((t) => clampMastery(t.mastery) >= MASTERY.SOLID);
+  const drillTerms = practiceAll || workTerms.length === 0 ? terms : workTerms;
 
   const rankMode = sessionRankMode(sourceRef.current?.session?.setup, terms, {
     title: sourceRef.current?.session?.title,
@@ -132,7 +151,7 @@ export default function Practice() {
     return (
       <div className="min-h-[100dvh] bg-background text-foreground flex flex-col">
         {header}
-        <PracticeFlashcards terms={terms} onUpdateTerm={updateTerm} onDone={() => setMode('hub')} />
+        <PracticeFlashcards terms={drillTerms} onUpdateTerm={updateTerm} onDone={() => setMode('hub')} />
       </div>
     );
   }
@@ -141,7 +160,7 @@ export default function Practice() {
     return (
       <div className="min-h-[100dvh] bg-background text-foreground flex flex-col">
         {header}
-        <SmartDefMode terms={terms} rankMode={rankMode} onUpdateTerm={updateTerm} onDone={() => setMode('hub')} />
+        <SmartDefMode terms={drillTerms} rankMode={rankMode} onUpdateTerm={updateTerm} onDone={() => setMode('hub')} />
       </div>
     );
   }
@@ -151,11 +170,11 @@ export default function Practice() {
       <div className="min-h-[100dvh] bg-background text-foreground flex flex-col">
         {header}
         <PracticeTest
-          terms={terms}
+          terms={drillTerms}
           rankMode={rankMode}
           examType={sourceRef.current?.session?.setup?.examType || 'mixed'}
           budgetMs={12 * 60 * 1000}
-          priorMissed={workOn.concat(unstarted).map((t) => t.id)}
+          priorMissed={workTerms.map((t) => t.id)}
           onDone={({ missedIds, questionIds }) => {
             const miss = new Set(missedIds);
             commit((prev) =>
@@ -175,15 +194,14 @@ export default function Practice() {
     return (
       <div className="min-h-[100dvh] bg-background text-foreground flex flex-col">
         {header}
-        <ExplainIt terms={terms} onUpdateTerm={updateTerm} onDone={() => setMode('hub')} />
+        <ExplainIt terms={drillTerms} onUpdateTerm={updateTerm} onDone={() => setMode('hub')} />
       </div>
     );
   }
 
   const groups = [
-    { key: 'work', title: 'Work on these', items: workOn },
-    { key: 'fresh', title: 'Not practiced yet', items: unstarted },
-    { key: 'mastered', title: 'Mastered', items: mastered },
+    { key: 'work', title: 'Work on these', items: workTerms },
+    { key: 'known', title: 'Known terms', items: knownTerms },
   ].filter((g) => g.items.length);
 
   return (
@@ -192,9 +210,41 @@ export default function Practice() {
       <main className="flex-1 px-5 pb-safe overflow-y-auto">
         <div className="max-w-md mx-auto w-full">
           <h2 className="text-2xl font-bold tracking-tight mt-2">How do you want to practice?</h2>
-          <p className="text-sm text-muted-foreground mt-1 mb-4">
-            {mastered.length} mastered · {workOn.length + unstarted.length} still to lock in
-          </p>
+          <div className="flex items-center gap-2.5 mt-2 mb-4 flex-wrap">
+            <p className="text-sm text-muted-foreground">
+              {workTerms.length} to work on · {knownTerms.length} known
+            </p>
+            <div
+              className="flex rounded-full border border-border bg-muted/70 p-0.5"
+              role="group"
+              aria-label="Practice set"
+            >
+              <button
+                type="button"
+                onClick={() => setPracticeAll(true)}
+                aria-pressed={practiceAll}
+                className={cn(
+                  'px-2.5 py-1 rounded-full text-[11px] font-semibold transition',
+                  practiceAll ? 'bg-primary text-primary-foreground shadow-sm' : 'text-muted-foreground'
+                )}
+              >
+                All terms
+              </button>
+              <button
+                type="button"
+                onClick={() => setPracticeAll(false)}
+                disabled={!workTerms.length}
+                aria-pressed={!practiceAll}
+                className={cn(
+                  'px-2.5 py-1 rounded-full text-[11px] font-semibold transition disabled:opacity-40',
+                  !practiceAll ? 'bg-primary text-primary-foreground shadow-sm' : 'text-muted-foreground'
+                )}
+              >
+                To work on
+              </button>
+            </div>
+            <p className="text-[11px] text-muted-foreground">Practice content slider</p>
+          </div>
 
           <div className="space-y-2.5 mb-8">
             {MODES.map((m) => {
@@ -218,12 +268,7 @@ export default function Practice() {
             })}
           </div>
 
-          <h3 className="text-sm font-bold tracking-tight mb-1">Your terms</h3>
-          <p className="text-xs text-muted-foreground mb-3">
-            Tap a term if the level feels wrong. You can lower it or set Guess / Getting there / Solid — Mastered has to be earned in Explain it.
-          </p>
-
-          <div className="space-y-5">
+          <div className="space-y-5 mt-1">
             {groups.map((g) => (
               <div key={g.key}>
                 <p className="text-[11px] uppercase tracking-wide text-muted-foreground font-semibold mb-2">
@@ -234,18 +279,24 @@ export default function Practice() {
                     <button
                       key={t.id}
                       type="button"
-                      onClick={() => setAdjusting(t)}
-                      className="w-full text-left rounded-2xl border border-border bg-card px-3 py-2.5 flex items-center gap-3 hover:border-muted-foreground transition"
+                      onClick={() => setOpenTermId((cur) => (cur === t.id ? null : t.id))}
+                      aria-expanded={openTermId === t.id}
+                      className="w-full text-left rounded-2xl border border-border bg-card px-3 py-2.5 hover:border-muted-foreground transition"
                     >
-                      <div className="w-14 shrink-0">
-                        <UnderstandingPyramid level={t.mastery || 0} size="sm" />
-                      </div>
-                      <div className="min-w-0 flex-1">
+                      <div className="flex items-center justify-between gap-2">
                         <p className="text-sm font-semibold truncate">{t.term}</p>
-                        <p className="text-[11px] text-muted-foreground">
-                          {MASTERY_LEVELS.find((l) => l.level === clampMastery(t.mastery))?.label || 'Not practiced'}
-                        </p>
+                        <ChevronDown
+                          className={cn(
+                            'w-4 h-4 text-muted-foreground shrink-0 transition-transform',
+                            openTermId === t.id && 'rotate-180'
+                          )}
+                        />
                       </div>
+                      {openTermId === t.id && (
+                        <p className="text-sm text-muted-foreground mt-2 leading-relaxed">
+                          {flashcardDef(t) || 'No definition yet.'}
+                        </p>
+                      )}
                     </button>
                   ))}
                 </div>
@@ -254,78 +305,6 @@ export default function Practice() {
           </div>
         </div>
       </main>
-
-      <Sheet open={!!adjusting} onOpenChange={(open) => !open && setAdjusting(null)}>
-        <SheetContent side="bottom" className="rounded-t-3xl">
-          {adjusting && (
-            <>
-              <SheetHeader className="text-left">
-                <SheetTitle>{adjusting.term}</SheetTitle>
-                <SheetDescription>
-                  Change the level if it doesn’t match how you feel. Mastered can’t be tapped on — earn it by teaching the term in Explain it.
-                </SheetDescription>
-              </SheetHeader>
-              <div className="px-1 pt-4 pb-6">
-                <UnderstandingPyramid level={adjusting.mastery || 0} size="lg" showLabels className="mb-5" />
-                <div className="grid grid-cols-2 gap-2">
-                  <button
-                    type="button"
-                    onClick={() => {
-                      updateTerm(adjusting.id, { mastery: 0 });
-                      setAdjusting(null);
-                    }}
-                    className={cn(
-                      'rounded-xl border px-3 py-3 text-sm font-semibold',
-                      clampMastery(adjusting.mastery) === 0
-                        ? 'border-primary bg-primary text-primary-foreground'
-                        : 'border-border bg-card'
-                    )}
-                  >
-                    Not practiced
-                  </button>
-                  {MASTERY_LEVELS.map((l) => {
-                    const locked = l.level === MASTERY.MASTERED;
-                    const active = clampMastery(adjusting.mastery) === l.level;
-                    return (
-                      <button
-                        key={l.level}
-                        type="button"
-                        disabled={locked}
-                        onClick={() => {
-                          if (locked) return;
-                          updateTerm(adjusting.id, { mastery: userSetMastery(adjusting.mastery, l.level) });
-                          setAdjusting(null);
-                        }}
-                        className={cn(
-                          'rounded-xl border px-3 py-3 text-sm font-semibold flex items-center justify-center gap-1.5',
-                          locked && 'opacity-50 cursor-not-allowed',
-                          active && !locked ? 'border-primary bg-primary text-primary-foreground' : 'border-border bg-card',
-                          locked && active && 'border-emerald-500 bg-emerald-50 text-emerald-800 dark:border-emerald-400/40 dark:bg-emerald-400/10 dark:text-emerald-200 opacity-100'
-                        )}
-                      >
-                        {locked && <Lock className="w-3.5 h-3.5" />}
-                        {l.label}
-                      </button>
-                    );
-                  })}
-                </div>
-                {clampMastery(adjusting.mastery) >= MASTERY.MASTERED && (
-                  <button
-                    type="button"
-                    onClick={() => {
-                      updateTerm(adjusting.id, { mastery: MASTERY.SOLID });
-                      setAdjusting(null);
-                    }}
-                    className="mt-3 w-full text-xs text-muted-foreground underline-offset-4 hover:underline"
-                  >
-                    This doesn’t feel mastered — drop to Solid
-                  </button>
-                )}
-              </div>
-            </>
-          )}
-        </SheetContent>
-      </Sheet>
     </div>
   );
 }

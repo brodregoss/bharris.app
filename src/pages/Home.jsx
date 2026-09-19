@@ -13,7 +13,6 @@ import {
 import { cn } from '@/lib/utils';
 import { termCount, setupReturnPath } from '@/lib/notesSource';
 import { markOnboarded } from '@/lib/onboarding';
-import { recallTermCap } from '@/lib/studyUtils';
 
 const STEPPER = ({ value, onChange, min = 0, step = 1, suffix }) => {
   const clamp = (v) => Math.max(min, v);
@@ -70,9 +69,10 @@ export default function Home() {
   const navigate = useNavigate();
   const location = useLocation();
   const source = location.state?.source;
-  const [hours, setHours] = React.useState(location.state?.setup?.hours ?? 5);
-  const [examType, setExamType] = React.useState(location.state?.setup?.examType || '');
-  const [examTiming, setExamTiming] = React.useState(location.state?.setup?.examTiming || '');
+  const incomingSetup = location.state?.setup;
+  const [hours, setHours] = React.useState(incomingSetup?.hours ?? 5);
+  const [examType, setExamType] = React.useState(incomingSetup?.examType || '');
+  const [examTiming, setExamTiming] = React.useState(incomingSetup?.examTiming || '');
 
   if (!source) {
     return <Navigate to="/welcome" replace />;
@@ -81,24 +81,23 @@ export default function Home() {
   const count = termCount(source);
   const canStart = hours > 0 && examType && examTiming && count > 0;
   const perTerm = count && hours ? ((hours * 60) / count).toFixed(1) : null;
-  const drillCap = recallTermCap(hours);
-  const hoursHint = count > drillCap
-    ? `We'll drill about ${drillCap} terms and skim the rest`
-    : perTerm
-      ? `≈ ${perTerm} min per term`
-      : 'Time until the exam';
+  const hoursHint = perTerm
+    ? `≈ ${perTerm} min per term`
+    : 'Time you can study before the exam';
   const notesLabel = source.title || source.name || 'Your notes';
+
+  const setupState = { ...incomingSetup, hours, examType, examTiming };
 
   const goBack = () => {
     navigate(setupReturnPath(source), {
-      state: { source, setup: { hours, examType, examTiming } },
+      state: { source, setup: setupState },
     });
   };
 
   const lookOver = () => {
     if (source.items?.length) {
       navigate('/review-notes', {
-        state: { source, setup: { hours, examType, examTiming } },
+        state: { source, setup: setupState },
       });
       return;
     }
@@ -207,10 +206,16 @@ export default function Home() {
             disabled={!canStart}
             onClick={() => {
               markOnboarded();
-              navigate('/triage', {
+              navigate('/study-mode', {
                 state: {
                   source,
-                  setup: { terms: count || source.terms || 12, hours, examType, examTiming },
+                  setup: {
+                    ...incomingSetup,
+                    terms: count || source.terms || 12,
+                    hours,
+                    examType,
+                    examTiming,
+                  },
                 },
               });
             }}
@@ -221,7 +226,7 @@ export default function Home() {
                 : 'bg-muted text-muted-foreground'
             )}
           >
-            Start cram
+            Continue
             <ArrowRight className="w-5 h-5 ml-2" />
           </Button>
         </div>

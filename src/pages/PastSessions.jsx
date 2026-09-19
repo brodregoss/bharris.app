@@ -19,7 +19,8 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
-import { listRemoteSessions, loadPracticeSource, loadFinishedSession, loadRemoteSession, deleteRemoteSession, clearFinishedSession } from '@/lib/sessionStore';
+import { listRemoteSessions, loadPracticeSource, loadFinishedSession, loadRemoteSession, deleteRemoteSession, clearFinishedSession, loadSession, loadLatestCram } from '@/lib/sessionStore';
+import { continueStudyPath, trueCramPracticeState } from '@/lib/studyUtils';
 import { listNotes, parseNoteTerms, deleteNote } from '@/lib/notesUpload';
 import { useAuth } from '@/lib/AuthContext';
 import { sessionLimitForUser } from '@/lib/plans';
@@ -185,7 +186,7 @@ export default function PastSessions() {
 
   const openSession = (session) => {
     if (session.current && session.currentKind !== 'finished') {
-      navigate('/study');
+      navigate(continueStudyPath(loadSession()?.setup || session.setup));
       return;
     }
     setChoiceError('');
@@ -199,7 +200,8 @@ export default function PastSessions() {
     setChoiceError('');
     try {
       if (action === 'practice' && choice.current && choice.currentKind === 'finished') {
-        navigate('/practice');
+        const cram = trueCramPracticeState(loadLatestCram());
+        navigate('/practice', cram ? { state: cram } : undefined);
         return;
       }
       const full = await resolveFullSession(choice);
@@ -208,7 +210,10 @@ export default function PastSessions() {
         return;
       }
       if (action === 'practice') {
-        navigate('/practice', { state: { session: full, kind: 'history' } });
+        const cram = trueCramPracticeState(full);
+        navigate('/practice', {
+          state: { session: full, kind: 'history', ...(cram || {}) },
+        });
         return;
       }
       navigate('/setup', {

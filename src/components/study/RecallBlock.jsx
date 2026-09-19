@@ -50,7 +50,7 @@ function cardStyle(examType, i) {
 export default function RecallBlock({
   terms,
   retireThreshold,
-  blockBudgetMs,
+  blockBudgetMs = 0,
   singlePass = false,
   blockLabel,
   examType = 'mixed',
@@ -60,6 +60,7 @@ export default function RecallBlock({
   onOpenCheat,
 }) {
   const { logEvent } = useDebug() || {};
+  const timed = Number(blockBudgetMs) > 0;
   const byId = React.useMemo(() => Object.fromEntries(terms.map((t) => [t.id, t])), [terms]);
   const idsKey = terms.map((t) => t.id).filter((id) => id != null && id !== '').join('|');
 
@@ -120,6 +121,7 @@ export default function RecallBlock({
 
   // Block countdown — ends block on time budget exhausted.
   React.useEffect(() => {
+    if (!timed) return undefined;
     const start = Date.now();
     const iv = setInterval(() => {
       const left = blockBudgetMs - (Date.now() - start);
@@ -130,7 +132,7 @@ export default function RecallBlock({
       }
     }, 250);
     return () => clearInterval(iv);
-  }, [blockBudgetMs, finish]);
+  }, [timed, blockBudgetMs, finish]);
 
   // Finish as soon as the queue is empty so we never sit on "Wrapping up…"
   React.useLayoutEffect(() => {
@@ -352,7 +354,7 @@ export default function RecallBlock({
       <div className="flex items-center justify-between mb-3 text-xs text-muted-foreground">
         <span>{reviewing ? 'Practice your wording' : blockLabel}</span>
         <span>
-          {fmtTime(timeLeftMs)} left · round {st.round}
+          {timed ? `${fmtTime(timeLeftMs)} left · ` : ''}round {st.round}
         </span>
       </div>
       <div className="flex-1 flex flex-col items-center justify-center">

@@ -202,6 +202,79 @@ export function recallTermCap(hours) {
   return Math.max(8, Math.min(80, Math.floor(recallMinutes / 3)));
 }
 
+export const STUDY_MODE = {
+  ASSISTED: 'assisted',
+  TRUE_CRAM: 'true_cram',
+  SPACED_CRAM: 'spaced_cram',
+};
+
+export const STUDY_MODE_META = {
+  assisted: {
+    id: 'assisted',
+    title: 'Independent Assisted',
+    description:
+      'You study with the app’s help, at your own pace. Cram the important terms, then flashcards. Fine for today.',
+  },
+  true_cram: {
+    id: 'true_cram',
+    title: 'True Cram',
+    description: 'Go over every term with a partner. Rotate to landscape. Built for large sets.',
+  },
+  spaced_cram: {
+    id: 'spaced_cram',
+    title: 'Spaced Cram',
+    description:
+      'Spaced repetition over the time you have. You keep seeing old terms on a schedule, plus some new ones. Great for holding onto what you learn.',
+  },
+};
+
+export function normalizeStudyMode(mode) {
+  if (mode === STUDY_MODE.TRUE_CRAM || mode === STUDY_MODE.SPACED_CRAM) return mode;
+  return STUDY_MODE.ASSISTED;
+}
+
+export function continueStudyPath(setup) {
+  const mode = normalizeStudyMode(setup?.studyMode);
+  if (mode === STUDY_MODE.TRUE_CRAM) return '/true-cram';
+  if (mode === STUDY_MODE.SPACED_CRAM) return '/spaced-cram';
+  return '/study';
+}
+
+export function trueCramPracticeState(session) {
+  if (!session) return null;
+  const fromTrueCram =
+    normalizeStudyMode(session.setup?.studyMode) === STUDY_MODE.TRUE_CRAM || !!session.trueCram;
+  if (!fromTrueCram) return null;
+  return {
+    flaggedTermIds: session.flaggedTermIds || session.trueCram?.flaggedTermIds || [],
+    coveredIds: session.coveredIds || session.trueCram?.coveredIds || [],
+  };
+}
+
+export function minutesPerTerm(hours, termCount) {
+  const h = Number(hours);
+  const n = Number(termCount);
+  if (!Number.isFinite(h) || h <= 0 || !Number.isFinite(n) || n <= 0) return null;
+  return (h * 60) / n;
+}
+
+export function formatMinutesPerTerm(hours, termCount) {
+  const m = minutesPerTerm(hours, termCount);
+  if (m == null) return null;
+  if (m >= 10) return `${Math.round(m)} min`;
+  return `${m.toFixed(1)} min`;
+}
+
+export function suggestStudyMode(options = {}) {
+  const hours = options.hours;
+  const termCount = options.termCount;
+  const examTiming = options.examTiming;
+  if (examTiming === 'tomorrow' || examTiming === '2days') return STUDY_MODE.SPACED_CRAM;
+  const minutes = minutesPerTerm(hours, termCount);
+  if (minutes != null && minutes >= 2) return STUDY_MODE.TRUE_CRAM;
+  return STUDY_MODE.ASSISTED;
+}
+
 export function planRecallQueues(terms, hours) {
   const list = Array.isArray(terms) ? terms : [];
   const byPri = (a, b) => priority(b) - priority(a);

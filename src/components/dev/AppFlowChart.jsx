@@ -56,11 +56,15 @@ export default function AppFlowChart() {
         <Bar />
         <Node title="Review notes (photo upload)" sub="AI finds every term on the page, writes defs, then you edit or regenerate" />
         <Bar />
-        <Node title="Time & test type" sub="Hours · exam type · exam timing · term count · back to notes. Large sets: drill what the clock can cover, skim the rest." />
+        <Node title="Time & test type" sub="Hours · exam type · exam timing · term count · back to notes." />
+        <Bar />
+        <Node title="Choose a study mode" sub="Independent Assisted · True Cram · Spaced Cram. Suggested from minutes per term." />
         <Bar />
         <Node title="Triage (even random columns; AI ranks user terms only)" sub="Sample sets keep built-in difficulty. User notes get a difficulty rank. You drag Blank / Shaky / Know it. Big decks still triage all terms." />
         <Bar />
-        <Node title="Skim notes? (optional)" sub="All terms + defs before flashcards, or skip straight in" />
+        <Branch tag="Spaced" tone={TIMING}>Session plan → each sitting is flashcards, write-own-def on 3-miss terms, then drill those again</Branch>
+        <Branch tag="True" tone={TIMING}>Partner cockpit, every term</Branch>
+        <Branch tag="Assisted">Skim notes? then recall blocks</Branch>
       </Group>
 
       <Group label="2 · Triage tiers (by exam type)">

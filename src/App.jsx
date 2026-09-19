@@ -15,6 +15,9 @@ import ReviewNotes from './pages/ReviewNotes';
 import UploadNotes from './pages/UploadNotes';
 import Triage from './pages/Triage';
 import StudyFlow from './pages/StudyFlow';
+import StudyMode from './pages/StudyMode';
+import TrueCram from './pages/TrueCram';
+import SpacedCram from './pages/SpacedCram';
 import PanicReview from './pages/PanicReview';
 import PastSessions from './pages/PastSessions';
 import Settings from './pages/Settings';
@@ -50,6 +53,7 @@ function App() {
                   <Route path="/" element={<Landing />} />
                   <Route path="/welcome" element={<Welcome />} />
                   <Route path="/setup" element={<Home />} />
+                  <Route path="/study-mode" element={<StudyMode />} />
                   <Route path="/create-notes" element={<CreateNotes />} />
                   <Route path="/review-notes" element={<ReviewNotes />} />
                   <Route path="/history" element={<PastSessions />} />
@@ -59,6 +63,8 @@ function App() {
                   <Route path="/upload-notes" element={<UploadNotes />} />
                   <Route path="/triage" element={<Triage />} />
                   <Route path="/study" element={<StudyFlow />} />
+                  <Route path="/true-cram" element={<TrueCram />} />
+                  <Route path="/spaced-cram" element={<SpacedCram />} />
                   <Route path="/panic" element={<PanicReview />} />
                   <Route path="*" element={<PageNotFound />} />
                 </Route>

@@ -231,12 +231,17 @@ export default function PanicReview() {
           )}
 
           {hasSummary && !generating && (
-            <article
-              className="rounded-2xl border border-border bg-card p-6 shadow-sm"
-              style={{ fontSize: `${textPx}px` }}
-            >
-              <ReactMarkdown components={MD_COMPONENTS}>{summary.text}</ReactMarkdown>
-            </article>
+            <>
+              <article
+                className="rounded-2xl border border-border bg-card p-6 shadow-sm"
+                style={{ fontSize: `${textPx}px` }}
+              >
+                <ReactMarkdown components={MD_COMPONENTS}>{summary.text}</ReactMarkdown>
+              </article>
+              <p className="text-[11px] text-muted-foreground text-center mt-5 leading-relaxed px-3">
+                These notes are generated with AI. Fact-check important information.
+              </p>
+            </>
           )}
 
           {error && !generating && (

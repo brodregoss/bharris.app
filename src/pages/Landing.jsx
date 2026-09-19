@@ -4,6 +4,8 @@ import { Timer, History, Settings, ArrowRight, RotateCcw } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { loadSession, loadFinishedSession, loadLatestCram } from '@/lib/sessionStore';
 import { isOnboarded } from '@/lib/onboarding';
+import { continueStudyPath, normalizeStudyMode, STUDY_MODE, trueCramPracticeState } from '@/lib/studyUtils';
+import { countDueReviews } from '@/lib/spacedCram';
 
 // Persistent home base. The only job here is getting the user into a session
 // in one tap, with zero decisions to weigh. Everything informational lives one
@@ -20,9 +22,13 @@ export default function Landing() {
   // Read fresh on every render so the first-time redirect and the Continue
   // button never go stale if storage changes while the screen is mounted.
   const hasSession = typeof window !== 'undefined' ? !!loadSession() : false;
+  const activeSession = typeof window !== 'undefined' ? loadSession() : null;
   const onboarded = typeof window !== 'undefined' ? isOnboarded() : false;
   const finishedSession = typeof window !== 'undefined' ? loadFinishedSession() : null;
   const latestCram = typeof window !== 'undefined' ? loadLatestCram() : null;
+  const activeMode = normalizeStudyMode(activeSession?.setup?.studyMode);
+  const dueReviews =
+    activeMode === STUDY_MODE.SPACED_CRAM ? countDueReviews(activeSession?.terms || []) : 0;
 
   const restartCram = () => {
     if (!finishedSession) return;
@@ -32,12 +38,17 @@ export default function Landing() {
       correctStreak: 0,
       seen: false,
       testResult: null,
+      srs: t.srs ? { introduced: false, dueAt: 0, intervalMs: 0, reps: 0, lastGrade: null } : undefined,
     }));
-    navigate('/study', { state: { terms: resetTerms, setup: finishedSession.setup } });
+    navigate(continueStudyPath(finishedSession.setup), {
+      state: { terms: resetTerms, setup: finishedSession.setup },
+    });
   };
 
   const practice = () => {
-    navigate('/practice');
+    const session = loadLatestCram();
+    const cram = trueCramPracticeState(session);
+    navigate('/practice', cram ? { state: cram } : undefined);
   };
 
   // First time ever entering the app → welcome / notes-first setup.
@@ -92,10 +103,11 @@ export default function Landing() {
           {hasSession ? (
             <>
               <Button
-                onClick={() => navigate('/study')}
+                onClick={() => navigate(continueStudyPath(activeSession?.setup))}
                 className="h-16 rounded-2xl text-lg font-bold shadow-lg"
               >
-                <RotateCcw className="w-5 h-5 mr-2" /> Continue session
+                <RotateCcw className="w-5 h-5 mr-2" />
+                {dueReviews > 0 ? `Reviews due · ${dueReviews}` : 'Continue session'}
               </Button>
               <Button
                 variant="outline"

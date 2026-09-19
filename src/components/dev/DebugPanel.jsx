@@ -23,6 +23,7 @@ function fmtTs(ts) {
 }
 
 const SESSION_ROWS = [
+  { key: 'studyMode', label: 'Study mode' },
   { key: 'currentStep', label: 'Current step' },
   { key: 'examType', label: 'Exam type' },
   { key: 'examTiming', label: 'Exam timing' },

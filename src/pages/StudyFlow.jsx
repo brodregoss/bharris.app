@@ -1,5 +1,5 @@
 import React from 'react';
-import { useLocation, useNavigate } from 'react-router-dom';
+import { Navigate, useLocation, useNavigate } from 'react-router-dom';
 import { Moon } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import StudyHeader from '@/components/study/StudyHeader';
@@ -25,6 +25,9 @@ import {
   sessionRankMode,
   tierLabelsFor,
   RANK_MODE,
+  normalizeStudyMode,
+  continueStudyPath,
+  STUDY_MODE,
 } from '@/lib/studyUtils';
 import { loadSession, saveSession, clearSession, saveFinishedSession } from '@/lib/sessionStore';
 import { getActiveUid } from '@/lib/userStorage';
@@ -202,6 +205,7 @@ function StudyFlow() {
       examTiming: setup?.examTiming,
       examType: setup?.examType,
       hoursAvailable: setup?.hours,
+      studyMode: setup?.studyMode || 'assisted',
       timeSpentMs: now - sessionStart,
       readinessScore: computeReadiness(terms),
       currentStep: phase,
@@ -304,6 +308,10 @@ function StudyFlow() {
         </Button>
       </div>
     );
+  }
+
+  if (normalizeStudyMode(setup?.studyMode) !== STUDY_MODE.ASSISTED) {
+    return <Navigate to={continueStudyPath(setup)} replace />;
   }
 
   const timeRemainingMs = totalMs - (now - sessionStart);
