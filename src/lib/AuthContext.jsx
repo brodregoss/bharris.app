@@ -11,6 +11,7 @@ import {
   firebaseCreateAccount,
   firebaseErrorMessage,
   firebaseSignIn,
+  firebaseSignInWithApple,
   firebaseSignInWithGoogle,
   firebaseSignOut,
   listenFirebaseUser,
@@ -19,6 +20,7 @@ import { firebaseConfigured } from '@/lib/appConfig';
 import { cancelPendingCloudSave, hydrateRemoteSession } from '@/lib/sessionStore';
 import { configurePurchases, logOutPurchases } from '@/lib/premiumAccess';
 import { closeAdminGate } from '@/lib/adminGate';
+import { formatPersonName } from '@/lib/personName';
 
 const AuthContext = createContext();
 
@@ -126,10 +128,14 @@ export const AuthProvider = ({ children }) => {
       checkUserAuth: refresh,
       retryCloud,
       checkAppState: async () => {},
-      createAccount: async (email, password) => {
+      createAccount: async (email, password, displayName) => {
         try {
-          const fbUser = await firebaseCreateAccount(email, password);
-          const cloud = await ensureCloudUser(fbUser);
+          const name = formatPersonName(displayName);
+          const fbUser = await firebaseCreateAccount(email, password, name);
+          const cloud = await ensureCloudUser({
+            email: fbUser.email,
+            displayName: fbUser.displayName || name,
+          });
           cacheUser(cloud);
           setUser(cloud);
           setAuthError(null);
@@ -165,7 +171,21 @@ export const AuthProvider = ({ children }) => {
           await hydrateRemoteSession();
           return cloud;
         } catch (err) {
-          throw new Error(firebaseErrorMessage(err));
+          throw new Error(firebaseErrorMessage(err, 'Google'));
+        }
+      },
+      signInWithApple: async () => {
+        try {
+          const fbUser = await firebaseSignInWithApple();
+          const cloud = await ensureCloudUser(fbUser);
+          cacheUser(cloud);
+          setUser(cloud);
+          setAuthError(null);
+          configurePurchases(fbUser.uid).catch(() => {});
+          await hydrateRemoteSession();
+          return cloud;
+        } catch (err) {
+          throw new Error(firebaseErrorMessage(err, 'Apple'));
         }
       },
     };

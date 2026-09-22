@@ -181,6 +181,9 @@ export default function DebugPanel() {
                   <Button size="sm" variant="outline" onClick={() => bumpClock(60 * 60 * 1000)}>
                     +1 hr
                   </Button>
+                  <Button size="sm" variant="outline" onClick={() => bumpClock(8 * 60 * 60 * 1000)}>
+                    +8 hr
+                  </Button>
                   <Button size="sm" variant="outline" onClick={() => bumpClock(-15 * 60 * 1000)}>
                     −15 min
                   </Button>
@@ -189,7 +192,7 @@ export default function DebugPanel() {
                   </Button>
                 </div>
                 <p className="text-[11px] text-slate-400 mt-1">
-                  Fast-forwards the session clock to test budget trimming &amp; sleep stop-time.
+                  Fast-forwards the session clock to skip Spaced Cram sitting waits, budget trimming, and sleep stop-time.
                 </p>
               </section>
 

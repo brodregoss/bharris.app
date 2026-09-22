@@ -26,8 +26,8 @@ export function periodKey(date = new Date()) {
 }
 
 export function quotaLimit(env, tier) {
-  const free = Number(env.FREE_AI_QUOTA) || 30;
-  const pro = Number(env.PRO_AI_QUOTA) || 500;
+  const free = Number(env.FREE_AI_QUOTA) || 5;
+  const pro = Number(env.PRO_AI_QUOTA) || 30;
   return tier === 'pro' ? pro : free;
 }
 

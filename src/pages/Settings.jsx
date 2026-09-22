@@ -21,6 +21,7 @@ import { Progress } from '@/components/ui/progress';
 import { useAuth } from '@/lib/AuthContext';
 import ChangePasswordSheet from '@/components/account/ChangePasswordSheet';
 import { getUsage } from '@/lib/accountStore';
+import { formatPersonName } from '@/lib/personName';
 import { usePaywall } from '@/lib/PaywallContext';
 import { planLabel } from '@/lib/plans';
 import {
@@ -181,7 +182,7 @@ export default function Settings() {
               </div>
               <div className="min-w-0">
                 <p className="text-sm font-bold tracking-tight truncate">
-                  {me?.displayName || me?.email || APP_NAME}
+                  {formatPersonName(me?.displayName) || me?.email || APP_NAME}
                 </p>
                 <p className="text-xs text-muted-foreground mt-0.5 truncate">
                   {me?.email || 'Notes sync to this account.'}

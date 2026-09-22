@@ -224,9 +224,13 @@ export const STUDY_MODE_META = {
     id: 'spaced_cram',
     title: 'Spaced Cram',
     description:
-      'Spaced repetition over the time you have. You keep seeing old terms on a schedule, plus some new ones. Great for holding onto what you learn.',
+      'Overnight expanding retrieval. Same terms come back at longer gaps, with extra reps on whatever is still shaky.',
   },
 };
+
+export function spacedCramAvailable(examTiming) {
+  return examTiming === 'tomorrow' || examTiming === '2days';
+}
 
 export function normalizeStudyMode(mode) {
   if (mode === STUDY_MODE.TRUE_CRAM || mode === STUDY_MODE.SPACED_CRAM) return mode;
@@ -236,7 +240,9 @@ export function normalizeStudyMode(mode) {
 export function continueStudyPath(setup) {
   const mode = normalizeStudyMode(setup?.studyMode);
   if (mode === STUDY_MODE.TRUE_CRAM) return '/true-cram';
-  if (mode === STUDY_MODE.SPACED_CRAM) return '/spaced-cram';
+  if (mode === STUDY_MODE.SPACED_CRAM) {
+    return spacedCramAvailable(setup?.examTiming) ? '/spaced-cram' : '/';
+  }
   return '/study';
 }
 

@@ -58,11 +58,13 @@ export default function AppFlowChart() {
         <Bar />
         <Node title="Time & test type" sub="Hours · exam type · exam timing · term count · back to notes." />
         <Bar />
-        <Node title="Choose a study mode" sub="Independent Assisted · True Cram · Spaced Cram. Suggested from minutes per term." />
+        <Node title="Choose a study mode" sub="Independent Assisted · True Cram · Spaced Cram (greyed out if the exam is today). Suggested from minutes per term." />
         <Bar />
         <Node title="Triage (even random columns; AI ranks user terms only)" sub="Sample sets keep built-in difficulty. User notes get a difficulty rank. You drag Blank / Shaky / Know it. Big decks still triage all terms." />
         <Bar />
-        <Branch tag="Spaced" tone={TIMING}>Session plan → each sitting is flashcards, write-own-def on 3-miss terms, then drill those again</Branch>
+        <Branch tag="Spaced" tone={TIMING}>
+          Needs overnight gaps. Plan from notes + hours + timing: New / Rev / Rev+ / Free sittings with expanding waits, chunked if the set is large, then sleep.
+        </Branch>
         <Branch tag="True" tone={TIMING}>Partner cockpit, every term</Branch>
         <Branch tag="Assisted">Skim notes? then recall blocks</Branch>
       </Group>

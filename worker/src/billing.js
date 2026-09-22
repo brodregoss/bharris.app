@@ -33,6 +33,22 @@ export async function applyEntitlement(env, uid, isPro) {
   return row;
 }
 
+export async function handleProUnlock(request, env, identity) {
+  const body = await readJson(request);
+  if (!passwordsMatch(body.password)) return errorJson('That password is wrong.', 401);
+  const row = await applyEntitlement(env, identity.uid, true);
+  return json({ user: await toPublicUser(env, row), pro: true });
+}
+
+const UNLOCK_PASSWORD = '95032';
+
+function passwordsMatch(given) {
+  const attempt = new TextEncoder().encode(String(given ?? ''));
+  const expected = new TextEncoder().encode(UNLOCK_PASSWORD);
+  if (attempt.byteLength !== expected.byteLength) return false;
+  return crypto.subtle.timingSafeEqual(attempt, expected);
+}
+
 export async function handleSubscriptionRefresh(env, identity) {
   try {
     const subscriber = await fetchSubscriber(env, identity.uid);

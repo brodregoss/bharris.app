@@ -1,13 +1,13 @@
 # Last Minute Study
 
-A last-minute exam cram app. Accounts use **Firebase**. Notes, sessions, AI quota, and file uploads go through a **Cloudflare Worker** (D1 + Durable Objects + R2). App Store upgrades use **RevenueCat**. The OpenAI key never lives in the iPhone app.
+A last-minute exam cram app. Accounts use **Firebase**. Notes, sessions, and AI quota go through a **Cloudflare Worker** (D1 + Durable Objects). Photos are transcribed on the device, then discarded — original JPEGs are not stored. App Store upgrades use **RevenueCat**. The OpenAI key never lives in the iPhone app.
 
 ## Prerequisites
 
 - Node.js 20+
 - A GitHub account
 - A Firebase project with Email/Password and Google sign-in enabled
-- A Cloudflare account (Workers, D1, R2, Durable Objects)
+- A Cloudflare account (Workers, D1, Durable Objects)
 - An OpenAI API key
 - A RevenueCat project (for the iPhone paywall)
 
@@ -62,7 +62,7 @@ Then open `ios/App/App.xcodeproj`. The shared App scheme points at `ios/StudyApp
 - `studyapp.pro.yearly`
 - Entitlement: `Study Pro`
 
-Plans in the app: **Free** (30 AI calls/month) and **Study Pro** (500 AI calls/month, $4.99/mo or $39.99/yr). The paywall in Settings shows that comparison. StoreKit / RevenueCat supply the live prices on device.
+Plans in the app: **Free** (5 AI calls/month) and **Study Pro** (30 AI calls/month, $4.99/mo or $39.99/yr). The paywall in Settings shows that comparison. StoreKit / RevenueCat supply the live prices on device.
 
 Add your Firebase auth domain for the Capacitor hostname (`enthusiastic-cram-genius-flow.base44.app`).
 
@@ -84,16 +84,15 @@ npm run ios:open       # Open the iOS project in Xcode
 
 ## Deploying the Worker
 
-Replace the placeholder D1 / R2 ids in `worker/wrangler.jsonc` with ids from:
-
 ```bash
-npx wrangler d1 create studyapp-app
-npx wrangler d1 create studyapp-user-00
-# …user-01 through user-07
-npx wrangler r2 bucket create studyapp-notes
+npx wrangler secret put FIREBASE_PROJECT_ID
+npx wrangler secret put OPENAI_API_KEY
+npm run worker:deploy
 ```
 
-Then `npx wrangler d1 migrations apply studyapp-app --remote` and `npm run worker:deploy`. Set `VITE_WORKER_URL` to the workers.dev (or custom) URL and run `npm run ios:sync`.
+Set `VITE_WORKER_URL` to the `workers.dev` URL it prints, then `npm run ios:sync`. Opening that URL in a browser now loads the app (`/v1` stays the API). Add the same hostname under Firebase Authentication → Settings → Authorized domains.
+
+The live app does not use Vercel. Old `api/llm.js` / `api/account.js` files are leftover and unused.
 
 ## Run in Xcode
 

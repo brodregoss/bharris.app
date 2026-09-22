@@ -5,17 +5,19 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import AuthShell from '@/components/AuthShell';
+import AppleSignInButton from '@/components/account/AppleSignInButton';
 import GoogleSignInButton from '@/components/account/GoogleSignInButton';
 import { useAuth } from '@/lib/AuthContext';
 import { afterAuthPath } from '@/lib/onboarding';
 
 export default function AccountSignIn() {
   const navigate = useNavigate();
-  const { isAuthenticated, signIn, signInWithGoogle } = useAuth();
+  const { isAuthenticated, signIn, signInWithApple, signInWithGoogle } = useAuth();
   const [email, setEmail] = React.useState('');
   const [password, setPassword] = React.useState('');
   const [error, setError] = React.useState('');
   const [loading, setLoading] = React.useState(false);
+  const [appleLoading, setAppleLoading] = React.useState(false);
   const [googleLoading, setGoogleLoading] = React.useState(false);
 
   if (isAuthenticated) {
@@ -33,6 +35,19 @@ export default function AccountSignIn() {
       setError(err.message || 'Could not sign in.');
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleApple = async () => {
+    setError('');
+    setAppleLoading(true);
+    try {
+      await signInWithApple();
+      navigate(afterAuthPath(), { replace: true });
+    } catch (err) {
+      setError(err.message || 'Could not sign in with Apple.');
+    } finally {
+      setAppleLoading(false);
     }
   };
 
@@ -61,7 +76,10 @@ export default function AccountSignIn() {
           {error}
         </div>
       )}
-      <GoogleSignInButton onClick={handleGoogle} loading={googleLoading} disabled={loading} />
+      <div className="space-y-3">
+        <AppleSignInButton onClick={handleApple} loading={appleLoading} disabled={loading || googleLoading} />
+        <GoogleSignInButton onClick={handleGoogle} loading={googleLoading} disabled={loading || appleLoading} />
+      </div>
       <p className="text-center text-xs text-muted-foreground my-4">or use email</p>
       <form onSubmit={handleSubmit} className="space-y-4">
         <div className="space-y-2">
@@ -106,7 +124,7 @@ export default function AccountSignIn() {
             />
           </div>
         </div>
-        <Button type="submit" className="w-full h-14 rounded-2xl text-base font-semibold" disabled={loading || googleLoading}>
+        <Button type="submit" className="w-full h-14 rounded-2xl text-base font-semibold" disabled={loading || googleLoading || appleLoading}>
           {loading ? (
             <>
               <Loader2 className="w-4 h-4 mr-2 animate-spin" />

@@ -20,6 +20,23 @@ function shuffle(a) {
 
 // Distractors prefer terms sharing a depends_on concept (topic cluster),
 // then same tier, then any other term — plausible near-misses, not random picks.
+function pickRecallTermDistractors(allTerms, correct, n) {
+  const depSet = new Set(correct.depends_on || []);
+  const candidates = allTerms.filter((t) => t.id !== correct.id);
+  const cluster = candidates.filter((t) => (t.depends_on || []).some((d) => depSet.has(d)));
+  const sameTier = candidates.filter((t) => t.tier === correct.tier);
+  const pool = [...cluster, ...sameTier, ...candidates];
+  const seen = new Set();
+  const out = [];
+  for (const t of pool) {
+    if (seen.has(t.term)) continue;
+    seen.add(t.term);
+    out.push(t.term);
+    if (out.length >= n) break;
+  }
+  return out;
+}
+
 function pickRecallDistractors(allTerms, correct, n) {
   const depSet = new Set(correct.depends_on || []);
   const candidates = allTerms.filter((t) => t.id !== correct.id);
@@ -54,6 +71,7 @@ export default function RecallBlock({
   singlePass = false,
   blockLabel,
   examType = 'mixed',
+  mixReverse = false,
   onUpdateTerm,
   onLogAttempt,
   onDone,
@@ -158,7 +176,8 @@ export default function RecallBlock({
   const currentId = st.queue[st.pos];
   const current = currentId != null ? byId[currentId] : null;
 
-  const style = cardStyle(examType, st.pos);
+  const reverse = mixReverse && st.pos % 2 === 1;
+  const style = reverse ? 'free_recall' : cardStyle(examType, st.pos);
 
   // Reset per-card interaction state when the card (or attempt) changes.
   // Options are shuffled once here and held until the card is answered.
@@ -166,9 +185,12 @@ export default function RecallBlock({
     advancingRef.current = false;
     setRevealed(false);
     setRecogSelected(null);
-    if (current && style === 'recognition') {
+    if (current && style === 'recognition' && !reverse) {
       const distractors = pickRecallDistractors(terms, current, 3);
       setRecogOptions(shuffle([current.definition, ...distractors]));
+    } else if (current && reverse && style === 'recognition') {
+      const distractors = pickRecallTermDistractors(terms, current, 3);
+      setRecogOptions(shuffle([current.term, ...distractors]));
     } else {
       setRecogOptions(null);
     }
@@ -309,12 +331,13 @@ export default function RecallBlock({
     setCardSeq((n) => n + 1);
   };
 
-  const promptLabel =
-    style === 'explain'
+  const promptLabel = reverse
+    ? 'Definition'
+    : style === 'explain'
       ? 'Explain in your own words'
       : style === 'recognition'
-      ? 'Pick the correct definition'
-      : 'Term';
+        ? 'Pick the correct definition'
+        : 'Term';
 
   const defCards = cardsAtStuckThreshold(st.queue, byId, missCountRef.current, writtenRef.current);
   const writeCards = stuck?.length ? stuck : defMode ? defCards : null;
@@ -360,13 +383,15 @@ export default function RecallBlock({
       <div className="flex-1 flex flex-col items-center justify-center">
         <div className="w-full max-w-md rounded-3xl border border-border bg-card p-8 shadow-sm text-center min-h-[280px] flex flex-col items-center justify-center">
           <p className="text-[11px] uppercase tracking-wide text-muted-foreground mb-3">{promptLabel}</p>
-          <p className="text-3xl font-bold tracking-tight">{current.term}</p>
+          <p className={reverse ? 'text-lg font-semibold tracking-tight leading-relaxed' : 'text-3xl font-bold tracking-tight'}>
+            {reverse ? flashcardDef(current) : current.term}
+          </p>
 
           {style === 'recognition' ? (
             <div className="mt-5 w-full space-y-2 text-left">
               {(recogOptions || []).map((opt, i) => {
                 const selected = recogSelected === opt;
-                const isCorrect = opt === current.definition;
+                const isCorrect = opt === (reverse ? current.term : current.definition);
                 return (
                   <button
                     key={i}
@@ -387,12 +412,16 @@ export default function RecallBlock({
               })}
             </div>
           ) : revealed ? (
-            <p className="mt-5 text-lg text-muted-foreground leading-relaxed">{flashcardDef(current)}</p>
+            <p className="mt-5 text-lg text-muted-foreground leading-relaxed">
+              {reverse ? current.term : flashcardDef(current)}
+            </p>
           ) : (
             <p className="mt-5 text-xs text-muted-foreground">
-              {style === 'explain'
-                ? 'Reveal the definition to self-grade your explanation.'
-                : 'Reveal the definition, then grade yourself.'}
+              {reverse
+                ? 'Say the term, then reveal.'
+                : style === 'explain'
+                  ? 'Reveal the definition to self-grade your explanation.'
+                  : 'Reveal the definition, then grade yourself.'}
             </p>
           )}
         </div>
@@ -401,7 +430,9 @@ export default function RecallBlock({
           {style === 'recognition' ? (
             recogSelected ? (
               <Button
-                onClick={() => (recogSelected === current.definition ? handleGot() : handleMissed())}
+                onClick={() =>
+                  (recogSelected === (reverse ? current.term : current.definition) ? handleGot() : handleMissed())
+                }
                 className="w-full h-12 rounded-2xl font-semibold"
               >
                 Continue

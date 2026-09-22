@@ -4,8 +4,8 @@
   "compatibility_date": "2025-09-01",
   "vars": {
     "REVENUECAT_ENTITLEMENT_ID": "Study Pro",
-    "FREE_AI_QUOTA": "30",
-    "PRO_AI_QUOTA": "500"
+    "FREE_AI_QUOTA": "5",
+    "PRO_AI_QUOTA": "30"
   },
   "d1_databases": [
     {
@@ -78,10 +78,10 @@
       "new_sqlite_classes": ["UserStudyDO"]
     }
   ],
-  "r2_buckets": [
-    {
-      "binding": "NOTES",
-      "bucket_name": "studyapp-notes"
-    }
-  ]
+  "assets": {
+    "directory": "../dist",
+    "binding": "ASSETS",
+    "not_found_handling": "single-page-application",
+    "run_worker_first": ["/v1/*"]
+  }
 }

@@ -3,30 +3,45 @@ import { Navigate, useLocation, useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { useAuth } from '@/lib/AuthContext';
 import { afterAuthPath } from '@/lib/onboarding';
+import AppleSignInButton from '@/components/account/AppleSignInButton';
 import GoogleSignInButton from '@/components/account/GoogleSignInButton';
 
 export default function Account() {
   const navigate = useNavigate();
   const location = useLocation();
-  const { isAuthenticated, authError, firebaseUser, retryCloud, signInWithGoogle } = useAuth();
+  const { isAuthenticated, authError, firebaseUser, retryCloud, signInWithApple, signInWithGoogle } = useAuth();
   const from = location.state?.from;
   const [retrying, setRetrying] = React.useState(false);
+  const [appleLoading, setAppleLoading] = React.useState(false);
   const [googleLoading, setGoogleLoading] = React.useState(false);
-  const [googleError, setGoogleError] = React.useState('');
+  const [socialError, setSocialError] = React.useState('');
   const safeFrom = from === '/' || from === '/welcome' || from === '/settings' || from === '/history' || from === '/practice';
 
   if (isAuthenticated) {
     return <Navigate to={safeFrom ? from : afterAuthPath()} replace />;
   }
 
+  const handleApple = async () => {
+    setSocialError('');
+    setAppleLoading(true);
+    try {
+      await signInWithApple();
+      navigate(afterAuthPath(), { replace: true });
+    } catch (err) {
+      setSocialError(err.message || 'Could not sign in with Apple.');
+    } finally {
+      setAppleLoading(false);
+    }
+  };
+
   const handleGoogle = async () => {
-    setGoogleError('');
+    setSocialError('');
     setGoogleLoading(true);
     try {
       await signInWithGoogle();
       navigate(afterAuthPath(), { replace: true });
     } catch (err) {
-      setGoogleError(err.message || 'Could not sign in with Google.');
+      setSocialError(err.message || 'Could not sign in with Google.');
     } finally {
       setGoogleLoading(false);
     }
@@ -40,10 +55,10 @@ export default function Account() {
           Last Minute Study
         </h1>
         <p className="text-base text-muted-foreground mt-4">Create an account or sign back in</p>
-        {(authError || googleError) && (
+        {(authError || socialError) && (
           <div className="mt-4 max-w-sm mx-auto">
-            <p className="text-sm text-destructive">{googleError || authError}</p>
-            {firebaseUser && !googleError && (
+            <p className="text-sm text-destructive">{socialError || authError}</p>
+            {firebaseUser && !socialError && (
               <Button
                 variant="outline"
                 className="mt-3 h-11 rounded-2xl"
@@ -68,7 +83,8 @@ export default function Account() {
 
       <footer className="px-6 pb-safe pt-4">
         <div className="max-w-md mx-auto w-full flex flex-col gap-3">
-          <GoogleSignInButton onClick={handleGoogle} loading={googleLoading} />
+          <AppleSignInButton onClick={handleApple} loading={appleLoading} disabled={googleLoading} />
+          <GoogleSignInButton onClick={handleGoogle} loading={googleLoading} disabled={appleLoading} />
           <Button
             className="h-16 rounded-2xl text-lg font-bold shadow-lg"
             onClick={() => navigate('/account/create')}

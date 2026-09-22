@@ -22,6 +22,10 @@ function decodeImage(input) {
   return null;
 }
 
+function hasNotesBucket(env) {
+  return Boolean(env.NOTES);
+}
+
 export async function handleCreateNote(request, env, identity) {
   const body = await readJson(request);
   const terms = Array.isArray(body.terms) ? body.terms : null;
@@ -35,6 +39,15 @@ export async function handleCreateNote(request, env, identity) {
   const pages = [];
   let total = 0;
   for (let i = 0; i < images.length; i += 1) {
+    if (!hasNotesBucket(env)) {
+      pages.push({
+        pageIndex: i,
+        r2Key: null,
+        contentType: 'image/jpeg',
+        sizeBytes: 0,
+      });
+      continue;
+    }
     const decoded = decodeImage(typeof images[i] === 'string' ? images[i] : images[i]?.dataUrl || images[i]?.data);
     if (!decoded) return errorJson('Each photo must be an image', 400);
     const key = `notes/${identity.uid}/${noteId}/pages/${padPage(i)}.jpg`;
@@ -104,12 +117,14 @@ export async function handleDeleteNote(env, identity, noteId) {
   const existing = await stub.getNote(noteId);
   if (!existing) return errorJson('Note not found', 404);
   const pages = existing.pages || [];
-  await Promise.all(
-    pages
-      .map((page) => page.r2_key || page.r2Key)
-      .filter((key) => key && String(key).startsWith(`notes/${identity.uid}/`))
-      .map((key) => env.NOTES.delete(key)),
-  );
+  if (hasNotesBucket(env)) {
+    await Promise.all(
+      pages
+        .map((page) => page.r2_key || page.r2Key)
+        .filter((key) => key && String(key).startsWith(`notes/${identity.uid}/`))
+        .map((key) => env.NOTES.delete(key)),
+    );
+  }
   await stub.deleteNote(noteId);
   return json({ ok: true });
 }
@@ -126,7 +141,7 @@ export async function handleGetNotePage(env, identity, noteId, pageIndex) {
   const note = await stub.getNote(noteId);
   if (!note) return errorJson('Note not found', 404);
   const page = (note.pages || []).find((p) => Number(p.page_index) === Number(pageIndex));
-  if (!page?.r2_key || !String(page.r2_key).startsWith(`notes/${identity.uid}/`)) {
+  if (!hasNotesBucket(env) || !page?.r2_key || !String(page.r2_key).startsWith(`notes/${identity.uid}/`)) {
     return errorJson('Page not found', 404);
   }
   const obj = await env.NOTES.get(page.r2_key);
@@ -140,6 +155,7 @@ export async function handleGetNotePage(env, identity, noteId, pageIndex) {
 }
 
 export async function deleteUserNotes(env, uid) {
+  if (!hasNotesBucket(env)) return;
   const listed = await env.NOTES.list({ prefix: `notes/${uid}/` });
   await Promise.all((listed.objects || []).map((obj) => env.NOTES.delete(obj.key)));
   let truncated = listed.truncated;

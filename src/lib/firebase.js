@@ -7,6 +7,7 @@ import {
   GoogleAuthProvider,
   indexedDBLocalPersistence,
   initializeAuth,
+  OAuthProvider,
   onAuthStateChanged,
   reauthenticateWithCredential,
   sendPasswordResetEmail,
@@ -18,8 +19,10 @@ import {
   signInWithPopup,
   signOut,
   updatePassword,
+  updateProfile,
 } from 'firebase/auth';
 import { Capacitor } from '@capacitor/core';
+import { formatPersonName } from '@/lib/personName';
 import { APP_CONFIG, firebaseConfigured } from '@/lib/appConfig';
 
 let authPromise;
@@ -63,10 +66,21 @@ async function nativeGoogleUser(auth) {
   return cred.user;
 }
 
-export async function firebaseCreateAccount(email, password) {
+export async function firebaseCreateAccount(email, password, displayName) {
   const auth = await getFirebaseAuth();
   const cred = await createUserWithEmailAndPassword(auth, email.trim(), password);
-  return cred.user;
+  const name = formatPersonName(displayName);
+  if (name) {
+    await updateProfile(cred.user, { displayName: name });
+    if (!cred.user.displayName) {
+      try {
+        await cred.user.reload();
+      } catch {
+        // The typed name is still sent to the study server.
+      }
+    }
+  }
+  return auth.currentUser || cred.user;
 }
 
 export async function firebaseSignIn(email, password) {
@@ -81,6 +95,41 @@ export async function firebaseSignInWithGoogle() {
     return nativeGoogleUser(auth);
   }
   const cred = await signInWithPopup(auth, googleProvider());
+  return cred.user;
+}
+
+function appleProvider() {
+  const provider = new OAuthProvider('apple.com');
+  provider.addScope('email');
+  provider.addScope('name');
+  return provider;
+}
+
+async function nativeAppleUser(auth) {
+  const { FirebaseAuthentication } = await import('@capacitor-firebase/authentication');
+  const result = await FirebaseAuthentication.signInWithApple({ skipNativeAuth: true });
+  const idToken = result.credential?.idToken;
+  const rawNonce = result.credential?.nonce;
+  if (!idToken) throw new Error('Apple did not return a sign-in token.');
+  const credential = appleProvider().credential({ idToken, rawNonce });
+  const cred = await signInWithCredential(auth, credential);
+  const displayName = formatPersonName(result.user?.displayName);
+  if (displayName && !cred.user.displayName) {
+    try {
+      await updateProfile(cred.user, { displayName });
+    } catch {
+      // The name is optional. Sign-in already succeeded.
+    }
+  }
+  return cred.user;
+}
+
+export async function firebaseSignInWithApple() {
+  const auth = await getFirebaseAuth();
+  if (Capacitor.isNativePlatform()) {
+    return nativeAppleUser(auth);
+  }
+  const cred = await signInWithPopup(auth, appleProvider());
   return cred.user;
 }
 
@@ -176,9 +225,10 @@ export async function listenFirebaseUser(callback) {
   return onAuthStateChanged(auth, callback);
 }
 
-export function firebaseErrorMessage(err) {
+export function firebaseErrorMessage(err, provider) {
   const code = err?.code || '';
   const message = String(err?.message || '');
+  const who = provider || 'Google';
   if (code === 'auth/email-already-in-use') return 'That email already has an account.';
   if (code === 'auth/invalid-email') return 'Enter a valid email.';
   if (code === 'auth/weak-password') return 'Use at least 6 characters.';
@@ -191,19 +241,24 @@ export function firebaseErrorMessage(err) {
   }
   if (code === 'auth/too-many-requests') return 'Too many tries. Wait a minute and try again.';
   if (code === 'auth/network-request-failed') return 'Network error. Check your connection.';
-  if (code === 'auth/popup-closed-by-user' || code === 'auth/cancelled-popup-request') {
-    return 'Google sign-in was closed.';
+  if (
+    code === 'auth/popup-closed-by-user'
+    || code === 'auth/cancelled-popup-request'
+    || code === '1001'
+    || /canceled|cancelled|AuthorizationError error 1001/i.test(message)
+  ) {
+    return `${who} sign-in was closed.`;
   }
-  if (code === 'auth/popup-blocked') return 'Allow popups to sign in with Google.';
+  if (code === 'auth/popup-blocked') return `Allow popups to sign in with ${who}.`;
   if (code === 'auth/operation-not-allowed') {
-    return 'Turn on Google sign-in in Firebase Authentication → Sign-in method.';
+    return `Turn on ${who} sign-in in Firebase Authentication → Sign-in method.`;
   }
+  if (code === 'auth/missing-or-invalid-nonce') return 'Apple sign-in could not be verified. Try again.';
   if (code === 'auth/unauthorized-domain') {
     return 'Add this site to Firebase Authentication → Settings → Authorized domains.';
   }
   if (code === 'auth/account-exists-with-different-credential') {
-    return 'That email already has an account. Sign in with email, then you can use Google next time.';
+    return 'That email already has an account. Sign in with the method you used first.';
   }
-  if (/canceled|cancelled/i.test(message)) return 'Google sign-in was closed.';
   return err?.message || 'Could not sign in.';
 }

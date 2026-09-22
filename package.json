@@ -11,7 +11,7 @@
     "typecheck": "tsc -p ./jsconfig.json",
     "preview": "vite preview",
     "worker:dev": "npm run start --prefix worker",
-    "worker:deploy": "npm run deploy --prefix worker",
+    "worker:deploy": "npm run build && npm run deploy --prefix worker",
     "ios:sync": "npm run build && npx cap sync ios",
     "ios:open": "npx cap open ios"
   },

@@ -5,6 +5,7 @@ const ALLOWED = new Set([
   'http://127.0.0.1:5174',
   'http://localhost:4173',
   'https://enthusiastic-cram-genius-flow.base44.app',
+  'https://last-minute-study.broderickharris11.workers.dev',
 ]);
 
 export function corsHeaders(request, env) {

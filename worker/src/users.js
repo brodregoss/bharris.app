@@ -14,7 +14,7 @@ async function ensureUserTable(db) {
       do_status TEXT NOT NULL DEFAULT 'pending',
       subscription_tier TEXT NOT NULL DEFAULT 'free',
       ai_quota_used INTEGER NOT NULL DEFAULT 0,
-      ai_quota_limit INTEGER NOT NULL DEFAULT 30,
+      ai_quota_limit INTEGER NOT NULL DEFAULT 5,
       ai_quota_period TEXT,
       revenuecat_app_user_id TEXT
     )`,
@@ -117,12 +117,25 @@ export async function updateQuota(env, uid, { used, limit, tier }) {
 
 export async function toPublicUser(env, row) {
   if (!row) return null;
-  const admin = await isAdminUid(env, row.firebase_uid, row.email);
-  return publicUser(row, { isAdmin: admin });
+  const fresh = await alignQuotaLimit(env, row);
+  const admin = await isAdminUid(env, fresh.firebase_uid, fresh.email);
+  return publicUser(fresh, { isAdmin: admin });
+}
+
+export async function alignQuotaLimit(env, row) {
+  if (!row) return null;
+  const tier = row.subscription_tier || 'free';
+  const expected = quotaLimit(env, tier);
+  const stored = Number(row.ai_quota_limit) || 0;
+  const unlimited = tier === 'pro' && stored >= 100000;
+  if (unlimited || stored === expected) return row;
+  return updateQuota(env, row.firebase_uid, { limit: expected });
 }
 
 export async function requireFreshQuota(env, row) {
   if (!row) return null;
-  if (row.ai_quota_period === periodKey()) return row;
-  return updateQuota(env, row.firebase_uid, { used: 0 });
+  const current = row.ai_quota_period === periodKey()
+    ? row
+    : await updateQuota(env, row.firebase_uid, { used: 0 });
+  return alignQuotaLimit(env, current);
 }

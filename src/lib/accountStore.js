@@ -49,14 +49,20 @@ export function cacheUser(user) {
     cancelPendingCloudSave();
     localStorage.removeItem(USER_KEY);
     setActiveUid('');
-  } else {
-    const previousUid = readUser()?.uid || getActiveUid();
-    if (user.uid && previousUid && previousUid !== user.uid) cancelPendingCloudSave();
-    localStorage.setItem(USER_KEY, JSON.stringify(user));
-    if (user.uid) setActiveUid(user.uid, previousUid);
+    notify();
+    return user;
   }
+  const previous = readUser();
+  const previousUid = previous?.uid || getActiveUid();
+  if (user.uid && previousUid && previousUid !== user.uid) cancelPendingCloudSave();
+  // A sign-in refresh can arrive before the name is written. Keep the name
+  // already saved for this account so the home greeting does not go blank.
+  const keptName = !user.displayName && previous?.uid === user.uid ? previous.displayName : '';
+  const next = keptName ? { ...user, displayName: keptName } : user;
+  localStorage.setItem(USER_KEY, JSON.stringify(next));
+  if (next.uid) setActiveUid(next.uid, previousUid);
   notify();
-  return user;
+  return next;
 }
 
 export function clearAccountCache() {
@@ -84,6 +90,12 @@ export async function getUsage() {
   const data = await workerRequest('GET', '/v1/users/me/usage');
   if (data.me) cacheUser(data.me);
   else if (data.user) cacheUser(data.user);
+  return data;
+}
+
+export async function unlockStudyPro(password) {
+  const data = await workerRequest('POST', '/v1/users/me/subscription/unlock', { password });
+  if (data.user) cacheUser(data.user);
   return data;
 }
 

@@ -1,73 +1,91 @@
 import React from 'react';
-import { ChevronDown } from 'lucide-react';
+import { Check } from 'lucide-react';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { cn } from '@/lib/utils';
-import { examTimingPlanCopy, sittingWhenLabel } from '@/lib/spacedCram';
+import { SESSION_TYPE_META, sittingDetail, planProgress } from '@/lib/spacedCram';
 
-function sessionSummary(session) {
-  const reviewN = session.reviews.length;
-  const newN = session.news.length;
-  const reviewBit = reviewN ? `${reviewN} review${reviewN === 1 ? '' : 's'}` : null;
-  const newBit = `${newN} new`;
-  return reviewBit ? `${reviewBit} · ${newBit}` : newBit;
+const KEY_ORDER = ['new', 'rev', 'rev_plus', 'free'];
+
+function TypeBadge({ type, muted }) {
+  const meta = SESSION_TYPE_META[type];
+  if (!meta) return null;
+  return (
+    <span
+      className={cn(
+        'text-[10px] uppercase tracking-wide font-semibold px-1.5 py-0.5 rounded-md',
+        muted ? 'bg-muted text-muted-foreground' : 'bg-primary/10 text-primary'
+      )}
+    >
+      {meta.label}
+    </span>
+  );
 }
 
-function TermList({ label, terms }) {
-  if (!terms.length) return null;
+function SleepRow() {
   return (
-    <div>
-      <p className="text-[10px] font-bold uppercase tracking-wide text-muted-foreground mb-1">
-        {label}
-      </p>
-      <ul className="space-y-1">
-        {terms.map((t) => (
-          <li key={t.id} className="text-sm leading-snug">
-            {t.term}
-          </li>
-        ))}
-      </ul>
+    <div className="flex items-center gap-3 py-1 px-1">
+      <div className="w-7 h-7 rounded-full border border-dashed border-border flex items-center justify-center text-[10px] text-muted-foreground">
+        —
+      </div>
+      <p className="text-sm font-medium text-muted-foreground">Sleep</p>
+      <p className="text-xs text-muted-foreground">overnight gap</p>
     </div>
   );
 }
 
-function SessionCard({ session, examTiming, currentSitting, defaultOpen }) {
+function SittingRow({ sitting, schedule, currentSitting, defaultOpen, leftover }) {
   const [open, setOpen] = React.useState(defaultOpen);
-  const isCurrent = session.sitting === currentSitting;
-  const when = sittingWhenLabel(examTiming, session.sitting);
+  const isCurrent = sitting.sitting === currentSitting;
+  const isDone = sitting.sitting < currentSitting;
+  const meta = SESSION_TYPE_META[sitting.type];
+  const chunkN = schedule?.chunks?.length || 1;
 
   return (
     <Collapsible open={open} onOpenChange={setOpen}>
       <div
         className={cn(
-          'rounded-2xl border shadow-sm overflow-hidden',
-          isCurrent ? 'border-primary bg-primary/5 ring-2 ring-primary' : 'border-border bg-card'
+          'rounded-2xl border overflow-hidden',
+          isCurrent ? 'border-primary bg-primary/5 ring-2 ring-primary' : 'border-border bg-card',
+          isDone && 'opacity-70'
         )}
       >
-        <CollapsibleTrigger className="w-full text-left px-4 py-3 flex items-start gap-2">
+        <CollapsibleTrigger className="w-full text-left px-4 py-3 flex items-start gap-3">
+          <div
+            className={cn(
+              'w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold shrink-0 mt-0.5',
+              isDone
+                ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-400/15 dark:text-emerald-300'
+                : isCurrent
+                  ? 'bg-primary text-primary-foreground'
+                  : 'bg-muted text-muted-foreground'
+            )}
+          >
+            {isDone ? <Check className="w-3.5 h-3.5" /> : sitting.sitting}
+          </div>
           <div className="flex-1 min-w-0">
             <div className="flex items-center gap-2 flex-wrap">
-              <p className="text-base font-bold tracking-tight">Sitting {session.sitting}</p>
+              <p className="text-sm font-bold tracking-tight">{sitting.timing}</p>
+              <TypeBadge type={sitting.type} muted={!isCurrent && !isDone} />
               {isCurrent && (
                 <span className="text-[10px] uppercase tracking-wide font-semibold text-primary">
-                  Up next
+                  You are here
                 </span>
               )}
             </div>
-            <p className="text-xs text-muted-foreground mt-0.5">
-              {when} · {sessionSummary(session)}
+            <p className="text-xs text-muted-foreground mt-0.5 leading-snug">
+              {isCurrent && leftover
+                ? leftover
+                : sitting.type === 'new' && chunkN > 1
+                  ? `${meta?.label} · ${chunkN} chunks`
+                  : meta?.meaning}
             </p>
           </div>
-          <ChevronDown
-            className={cn(
-              'w-4 h-4 shrink-0 text-muted-foreground mt-1 transition-transform',
-              open && 'rotate-180'
-            )}
-          />
         </CollapsibleTrigger>
         <CollapsibleContent>
-          <div className="px-4 pb-3 space-y-3 border-t border-border/60 pt-3">
-            <TermList label="Review" terms={session.reviews} />
-            <TermList label="New" terms={session.news} />
+          <div className="px-4 pb-3 pt-0 border-t border-border/60 ml-10 mr-3">
+            <p className="text-sm text-muted-foreground leading-relaxed pt-3">
+              {sittingDetail(sitting, schedule)}
+            </p>
           </div>
         </CollapsibleContent>
       </div>
@@ -75,31 +93,77 @@ function SessionCard({ session, examTiming, currentSitting, defaultOpen }) {
   );
 }
 
-export default function SpacedPlan({ forecast, examTiming, currentSitting = 1 }) {
-  const sessions = forecast?.sessions || [];
-  const sittingN = sessions.length;
-  const copy = examTimingPlanCopy(examTiming);
+export default function SpacedPlan({ schedule, currentSitting = 1, spaced, terms }) {
+  const items = schedule?.items || [];
+  const progress = planProgress(schedule, spaced, terms);
+  const leftover = progress.finishedAll ? null : progress.leftLine;
 
   return (
     <div className="space-y-3">
       <div>
         <h1 className="text-2xl font-bold tracking-tight">Your study plan</h1>
         <p className="text-sm text-muted-foreground mt-2 leading-relaxed">
-          {sittingN} sitting{sittingN === 1 ? '' : 's'} {copy}. Highest-priority terms first.
-          Each sitting is flashcards — if a term keeps slipping (3 misses), you write your own
-          definition, then drill those again. Later sittings bring earlier terms back as reviews,
-          plus a new batch.
+          {schedule?.whyLine}
+        </p>
+        {schedule?.summaryLine && (
+          <p className="text-sm text-foreground mt-1.5 font-medium">{schedule.summaryLine}</p>
+        )}
+      </div>
+
+      <div className="rounded-2xl border border-primary bg-primary/5 px-4 py-3">
+        <p className="text-[10px] font-bold uppercase tracking-wide text-primary">You are here</p>
+        <p className="text-base font-bold tracking-tight mt-0.5">{progress.hereLine}</p>
+        <p className="text-sm text-muted-foreground mt-1 leading-snug">{progress.leftLine}</p>
+        <div className="h-1.5 rounded-full bg-muted mt-3 overflow-hidden">
+          <div
+            className="h-full bg-primary rounded-full"
+            style={{ width: `${Math.min(100, Math.max(0, progress.sittingPct))}%` }}
+          />
+        </div>
+        <p className="text-[11px] text-muted-foreground mt-1.5">
+          {progress.sittingsDone} of {progress.last} sitting{progress.last === 1 ? '' : 's'} done
         </p>
       </div>
-      {sessions.map((session) => (
-        <SessionCard
-          key={session.sitting}
-          session={session}
-          examTiming={examTiming}
-          currentSitting={currentSitting}
-          defaultOpen={currentSitting === 1 || session.sitting === currentSitting}
-        />
-      ))}
+
+      <div className="rounded-2xl border border-border bg-card px-4 py-3">
+        <p className="text-[10px] font-bold uppercase tracking-wide text-muted-foreground mb-2">Key</p>
+        <ul className="space-y-1.5">
+          {KEY_ORDER.map((id) => {
+            const meta = SESSION_TYPE_META[id];
+            return (
+              <li key={id} className="flex items-start gap-2">
+                <TypeBadge type={id} />
+                <p className="text-xs text-muted-foreground leading-snug pt-0.5">{meta.meaning}</p>
+              </li>
+            );
+          })}
+          <li className="flex items-start gap-2">
+            <span className="text-[10px] uppercase tracking-wide font-semibold px-1.5 py-0.5 rounded-md bg-muted text-muted-foreground">
+              Sleep
+            </span>
+            <p className="text-xs text-muted-foreground leading-snug pt-0.5">
+              Overnight gap — the most important consolidation point, not a sitting.
+            </p>
+          </li>
+        </ul>
+      </div>
+
+      <div className="space-y-2">
+        {items.map((item, i) =>
+          item.kind === 'sleep' ? (
+            <SleepRow key={`sleep-${i}`} />
+          ) : (
+            <SittingRow
+              key={item.sitting}
+              sitting={item}
+              schedule={schedule}
+              currentSitting={currentSitting}
+              defaultOpen={item.sitting === currentSitting}
+              leftover={item.sitting === currentSitting ? leftover : null}
+            />
+          )
+        )}
+      </div>
     </div>
   );
 }

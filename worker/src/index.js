@@ -17,7 +17,7 @@ import {
   handleListNotes,
   handleDeleteNote,
 } from './notes.js';
-import { handleRevenueCatWebhook, handleSubscriptionRefresh } from './billing.js';
+import { handleRevenueCatWebhook, handleSubscriptionRefresh, handleProUnlock } from './billing.js';
 import { UserStudyDO } from './user-do.js';
 
 export { UserStudyDO };
@@ -131,6 +131,7 @@ export default {
       }
 
       if (parts[0] !== 'v1') {
+        if (env.ASSETS) return env.ASSETS.fetch(request);
         return withCors(errorJson('Not found', 404), request, env);
       }
 
@@ -153,6 +154,14 @@ export default {
         && request.method === 'POST'
       ) {
         response = await handleSubscriptionRefresh(env, identity);
+      } else if (
+        parts[1] === 'users'
+        && parts[2] === 'me'
+        && parts[3] === 'subscription'
+        && parts[4] === 'unlock'
+        && request.method === 'POST'
+      ) {
+        response = await handleProUnlock(request, env, identity);
       } else if (parts[1] === 'ai' && request.method === 'POST') {
         response = await handleAi(request, env, identity, parts[2] || 'complete');
       } else if (parts[1] === 'notes' && request.method === 'GET' && !parts[2]) {

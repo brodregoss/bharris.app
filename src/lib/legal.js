@@ -19,7 +19,7 @@ export const ABOUT_SECTIONS = [
 export const PRIVACY_SECTIONS = [
   {
     title: 'Account',
-    body: 'You sign in with Firebase (email and password). That account id is how notes, study progress, and AI quota are stored on the server.',
+    body: 'You sign in with Firebase (email and password, Apple, or Google). That account id is how notes, study progress, and AI quota are stored on the server.',
   },
   {
     title: 'What stays with your account',

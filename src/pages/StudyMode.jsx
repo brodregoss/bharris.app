@@ -10,6 +10,7 @@ import {
   suggestStudyMode,
   formatMinutesPerTerm,
   normalizeStudyMode,
+  spacedCramAvailable,
 } from '@/lib/studyUtils';
 
 const MODES = [STUDY_MODE.ASSISTED, STUDY_MODE.TRUE_CRAM, STUDY_MODE.SPACED_CRAM];
@@ -25,9 +26,17 @@ const PICKER_COPY = {
   },
   spaced_cram: {
     title: 'Spaced Cram',
-    description: 'Review old terms on a schedule, plus some new ones.',
+    description: 'Overnight expanding retrieval. Same terms come back on a schedule.',
   },
 };
+
+function pickSafeMode(mode, suggested, examTiming) {
+  const next = normalizeStudyMode(mode || suggested);
+  if (next === STUDY_MODE.SPACED_CRAM && !spacedCramAvailable(examTiming)) {
+    return suggested === STUDY_MODE.SPACED_CRAM ? STUDY_MODE.ASSISTED : normalizeStudyMode(suggested);
+  }
+  return next;
+}
 
 export default function StudyMode() {
   const navigate = useNavigate();
@@ -40,9 +49,17 @@ export default function StudyMode() {
     termCount: count,
     examTiming: setup?.examTiming,
   });
-  const [selected, setSelected] = React.useState(
-    () => normalizeStudyMode(setup?.studyMode || suggested)
+  const [selected, setSelected] = React.useState(() =>
+    pickSafeMode(setup?.studyMode, suggested, setup?.examTiming)
   );
+
+  const spacedOk = spacedCramAvailable(setup?.examTiming);
+
+  React.useEffect(() => {
+    if (selected === STUDY_MODE.SPACED_CRAM && !spacedOk) {
+      setSelected(pickSafeMode(null, suggested, setup?.examTiming));
+    }
+  }, [selected, spacedOk, suggested, setup?.examTiming]);
 
   if (!source) {
     return <Navigate to="/welcome" replace />;
@@ -62,10 +79,11 @@ export default function StudyMode() {
   };
 
   const continueOn = () => {
+    const studyMode = pickSafeMode(selected, suggested, setup.examTiming);
     navigate('/triage', {
       state: {
         source,
-        setup: { ...setup, studyMode: selected },
+        setup: { ...setup, studyMode },
       },
     });
   };
@@ -96,18 +114,22 @@ export default function StudyMode() {
           <div className="mt-5 mx-auto w-full max-w-md flex flex-col gap-3">
             {MODES.map((id) => {
               const meta = PICKER_COPY[id];
-              const isSelected = selected === id;
-              const isSuggested = suggested === id;
+              const locked = id === STUDY_MODE.SPACED_CRAM && !spacedOk;
+              const isSelected = selected === id && !locked;
+              const isSuggested = suggested === id && !locked;
               return (
                 <button
                   key={id}
                   type="button"
+                  disabled={locked}
                   onClick={() => setSelected(id)}
                   className={cn(
                     'w-full text-center rounded-2xl border px-4 py-4 shadow-sm transition flex flex-col items-center',
-                    isSelected
-                      ? 'border-primary bg-primary/5 ring-2 ring-primary'
-                      : 'border-border bg-card hover:border-muted-foreground'
+                    locked
+                      ? 'border-border bg-muted/40 text-muted-foreground opacity-60 cursor-not-allowed'
+                      : isSelected
+                        ? 'border-primary bg-primary/5 ring-2 ring-primary'
+                        : 'border-border bg-card hover:border-muted-foreground'
                   )}
                 >
                   {isSuggested && (
@@ -121,9 +143,9 @@ export default function StudyMode() {
                   <p className="text-sm text-muted-foreground mt-1.5 leading-snug text-center">
                     {meta.description}
                   </p>
-                  {id === STUDY_MODE.SPACED_CRAM && setup.examTiming === 'today' && (
+                  {locked && (
                     <p className="text-xs text-muted-foreground mt-1.5 leading-snug text-center">
-                      Nice if you can come back again.
+                      Needs overnight gaps — won’t work for a same-day exam.
                     </p>
                   )}
                 </button>
