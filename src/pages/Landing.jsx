@@ -151,46 +151,59 @@ export default function Landing() {
 
       <footer className="px-5 pb-safe pt-2">
         <div className="max-w-md mx-auto w-full flex flex-col items-stretch gap-3 pb-4">
-          {hasSession && (
-            <>
-              <Button
-                onClick={() => navigate(continueStudyPath(activeSession?.setup))}
-                className={`${box} text-lg`}
-              >
-                <RotateCcw className="w-5 h-5" />
-                {continueLabel}
-              </Button>
-              <Button variant="secondary" onClick={practice} className={box}>
-                Practice
-              </Button>
-            </>
-          )}
-          <div className="grid grid-cols-2 gap-3">
+          {hasSession ? (
             <Button
-              variant={hasSession ? 'secondary' : 'default'}
-              onClick={() => setConfirmNew(true)}
-              className={`${box} px-2 text-sm`}
+              onClick={() => navigate(continueStudyPath(activeSession?.setup))}
+              className={`${box} text-lg`}
             >
+              <RotateCcw className="w-5 h-5" />
+              {continueLabel}
+            </Button>
+          ) : finishedSession ? (
+            <Button onClick={practice} className={`${box} text-lg`}>
+              Practice
+            </Button>
+          ) : (
+            <Button onClick={() => setConfirmNew(true)} className={`${box} text-lg`}>
               Start new cram
             </Button>
+          )}
+          {hasSession && (
+            <Button variant="secondary" onClick={practice} className={box}>
+              Practice
+            </Button>
+          )}
+          {!hasSession && finishedSession && (
+            <Button variant="secondary" onClick={() => setConfirmNew(true)} className={box}>
+              Start new cram
+            </Button>
+          )}
+          <div className="grid grid-cols-2 gap-3">
+            {hasSession ? (
+              <Button
+                variant="secondary"
+                onClick={() => setConfirmNew(true)}
+                className={`${box} px-2 text-sm`}
+              >
+                Start new cram
+              </Button>
+            ) : finishedSession ? (
+              <Button
+                variant="secondary"
+                onClick={restartCram}
+                className={`${box} px-2 text-sm`}
+              >
+                Restart cram
+              </Button>
+            ) : null}
             <Button
               variant="secondary"
               onClick={() => navigate('/panic')}
-              className={`${box} px-2 text-sm`}
+              className={`${box} px-2 text-sm ${hasSession || finishedSession ? '' : 'col-span-2'}`}
             >
               Panic notes
             </Button>
           </div>
-          {!hasSession && finishedSession && (
-            <>
-              <Button variant="secondary" onClick={practice} className={box}>
-                Practice
-              </Button>
-              <Button variant="secondary" onClick={restartCram} className={box}>
-                Restart cram
-              </Button>
-            </>
-          )}
         </div>
       </footer>
 
