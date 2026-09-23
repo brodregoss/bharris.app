@@ -14,9 +14,11 @@ import {
   confirmPasswordReset,
   verifyPasswordResetCode,
   setPersistence,
+  getRedirectResult,
   signInWithCredential,
   signInWithEmailAndPassword,
   signInWithPopup,
+  signInWithRedirect,
   signOut,
   updatePassword,
   updateProfile,
@@ -27,13 +29,28 @@ import { APP_CONFIG, firebaseConfigured } from '@/lib/appConfig';
 
 let authPromise;
 
+function isIosBrowser() {
+  if (typeof navigator === 'undefined') return false;
+  const ua = navigator.userAgent || '';
+  if (/iPad|iPhone|iPod/i.test(ua)) return true;
+  return navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1;
+}
+
+function firebaseAppConfig() {
+  const config = { ...APP_CONFIG.firebase };
+  if (typeof window !== 'undefined' && !Capacitor.isNativePlatform() && isIosBrowser()) {
+    config.authDomain = window.location.host;
+  }
+  return config;
+}
+
 export function getFirebaseAuth() {
   if (!firebaseConfigured()) {
     throw new Error('Firebase is not configured. Add the VITE_FIREBASE_* values and reload.');
   }
   if (authPromise) return authPromise;
   authPromise = (async () => {
-    const app = getApps()[0] || initializeApp(APP_CONFIG.firebase);
+    const app = getApps()[0] || initializeApp(firebaseAppConfig());
     if (Capacitor.isNativePlatform()) {
       try {
         return initializeAuth(app, { persistence: indexedDBLocalPersistence });
@@ -89,13 +106,32 @@ export async function firebaseSignIn(email, password) {
   return cred.user;
 }
 
+async function webProviderSignIn(auth, provider) {
+  if (isIosBrowser()) {
+    await signInWithRedirect(auth, provider);
+    await new Promise(() => {});
+  }
+  const cred = await signInWithPopup(auth, provider);
+  return cred.user;
+}
+
+export async function finishRedirectSignIn() {
+  if (Capacitor.isNativePlatform() || !isIosBrowser()) return null;
+  const auth = await getFirebaseAuth();
+  try {
+    await getRedirectResult(auth);
+    return null;
+  } catch (err) {
+    return firebaseErrorMessage(err);
+  }
+}
+
 export async function firebaseSignInWithGoogle() {
   const auth = await getFirebaseAuth();
   if (Capacitor.isNativePlatform()) {
     return nativeGoogleUser(auth);
   }
-  const cred = await signInWithPopup(auth, googleProvider());
-  return cred.user;
+  return webProviderSignIn(auth, googleProvider());
 }
 
 function appleProvider() {
@@ -129,8 +165,7 @@ export async function firebaseSignInWithApple() {
   if (Capacitor.isNativePlatform()) {
     return nativeAppleUser(auth);
   }
-  const cred = await signInWithPopup(auth, appleProvider());
-  return cred.user;
+  return webProviderSignIn(auth, appleProvider());
 }
 
 export async function firebaseSignOut() {

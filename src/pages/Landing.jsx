@@ -18,30 +18,7 @@ import { continueStudyPath, normalizeStudyMode, STUDY_MODE, trueCramPracticeStat
 import { spacedContinueLabel } from '@/lib/spacedCram';
 import { useDebug } from '@/lib/DebugContext';
 import { useAuth } from '@/lib/AuthContext';
-import { formatPersonName } from '@/lib/personName';
-
-const NAME_SUFFIXES = new Set(['jr', 'jr.', 'sr', 'sr.', 'ii', 'iii', 'iv', 'v']);
-
-function dayPart(date) {
-  const hour = date.getHours();
-  if (hour < 12) return 'morning';
-  if (hour < 17) return 'afternoon';
-  return 'evening';
-}
-
-function lastNameFrom(displayName) {
-  const parts = String(displayName || '').trim().split(/\s+/).filter(Boolean);
-  while (parts.length > 1 && NAME_SUFFIXES.has(parts[parts.length - 1].toLowerCase())) {
-    parts.pop();
-  }
-  return formatPersonName(parts.at(-1) || '');
-}
-
-function greetingLine(displayName, date) {
-  const hello = `Good ${dayPart(date)}`;
-  const last = lastNameFrom(displayName);
-  return last ? `${hello}, ${last}` : hello;
-}
+import { greetingLine } from '@/lib/greeting';
 
 // Persistent home base. The only job here is getting the user into a session
 // in one tap, with zero decisions to weigh. Everything informational lives one

@@ -1,5 +1,6 @@
 import React from 'react';
-import { Navigate, useLocation, useNavigate } from 'react-router-dom';
+import { Link, Navigate, useLocation, useNavigate } from 'react-router-dom';
+import { Home } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import PartnerCockpit from '@/components/study/PartnerCockpit';
 import { continueStudyPath, normalizeStudyMode, STUDY_MODE } from '@/lib/studyUtils';
@@ -151,7 +152,16 @@ export default function TrueCram() {
     const flagged = trueCram.flaggedTermIds?.length || 0;
     return (
       <div className="min-h-[100dvh] bg-background text-foreground flex flex-col">
-        <main className="flex-1 px-6 pt-safe flex flex-col justify-center">
+        <header className="px-3 pt-safe pb-2">
+          <Link
+            to="/"
+            aria-label="Home"
+            className="flex items-center justify-center w-11 h-11 rounded-xl bg-primary text-primary-foreground shrink-0 hover:bg-primary/90 transition"
+          >
+            <Home className="w-4 h-4" />
+          </Link>
+        </header>
+        <main className="flex-1 px-6 flex flex-col justify-center">
           <div className="max-w-md mx-auto w-full">
             <h1 className="text-2xl font-bold tracking-tight">Deck covered</h1>
             <p className="text-sm text-muted-foreground mt-2 leading-relaxed">

@@ -5,7 +5,8 @@
   "vars": {
     "REVENUECAT_ENTITLEMENT_ID": "Study Pro",
     "FREE_AI_QUOTA": "5",
-    "PRO_AI_QUOTA": "30"
+    "PRO_AI_QUOTA": "30",
+    "FIREBASE_AUTH_HOST": "last-minute-study-899f2.firebaseapp.com"
   },
   "d1_databases": [
     {
@@ -82,6 +83,6 @@
     "directory": "../dist",
     "binding": "ASSETS",
     "not_found_handling": "single-page-application",
-    "run_worker_first": ["/v1/*"]
+    "run_worker_first": ["/v1/*", "/__/auth/*", "/__/firebase/*"]
   }
 }

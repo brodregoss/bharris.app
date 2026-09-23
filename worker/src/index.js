@@ -19,6 +19,7 @@ import {
 } from './notes.js';
 import { handleRevenueCatWebhook, handleSubscriptionRefresh, handleProUnlock } from './billing.js';
 import { UserStudyDO } from './user-do.js';
+import { isFirebaseAuthProxyPath, proxyFirebaseAuth } from './firebaseAuthProxy.js';
 
 export { UserStudyDO };
 
@@ -118,11 +119,14 @@ async function handlePanic(request, env, identity, sessionId) {
 
 export default {
   async fetch(request, env, ctx) {
+    const url = new URL(request.url);
+    if (isFirebaseAuthProxyPath(url.pathname)) {
+      return proxyFirebaseAuth(request, env);
+    }
+
     if (request.method === 'OPTIONS') {
       return new Response(null, { status: 204, headers: corsHeaders(request, env) });
     }
-
-    const url = new URL(request.url);
     const parts = routeParts(url.pathname);
 
     try {

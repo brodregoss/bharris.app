@@ -22,6 +22,7 @@ import { useAuth } from '@/lib/AuthContext';
 import ChangePasswordSheet from '@/components/account/ChangePasswordSheet';
 import { getUsage } from '@/lib/accountStore';
 import { formatPersonName } from '@/lib/personName';
+import { greetingLine, greetingNameStyle, setGreetingNameStyle } from '@/lib/greeting';
 import { usePaywall } from '@/lib/PaywallContext';
 import { planLabel } from '@/lib/plans';
 import {
@@ -143,6 +144,7 @@ export default function Settings() {
   const [doc, setDoc] = React.useState(null);
   const [changePasswordOpen, setChangePasswordOpen] = React.useState(false);
   const [usage, setUsage] = React.useState(null);
+  const [nameStyle, setNameStyle] = React.useState(() => greetingNameStyle());
 
   React.useEffect(() => {
     setReady(true);
@@ -164,6 +166,13 @@ export default function Settings() {
   const dark = ready && (resolvedTheme || theme) === 'dark';
   const open = DOCS[doc];
   const me = usage?.me || usage?.user || user;
+  const displayName = me?.displayName || firebaseUser?.displayName || '';
+  const greetingPreview = greetingLine(displayName, new Date(), nameStyle);
+
+  const chooseGreetingName = (style) => {
+    setGreetingNameStyle(style);
+    setNameStyle(style);
+  };
 
   return (
     <div className="min-h-[100dvh] bg-background text-foreground flex flex-col">
@@ -204,6 +213,31 @@ export default function Settings() {
               onClick={openPaywall}
             />
             <UsageBlock heading="AI this month" person={me} onUpgrade={openPaywall} />
+          </section>
+
+          <section className="rounded-2xl border border-border bg-card p-5">
+            <p className="text-sm font-bold tracking-tight">Greeting name</p>
+            <p className="text-xs text-muted-foreground mt-0.5">
+              Home says {greetingPreview}.
+            </p>
+            <div className="mt-3 grid grid-cols-2 gap-2">
+              <Button
+                type="button"
+                variant={nameStyle === 'first' ? 'default' : 'outline'}
+                className="h-11 rounded-xl text-sm font-semibold"
+                onClick={() => chooseGreetingName('first')}
+              >
+                First name
+              </Button>
+              <Button
+                type="button"
+                variant={nameStyle === 'last' ? 'default' : 'outline'}
+                className="h-11 rounded-xl text-sm font-semibold"
+                onClick={() => chooseGreetingName('last')}
+              >
+                Last name
+              </Button>
+            </div>
           </section>
 
           <section className="rounded-2xl border border-border bg-card p-5">

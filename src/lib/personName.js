@@ -1,4 +1,5 @@
 const ROMAN_SUFFIXES = new Set(['ii', 'iii', 'iv', 'v']);
+const NAME_SUFFIXES = new Set(['jr', 'jr.', 'sr', 'sr.', 'ii', 'iii', 'iv', 'v']);
 
 function capitalizeChunk(chunk) {
   const first = chunk.charAt(0);
@@ -23,4 +24,20 @@ export function formatPersonName(value) {
     .filter(Boolean)
     .map(capitalizeNamePart)
     .join(' ');
+}
+
+function nameParts(displayName) {
+  const parts = formatPersonName(displayName).split(' ').filter(Boolean);
+  while (parts.length > 1 && NAME_SUFFIXES.has(parts[parts.length - 1].toLowerCase())) {
+    parts.pop();
+  }
+  return parts;
+}
+
+// "Broderick Harris Jr" → first "Broderick", last "Harris".
+export function greetingName(displayName, style) {
+  const parts = nameParts(displayName);
+  if (!parts.length) return '';
+  if (style === 'first') return parts[0];
+  return parts[parts.length - 1];
 }

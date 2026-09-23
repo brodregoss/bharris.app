@@ -14,6 +14,7 @@ import {
   firebaseSignInWithApple,
   firebaseSignInWithGoogle,
   firebaseSignOut,
+  finishRedirectSignIn,
   listenFirebaseUser,
 } from '@/lib/firebase';
 import { firebaseConfigured } from '@/lib/appConfig';
@@ -42,6 +43,9 @@ export const AuthProvider = ({ children }) => {
         return;
       }
       try {
+        const redirectError = await finishRedirectSignIn();
+        if (cancelled) return;
+        if (redirectError) setAuthError(redirectError);
         unsubscribe = await listenFirebaseUser(async (next) => {
           setFirebaseUser(next || null);
           if (!next) {
@@ -163,6 +167,7 @@ export const AuthProvider = ({ children }) => {
       signInWithGoogle: async () => {
         try {
           const fbUser = await firebaseSignInWithGoogle();
+          if (!fbUser) return null;
           const cloud = await ensureCloudUser(fbUser);
           cacheUser(cloud);
           setUser(cloud);
@@ -177,6 +182,7 @@ export const AuthProvider = ({ children }) => {
       signInWithApple: async () => {
         try {
           const fbUser = await firebaseSignInWithApple();
+          if (!fbUser) return null;
           const cloud = await ensureCloudUser(fbUser);
           cacheUser(cloud);
           setUser(cloud);

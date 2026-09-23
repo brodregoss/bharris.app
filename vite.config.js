@@ -40,6 +40,16 @@ export default defineConfig(({ mode }) => {
           target: 'http://127.0.0.1:8787',
           changeOrigin: true,
         },
+        '/__/auth': {
+          target: 'https://last-minute-study-899f2.firebaseapp.com',
+          changeOrigin: true,
+          secure: true,
+        },
+        '/__/firebase': {
+          target: 'https://last-minute-study-899f2.firebaseapp.com',
+          changeOrigin: true,
+          secure: true,
+        },
       },
     },
   }
