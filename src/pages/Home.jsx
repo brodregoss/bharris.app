@@ -118,9 +118,9 @@ export default function Home() {
         <div className="flex items-center justify-center w-9 h-9 rounded-xl bg-primary text-primary-foreground">
           <Timer className="w-5 h-5" />
         </div>
-        <div>
-          <h1 className="text-base font-bold tracking-tight leading-none">Last Minute Study</h1>
-          <p className="text-[11px] text-muted-foreground leading-none mt-1">How much time do you have?</p>
+        <div className="min-w-0">
+          <h1 className="text-base font-bold tracking-tight leading-none truncate">Last Minute Study</h1>
+          <p className="text-[11px] text-muted-foreground leading-none mt-1 truncate">How much time do you have?</p>
         </div>
       </header>
 

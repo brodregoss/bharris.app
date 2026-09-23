@@ -6,9 +6,13 @@ export const MAX_NOTE_PHOTOS = 2;
 export const MAX_NOTE_PHOTO_BYTES = 12 * 1024 * 1024;
 
 let pendingPhotos = [];
+let pendingMarks = [];
+let pendingExtract = null;
 
 export function stashPhotos(images) {
   pendingPhotos = (Array.isArray(images) ? images : images ? [images] : []).filter(Boolean);
+  pendingMarks = [];
+  pendingExtract = null;
 }
 
 export function stashPhoto(image) {
@@ -23,8 +27,33 @@ export function peekPhoto() {
   return pendingPhotos[0] || null;
 }
 
+// When the student highlights regions, extraction uses these crops.
+// Originals stay in pendingPhotos so they can adjust the boxes and try again.
+export function stashScopedPhotos(entries) {
+  const list = (Array.isArray(entries) ? entries : []).filter((entry) => entry?.image);
+  pendingExtract = list.length ? list : null;
+}
+
+export function peekExtractPlan() {
+  return pendingExtract;
+}
+
+export function clearScopedPhotos() {
+  pendingExtract = null;
+}
+
+export function stashHighlightMarks(marks) {
+  pendingMarks = Array.isArray(marks) ? marks : [];
+}
+
+export function peekHighlightMarks() {
+  return pendingMarks;
+}
+
 export function clearPhoto() {
   pendingPhotos = [];
+  pendingExtract = null;
+  pendingMarks = [];
 }
 
 export function validateNotePhotos(fileList) {
@@ -105,4 +134,71 @@ export async function fileToJpegDataUrl(file, { maxDim = 1600, quality = 0.72 } 
     img.onerror = () => finish(new Error('Could not read that photo'));
     img.src = url;
   });
+}
+
+function loadHtmlImage(src) {
+  return new Promise((resolve, reject) => {
+    const img = new Image();
+    img.onload = () => resolve(img);
+    img.onerror = () => reject(new Error('Could not read that photo'));
+    img.src = src;
+  });
+}
+
+function padRegion(region, pad = 0.012) {
+  const x = Math.max(0, region.x - pad);
+  const y = Math.max(0, region.y - pad);
+  const right = Math.min(1, region.x + region.w + pad);
+  const bottom = Math.min(1, region.y + region.h + pad);
+  return { x, y, w: Math.max(0, right - x), h: Math.max(0, bottom - y) };
+}
+
+// Crop highlighted areas out of a notes photo. Empty input means "use the whole page".
+export async function cropImageRegions(dataUrl, regions) {
+  const boxes = (Array.isArray(regions) ? regions : [])
+    .map((region) => padRegion(region))
+    .filter((region) => region.w >= 0.02 && region.h >= 0.02);
+  if (!boxes.length) return [];
+
+  const img = await loadHtmlImage(dataUrl);
+  const nw = img.naturalWidth || img.width;
+  const nh = img.naturalHeight || img.height;
+  if (!nw || !nh) throw new Error('Could not read that photo');
+
+  return boxes.map((region) => {
+    const sx = Math.max(0, Math.min(nw - 1, Math.round(region.x * nw)));
+    const sy = Math.max(0, Math.min(nh - 1, Math.round(region.y * nh)));
+    const sw = Math.max(1, Math.min(nw - sx, Math.round(region.w * nw)));
+    const sh = Math.max(1, Math.min(nh - sy, Math.round(region.h * nh)));
+    const long = Math.max(sw, sh);
+    const scale = Math.min(1600 / long, Math.max(1, 900 / long));
+    const dw = Math.max(1, Math.round(sw * scale));
+    const dh = Math.max(1, Math.round(sh * scale));
+    const canvas = document.createElement('canvas');
+    canvas.width = dw;
+    canvas.height = dh;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) throw new Error('Could not read that photo');
+    ctx.fillStyle = '#fff';
+    ctx.fillRect(0, 0, dw, dh);
+    ctx.drawImage(img, sx, sy, sw, sh, 0, 0, dw, dh);
+    return canvas.toDataURL('image/jpeg', 0.88);
+  });
+}
+
+// Full pages stay unmarked. Highlighted pages become one image per box.
+export async function buildHighlightedExtractPlan(images, regionsByImage) {
+  const photos = (Array.isArray(images) ? images : []).filter(Boolean);
+  const entries = [];
+  for (let i = 0; i < photos.length; i++) {
+    const regions = Array.isArray(regionsByImage?.[i]) ? regionsByImage[i] : [];
+    if (!regions.length) {
+      entries.push({ image: photos[i], scoped: false });
+      continue;
+    }
+    const crops = await cropImageRegions(photos[i], regions);
+    if (!crops.length) entries.push({ image: photos[i], scoped: false });
+    else crops.forEach((image) => entries.push({ image, scoped: true }));
+  }
+  return entries;
 }

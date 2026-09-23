@@ -216,7 +216,7 @@ export default function TrueCram() {
   }
 
   return (
-    <div className="min-h-[100dvh] bg-background text-foreground flex flex-col">
+    <div className="fixed inset-0 bg-background text-foreground flex flex-col overflow-hidden px-safe">
       <PartnerCockpit
         categories={trueCram.categories || []}
         termsById={byId}

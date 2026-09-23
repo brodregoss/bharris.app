@@ -66,8 +66,8 @@ export default function AccountCreate() {
     setError('');
     setGoogleLoading(true);
     try {
-      await signInWithGoogle();
-      navigate(afterAuthPath(), { replace: true });
+      const signedIn = await signInWithGoogle();
+      if (signedIn) navigate(afterAuthPath(), { replace: true });
     } catch (err) {
       setError(err.message || 'Could not sign in with Google.');
     } finally {

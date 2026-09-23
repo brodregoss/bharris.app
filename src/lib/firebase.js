@@ -1,7 +1,9 @@
 import { initializeApp, getApps } from 'firebase/app';
 import {
   browserLocalPersistence,
+  browserPopupRedirectResolver,
   createUserWithEmailAndPassword,
+  deleteUser,
   EmailAuthProvider,
   getAuth,
   GoogleAuthProvider,
@@ -36,11 +38,52 @@ function isIosBrowser() {
   return navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1;
 }
 
+const NATIVE_GOOGLE_REDIRECT_KEY = 'lms_google_redirect';
+
+function isNativeCapacitorPage() {
+  return Capacitor.isNativePlatform()
+    && typeof window !== 'undefined'
+    && window.location.protocol === 'capacitor:';
+}
+
+function isGoogleStartPage() {
+  if (typeof window === 'undefined' || window.location.protocol !== 'https:') return false;
+  return new URLSearchParams(window.location.search).get('googleStart') === '1';
+}
+
+function nativeGoogleReturnUrl() {
+  if (typeof window === 'undefined') return '';
+  const raw = new URLSearchParams(window.location.search).get('googleReturn') || '';
+  try {
+    const url = new URL(raw);
+    if (url.protocol === 'lmsstudy:' && url.hostname === 'auth') return 'lmsstudy://auth';
+    if (url.protocol === 'capacitor:' && url.hostname === APP_CONFIG.nativeAppHost) return `${url.origin}/`;
+    return '';
+  } catch {
+    return '';
+  }
+}
+
+function leaveNativeApp(returnUrl, params) {
+  const back = new URL(returnUrl);
+  Object.entries(params).forEach(([key, value]) => {
+    if (value) back.searchParams.set(key, value);
+  });
+  back.hash = '/account';
+  window.location.replace(back.toString());
+}
+
+function iosAuthDomain() {
+  if (typeof window === 'undefined' || !isIosBrowser()) return '';
+  // Safari and the in-app https page use this site so Google’s helper stays first-party.
+  if (!Capacitor.isNativePlatform() || window.location.protocol === 'https:') return window.location.host;
+  return String(APP_CONFIG.workerUrl || '').replace(/^https?:\/\//, '').replace(/\/$/, '');
+}
+
 function firebaseAppConfig() {
   const config = { ...APP_CONFIG.firebase };
-  if (typeof window !== 'undefined' && !Capacitor.isNativePlatform() && isIosBrowser()) {
-    config.authDomain = window.location.host;
-  }
+  const domain = iosAuthDomain();
+  if (domain) config.authDomain = domain;
   return config;
 }
 
@@ -51,7 +94,9 @@ export function getFirebaseAuth() {
   if (authPromise) return authPromise;
   authPromise = (async () => {
     const app = getApps()[0] || initializeApp(firebaseAppConfig());
-    if (Capacitor.isNativePlatform()) {
+    if (Capacitor.isNativePlatform() || isIosBrowser()) {
+      // Do not attach the popup redirect helper here. On iPhone it loads an
+      // iframe before anything else and makes Google sign-in feel stuck.
       try {
         return initializeAuth(app, { persistence: indexedDBLocalPersistence });
       } catch {
@@ -106,32 +151,121 @@ export async function firebaseSignIn(email, password) {
   return cred.user;
 }
 
+function rememberNativeGoogleRedirect() {
+  try {
+    localStorage.setItem(NATIVE_GOOGLE_REDIRECT_KEY, '1');
+  } catch {
+    // The redirect can still complete if session storage survives.
+  }
+}
+
+function clearNativeGoogleRedirect() {
+  try {
+    localStorage.removeItem(NATIVE_GOOGLE_REDIRECT_KEY);
+  } catch {
+    // Ignore storage failures.
+  }
+}
+
+function nativeGoogleRedirectPending() {
+  try {
+    return localStorage.getItem(NATIVE_GOOGLE_REDIRECT_KEY) === '1';
+  } catch {
+    return false;
+  }
+}
+
 async function webProviderSignIn(auth, provider) {
   if (isIosBrowser()) {
-    await signInWithRedirect(auth, provider);
-    await new Promise(() => {});
+    rememberNativeGoogleRedirect();
+    try {
+      await Promise.race([
+        signInWithRedirect(auth, provider, browserPopupRedirectResolver),
+        new Promise((_, reject) => {
+          setTimeout(() => reject(new Error('Google sign-in did not open. Try again.')), 10000);
+        }),
+      ]);
+    } catch (err) {
+      clearNativeGoogleRedirect();
+      const returnUrl = isGoogleStartPage() ? nativeGoogleReturnUrl() : '';
+      if (returnUrl) {
+        leaveNativeApp(returnUrl, { googleCancelled: '1' });
+        await new Promise(() => {});
+      }
+      throw err;
+    }
+    return null;
   }
   const cred = await signInWithPopup(auth, provider);
   return cred.user;
 }
 
+async function returnGoogleResultToApp(result) {
+  const returnUrl = nativeGoogleReturnUrl();
+  if (!returnUrl) return false;
+  const idToken = result ? GoogleAuthProvider.credentialFromResult(result)?.idToken || '' : '';
+  leaveNativeApp(returnUrl, idToken ? { googleIdToken: idToken } : { googleCancelled: '1' });
+  await new Promise(() => {});
+  return true;
+}
+
 export async function finishRedirectSignIn() {
-  if (Capacitor.isNativePlatform() || !isIosBrowser()) return null;
+  if (!isIosBrowser() || !nativeGoogleRedirectPending()) return null;
+  clearNativeGoogleRedirect();
   const auth = await getFirebaseAuth();
   try {
-    await getRedirectResult(auth);
+    const result = await Promise.race([
+      getRedirectResult(auth, browserPopupRedirectResolver),
+      new Promise((_, reject) => {
+        setTimeout(() => reject(Object.assign(new Error('redirect-timeout'), { code: 'auth/timeout' })), 12000);
+      }),
+    ]);
+    if (isGoogleStartPage()) await returnGoogleResultToApp(result);
     return null;
   } catch (err) {
+    if (isGoogleStartPage()) await returnGoogleResultToApp(null);
+    if (err?.code === 'auth/argument-error' || err?.code === 'auth/timeout') return null;
     return firebaseErrorMessage(err);
   }
 }
 
+export async function adoptNativeGoogleHandoff() {
+  if (!isNativeCapacitorPage()) return '';
+  const params = new URLSearchParams(window.location.search);
+  const token = params.get('googleIdToken') || '';
+  const cancelled = params.get('googleCancelled') === '1';
+  if (!token && !cancelled) return '';
+  const clean = new URL(window.location.href);
+  clean.searchParams.delete('googleIdToken');
+  clean.searchParams.delete('googleCancelled');
+  window.history.replaceState(null, '', `${clean.pathname}${clean.search}${clean.hash}`);
+  if (cancelled) return 'cancelled';
+  const auth = await getFirebaseAuth();
+  await signInWithCredential(auth, GoogleAuthProvider.credential(token));
+  return 'signed-in';
+}
+
 export async function firebaseSignInWithGoogle() {
   const auth = await getFirebaseAuth();
-  if (Capacitor.isNativePlatform()) {
+  // Open Safari, where the Google account is already signed in. The in-app
+  // page has no Google session, so it asks for the email again.
+  if (isNativeCapacitorPage()) {
+    if (!APP_CONFIG.workerUrl) throw new Error('Google sign-in is not available in the app yet.');
+    const start = new URL(`${APP_CONFIG.workerUrl}/`);
+    start.searchParams.set('googleStart', '1');
+    start.searchParams.set('googleReturn', 'lmsstudy://auth');
+    start.hash = '/account';
+    window.location.assign(start.toString());
+    return null;
+  }
+  if (Capacitor.isNativePlatform() && !isIosBrowser()) {
     return nativeGoogleUser(auth);
   }
   return webProviderSignIn(auth, googleProvider());
+}
+
+export function shouldStartHostedGoogleSignIn() {
+  return isGoogleStartPage() && !!nativeGoogleReturnUrl() && !nativeGoogleRedirectPending();
 }
 
 function appleProvider() {
@@ -166,6 +300,20 @@ export async function firebaseSignInWithApple() {
     return nativeAppleUser(auth);
   }
   return webProviderSignIn(auth, appleProvider());
+}
+
+export async function firebaseDeleteAccount() {
+  const auth = await getFirebaseAuth();
+  const current = auth.currentUser;
+  if (!current) throw new Error('Sign in again before deleting this account.');
+  try {
+    await deleteUser(current);
+  } catch (err) {
+    if (err?.code === 'auth/requires-recent-login') {
+      throw new Error('Sign out, sign back in, and delete the account again.');
+    }
+    throw new Error(firebaseErrorMessage(err));
+  }
 }
 
 export async function firebaseSignOut() {
@@ -290,6 +438,9 @@ export function firebaseErrorMessage(err, provider) {
   }
   if (code === 'auth/missing-or-invalid-nonce') return 'Apple sign-in could not be verified. Try again.';
   if (code === 'auth/unauthorized-domain') {
+    if (Capacitor.isNativePlatform() && window.location.protocol === 'capacitor:') {
+      return 'Google sign-in could not open inside the app. Try again.';
+    }
     return 'Add this site to Firebase Authentication → Settings → Authorized domains.';
   }
   if (code === 'auth/account-exists-with-different-credential') {

@@ -19,7 +19,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
-import { listRemoteSessions, loadPracticeSource, loadFinishedSession, loadRemoteSession, deleteRemoteSession, clearFinishedSession, loadSession, loadLatestCram } from '@/lib/sessionStore';
+import { listRemoteSessions, loadPracticeSource, loadFinishedSession, loadRemoteSession, deleteRemoteSession, clearFinishedSession, loadSession, loadLatestCram, beginSession } from '@/lib/sessionStore';
 import { continueStudyPath, trueCramPracticeState } from '@/lib/studyUtils';
 import { listNotes, parseNoteTerms, deleteNote } from '@/lib/notesUpload';
 import { useAuth } from '@/lib/AuthContext';
@@ -210,9 +210,20 @@ export default function PastSessions() {
         return;
       }
       if (action === 'practice') {
-        const cram = trueCramPracticeState(full);
+        const saved = beginSession({
+          setup: full.setup || { title: full.title || choice.title },
+          terms: full.terms,
+          title: full.title || choice.title,
+          noteId: full.noteId || full.note_id || choice.noteId || null,
+          phase: full.phase || null,
+          flaggedTermIds: full.flaggedTermIds || full.trueCram?.flaggedTermIds,
+          coveredIds: full.coveredIds || full.trueCram?.coveredIds,
+          trueCram: full.trueCram,
+        });
+        const session = saved?.terms?.length ? saved : full;
+        const cram = trueCramPracticeState(session);
         navigate('/practice', {
-          state: { session: full, kind: 'history', ...(cram || {}) },
+          state: { session, kind: saved ? 'active' : 'history', ...(cram || {}) },
         });
         return;
       }
@@ -265,7 +276,7 @@ export default function PastSessions() {
         <Button variant="ghost" size="icon" onClick={() => navigate('/')} aria-label="Back">
           <ArrowLeft className="w-5 h-5" />
         </Button>
-        <h1 className="text-base font-bold tracking-tight">Past sessions</h1>
+        <h1 className="min-w-0 truncate text-base font-bold tracking-tight">Past sessions</h1>
       </header>
       <p className="px-5 text-xs text-muted-foreground mb-3">
         {loading && !sessions.length

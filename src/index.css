@@ -101,6 +101,12 @@
     color: hsl(var(--foreground));
   }
 
+  /* Keep in-flow controls off the landscape notch. Fixed layers set this themselves. */
+  #root {
+    padding-left: env(safe-area-inset-left, 0px);
+    padding-right: env(safe-area-inset-right, 0px);
+  }
+
   html {
     color-scheme: light;
   }
@@ -159,5 +165,15 @@
   }
   .bottom-safe {
     bottom: max(1.25rem, calc(env(safe-area-inset-bottom, 0px) + 0.75rem));
+  }
+  .px-safe {
+    padding-left: env(safe-area-inset-left, 0px);
+    padding-right: env(safe-area-inset-right, 0px);
+  }
+  .right-safe {
+    right: max(1rem, env(safe-area-inset-right, 0px));
+  }
+  .bottom-safe-float {
+    bottom: max(1rem, env(safe-area-inset-bottom, 0px));
   }
 }

@@ -41,7 +41,7 @@ export default function Welcome() {
       } catch {
         // Extract still runs from the in-memory photos; R2 persist can retry later.
       }
-      navigate('/review-notes', {
+      navigate('/highlight-notes', {
         state: { source: { ...makePhotoSource({ name, title: '', noteId }), noteId } },
       });
     } catch {

@@ -49,16 +49,35 @@ export default function PartnerCockpit({
   const missed = React.useMemo(() => new Set(flaggedTermIds || []), [flaggedTermIds]);
   const covered = React.useMemo(() => new Set(coveredIds || []), [coveredIds]);
   const currentRef = React.useRef(null);
+  const listRef = React.useRef(null);
 
   React.useEffect(() => {
-    currentRef.current?.scrollIntoView({ block: 'nearest' });
+    const prev = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    return () => {
+      document.body.style.overflow = prev;
+    };
+  }, []);
+
+  React.useEffect(() => {
+    const item = currentRef.current;
+    const scroller = listRef.current;
+    if (!item || !scroller) return;
+    const itemRect = item.getBoundingClientRect();
+    const box = scroller.getBoundingClientRect();
+    if (itemRect.top < box.top) {
+      scroller.scrollTop -= box.top - itemRect.top;
+    } else if (itemRect.bottom > box.bottom) {
+      scroller.scrollTop += itemRect.bottom - box.bottom;
+    }
   }, [currentId]);
 
   const list = (
     <div
+      ref={listRef}
       className={cn(
-        'shrink-0 overflow-y-auto border-border bg-card/60',
-        landscape ? 'w-56 border-r' : 'w-full max-h-[38vh] border-b'
+        'min-h-0 overflow-y-auto overscroll-y-contain border-border bg-card/60',
+        landscape ? 'w-56 shrink-0 self-stretch border-r' : 'w-full max-h-[38vh] shrink-0 border-b'
       )}
     >
       <div className="px-2 py-2 space-y-3">
@@ -129,8 +148,12 @@ export default function PartnerCockpit({
   );
 
   return (
-    <div className="flex-1 flex flex-col min-h-0">
-      <div className="px-3 pt-safe pb-2 border-b border-border flex items-center gap-3">
+    <div
+      className={cn(
+        'flex-1 flex flex-col min-h-0 h-full overflow-hidden'
+      )}
+    >
+      <div className="shrink-0 px-3 pt-safe pb-2 border-b border-border flex items-center gap-3">
         <Link
           to="/"
           aria-label="Home"
@@ -147,7 +170,7 @@ export default function PartnerCockpit({
         </p>
       </div>
 
-      <div className="flex-1 flex flex-col min-h-0 relative">
+      <div className="flex-1 flex flex-col min-h-0 overflow-hidden relative">
         {showRotate && (
           <div className="absolute inset-0 z-30 bg-background/95 flex flex-col items-center justify-center px-8 text-center">
             <RotateCcw className="w-8 h-8 mb-3 text-muted-foreground" />
@@ -166,12 +189,12 @@ export default function PartnerCockpit({
           </div>
         )}
 
-        <div className={cn('flex-1 flex min-h-0', landscape ? 'flex-row' : 'flex-col')}>
+        <div className={cn('flex-1 flex min-h-0 overflow-hidden', landscape ? 'flex-row' : 'flex-col')}>
           {list}
-          <div className="flex-1 flex flex-col min-h-0 px-5 py-4">
+          <div className={cn('flex-1 flex flex-col min-h-0 overflow-hidden px-5', landscape ? 'py-2' : 'py-4')}>
             {current ? (
               <>
-                <div className="flex-1 overflow-y-auto">
+                <div className="flex-1 min-h-0 overflow-y-auto overscroll-y-contain">
                   <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground mb-1.5">
                     Term
                   </p>
@@ -188,7 +211,7 @@ export default function PartnerCockpit({
                     {flashcardDef(current)}
                   </p>
                 </div>
-                <div className="grid grid-cols-2 gap-3 pt-4 pb-safe">
+                <div className={cn('shrink-0 grid grid-cols-2 gap-3 pb-safe', landscape ? 'pt-2' : 'pt-4')}>
                   <Button
                     type="button"
                     variant="outline"

@@ -35,17 +35,28 @@ function mergeUnique(base, extra) {
   return out.slice(0, HARD_CAP);
 }
 
-async function extractPass(image, already) {
+function scopeLine(scoped) {
+  return scoped
+    ? `This image is one area the student highlighted on a page of notes.\n` +
+      `Extract terms only from what is visible in this image.\n`
+    : '';
+}
+
+async function extractPass(image, already, { scoped = false } = {}) {
   const prompt = already?.length
-    ? `This is the same photo of a student's study notes.\n` +
+    ? `${scopeLine(scoped)}` +
+      `This is the same image of a student's study notes.\n` +
       `These terms were already extracted:\n${already.map((t) => `- ${t}`).join('\n')}\n\n` +
       `List every remaining term, heading, or concept still visible that is not in that list.\n` +
       `If nothing is left, return an empty terms array.\n` +
-      `Do not repeat names. Do not invent topics that are not on the page.`
-    : `This is a photo of a student's study notes (handwritten or printed).\n` +
+      `Do not repeat names. Do not invent topics that are not in the image.`
+    : `${scopeLine(scoped)}` +
+      (scoped
+        ? ''
+        : `This is a photo of a student's study notes (handwritten or printed).\n`) +
       `Extract EVERY distinct term, heading, numbered item, or concept that actually appears.\n` +
       `Do not stop at a short list — a full page may have many terms.\n` +
-      `Do not invent topics that are not on the page.\n` +
+      `Do not invent topics that are not in the image.\n` +
       `For each: term (short name as written), notes (any definition or explanation written next to it; empty string if none).`;
 
   const res = await invokeLlm({
@@ -73,13 +84,19 @@ async function extractPass(image, already) {
   return parseExtracted(res);
 }
 
-export async function extractTermsFromPhoto(image, onProgress) {
+function asExtractImage(item) {
+  if (typeof item === 'string') return item ? { image: item, scoped: false } : null;
+  if (!item?.image) return null;
+  return { image: item.image, scoped: !!item.scoped };
+}
+
+export async function extractTermsFromPhoto(image, onProgress, options) {
   onProgress?.('Finding terms…');
-  const first = await extractPass(image, null);
+  const first = await extractPass(image, null, options);
   let list = first.slice(0, HARD_CAP);
   if (list.length >= 8 && list.length < HARD_CAP) {
     onProgress?.('Looking for more terms…');
-    const more = await extractPass(image, list.map((t) => t.term));
+    const more = await extractPass(image, list.map((t) => t.term), options);
     list = mergeUnique(list, more);
   }
   if (!list.length) throw new Error('empty terms');
@@ -87,13 +104,21 @@ export async function extractTermsFromPhoto(image, onProgress) {
 }
 
 export async function extractTermsFromPhotos(images, onProgress) {
-  const list = (Array.isArray(images) ? images : [images]).filter(Boolean);
+  const list = (Array.isArray(images) ? images : [images]).map(asExtractImage).filter(Boolean);
   if (!list.length) throw new Error('empty terms');
   let all = [];
   for (let i = 0; i < list.length; i++) {
-    const page = list.length > 1 ? ` (page ${i + 1} of ${list.length})` : '';
-    const found = await extractTermsFromPhoto(list[i], (msg) => onProgress?.(`${msg}${page}`));
-    all = mergeUnique(all, found);
+    const page = list.length > 1 ? ` (${i + 1} of ${list.length})` : '';
+    try {
+      const found = await extractTermsFromPhoto(
+        list[i].image,
+        (msg) => onProgress?.(`${msg}${page}`),
+        { scoped: list[i].scoped },
+      );
+      all = mergeUnique(all, found);
+    } catch (err) {
+      if (err?.message !== 'empty terms') throw err;
+    }
   }
   if (!all.length) throw new Error('empty terms');
   return all;

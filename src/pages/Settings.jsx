@@ -13,6 +13,7 @@ import {
   Sparkles,
   LogOut,
   KeyRound,
+  Trash2,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Switch } from '@/components/ui/switch';
@@ -32,6 +33,15 @@ import {
   SheetTitle,
   SheetDescription,
 } from '@/components/ui/sheet';
+import {
+  AlertDialog,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
 import {
   APP_NAME,
   APP_VERSION,
@@ -137,7 +147,7 @@ function UsageBlock({ heading, person, onUpgrade }) {
 
 export default function Settings() {
   const navigate = useNavigate();
-  const { user, firebaseUser, logout } = useAuth();
+  const { user, firebaseUser, logout, deleteAccount } = useAuth();
   const { openPaywall } = usePaywall();
   const { theme, setTheme, resolvedTheme } = useTheme();
   const [ready, setReady] = React.useState(false);
@@ -145,6 +155,9 @@ export default function Settings() {
   const [changePasswordOpen, setChangePasswordOpen] = React.useState(false);
   const [usage, setUsage] = React.useState(null);
   const [nameStyle, setNameStyle] = React.useState(() => greetingNameStyle());
+  const [deleteOpen, setDeleteOpen] = React.useState(false);
+  const [deleting, setDeleting] = React.useState(false);
+  const [deleteError, setDeleteError] = React.useState('');
 
   React.useEffect(() => {
     setReady(true);
@@ -180,7 +193,7 @@ export default function Settings() {
         <Button variant="ghost" size="icon" onClick={() => navigate('/')} aria-label="Back">
           <ArrowLeft className="w-5 h-5" />
         </Button>
-        <h1 className="text-base font-bold tracking-tight">Settings</h1>
+        <h1 className="min-w-0 truncate text-base font-bold tracking-tight">Settings</h1>
       </header>
       <div className="flex-1 overflow-y-auto px-5 pb-24 flex flex-col">
         <div className="max-w-md mx-auto w-full flex-1 flex flex-col gap-4">
@@ -285,11 +298,65 @@ export default function Settings() {
             Sign out
           </button>
 
+          <button
+            type="button"
+            onClick={() => {
+              setDeleteError('');
+              setDeleteOpen(true);
+            }}
+            className="flex items-center justify-center gap-2 text-sm text-destructive hover:opacity-80"
+          >
+            <Trash2 className="w-4 h-4" />
+            Delete account
+          </button>
+
           <p className="mt-auto pt-8 text-center text-xs font-bold text-muted-foreground">
             Honorable Mention – Room 91B
           </p>
         </div>
       </div>
+
+      <AlertDialog
+        open={deleteOpen}
+        onOpenChange={(open) => {
+          if (deleting) return;
+          setDeleteOpen(open);
+        }}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete this account?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This removes your login, notes, and study sessions. It cannot be undone.
+              An App Store subscription still has to be cancelled in iPhone Settings.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          {deleteError && (
+            <p className="text-sm text-destructive">{deleteError}</p>
+          )}
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={deleting}>Cancel</AlertDialogCancel>
+            <Button
+              variant="destructive"
+              disabled={deleting}
+              onClick={async () => {
+                setDeleting(true);
+                setDeleteError('');
+                try {
+                  await deleteAccount();
+                  navigate('/account', { replace: true });
+                } catch (err) {
+                  setDeleteError(err instanceof Error ? err.message : 'Could not delete the account.');
+                } finally {
+                  setDeleting(false);
+                }
+              }}
+            >
+              {deleting ? 'Deleting…' : 'Delete account'}
+            </Button>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
 
       <ChangePasswordSheet
         open={changePasswordOpen}

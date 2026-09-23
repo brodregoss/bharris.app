@@ -5,10 +5,12 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { extractTermsFromPhotos, generateDefinitions, regenerateDefinition } from '@/lib/extractNotes';
-import { peekPhotos, peekPhoto, clearPhoto } from '@/lib/imageData';
+import { peekPhotos, peekPhoto, peekExtractPlan, clearPhoto } from '@/lib/imageData';
 import { patchNote, saveManualNote } from '@/lib/notesUpload';
 
 function photosFor(source) {
+  const plan = peekExtractPlan();
+  if (plan?.length) return plan;
   const stashed = peekPhotos();
   if (stashed.length) return stashed;
   if (Array.isArray(source?.images) && source.images.length) return source.images.filter(Boolean);
@@ -161,10 +163,13 @@ export default function ReviewNotes() {
     clearPhoto();
   };
 
+  const backToHighlights = () => {
+    navigate('/highlight-notes', { state: { source } });
+  };
+
   const goBack = () => {
-    if (extracting) {
-      clearPhoto();
-      navigate('/welcome');
+    if (extracting || extractError) {
+      backToHighlights();
       return;
     }
     if (setup) {
@@ -226,7 +231,9 @@ export default function ReviewNotes() {
               <Loader2 className="w-8 h-8 text-muted-foreground animate-spin" />
               <p className="text-sm font-medium">{extractHint}</p>
               <p className="text-xs text-muted-foreground max-w-xs">
-                Reading your photo{photosFor(source).length > 1 ? 's' : ''}, then writing a short definition for each term.
+                {photosFor(source).some((item) => item?.scoped)
+                  ? 'Reading the areas you highlighted, then writing a short definition for each term.'
+                  : `Reading your photo${photosFor(source).length > 1 ? 's' : ''}, then writing a short definition for each term.`}
               </p>
             </div>
           ) : extractError ? (
@@ -243,6 +250,13 @@ export default function ReviewNotes() {
               >
                 Try again
               </Button>
+              <button
+                type="button"
+                onClick={backToHighlights}
+                className="text-xs text-muted-foreground underline-offset-4 hover:underline"
+              >
+                Change highlights
+              </button>
               <button
                 type="button"
                 onClick={() => {

@@ -450,12 +450,12 @@ export default function SpacedCram() {
           type="button"
           onClick={endToHome}
           aria-label="Home"
-          className="w-11 h-11 rounded-full flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-accent transition"
+          className="w-11 h-11 shrink-0 rounded-full flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-accent transition"
         >
           <ArrowLeft className="w-5 h-5" />
         </button>
-        <p className="text-sm font-semibold">{drillLabel(sitting, spaced, schedule)}</p>
-        <span className="w-11" />
+        <p className="min-w-0 flex-1 text-center text-sm font-semibold truncate">{drillLabel(sitting, spaced, schedule)}</p>
+        <span className="w-11 shrink-0" />
       </header>
       <div className="flex-1 flex flex-col min-h-0">
         {sittingTerms.length ? (

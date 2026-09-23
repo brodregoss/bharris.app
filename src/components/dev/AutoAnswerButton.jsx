@@ -76,7 +76,7 @@ export default function AutoAnswerButton() {
       onClick={run}
       disabled={busy}
       title="Answer current question correctly"
-      className="fixed z-[9998] bottom-4 right-16 w-10 h-10 rounded-full bg-emerald-600 text-white shadow-lg flex items-center justify-center opacity-40 hover:opacity-100 transition disabled:opacity-30"
+      className="w-10 h-10 rounded-full bg-emerald-600 text-white shadow-lg flex items-center justify-center opacity-40 hover:opacity-100 transition disabled:opacity-30"
     >
       <Check className="w-5 h-5" />
     </button>

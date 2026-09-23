@@ -16,7 +16,36 @@ class SceneDelegate: UIResponder, UIWindowSceneDelegate {
         lockWebViewZoom()
         DispatchQueue.main.async { [weak self] in self?.lockWebViewZoom() }
 
+        if let url = connectionOptions.urlContexts.first?.url {
+            deliverGoogleHandoff(url)
+        }
         SceneDelegateProxy.shared.scene(scene, willConnectTo: session, options: connectionOptions)
+    }
+
+    /// Safari finishes Google sign-in, then opens lmsstudy:// so the account comes back into the app.
+    private func deliverGoogleHandoff(_ url: URL, attempt: Int = 0) {
+        guard url.scheme == "lmsstudy" else { return }
+        guard let controller = window?.rootViewController as? CAPBridgeViewController,
+              let webView = controller.webView else {
+            if attempt < 20 {
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) { [weak self] in
+                    self?.deliverGoogleHandoff(url, attempt: attempt + 1)
+                }
+            }
+            return
+        }
+        let items = URLComponents(url: url, resolvingAgainstBaseURL: false)?.queryItems ?? []
+        let query = ["googleIdToken", "googleCancelled"].compactMap { name -> String? in
+            guard let value = items.first(where: { $0.name == name })?.value,
+                  let encoded = value.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) else {
+                return nil
+            }
+            return "\(name)=\(encoded)"
+        }.joined(separator: "&")
+        let local = "capacitor://enthusiastic-cram-genius-flow.base44.app/?\(query)#/account"
+        if let localURL = URL(string: local) {
+            webView.load(URLRequest(url: localURL))
+        }
     }
 
     /// Stops pinch-zoom and leftover auto-zoom after focusing a text field.
@@ -37,6 +66,10 @@ class SceneDelegate: UIResponder, UIWindowSceneDelegate {
     }
 
     func scene(_ scene: UIScene, openURLContexts URLContexts: Set<UIOpenURLContext>) {
+        if let url = URLContexts.first?.url, url.scheme == "lmsstudy" {
+            deliverGoogleHandoff(url)
+            return
+        }
         SceneDelegateProxy.shared.scene(scene, openURLContexts: URLContexts)
     }
 

@@ -6,6 +6,71 @@ import { cn } from '@/lib/utils';
 
 export const STUCK_AFTER_ROTATIONS = 3;
 
+function useFitAboveKeyboard(step, typing) {
+  const ref = React.useRef(null);
+  const [frame, setFrame] = React.useState({ height: null, keyboard: false });
+
+  React.useLayoutEffect(() => {
+    const html = document.documentElement;
+    const body = document.body;
+    const prev = {
+      htmlOverflow: html.style.overflow,
+      bodyOverflow: body.style.overflow,
+      bodyPosition: body.style.position,
+      bodyTop: body.style.top,
+      bodyWidth: body.style.width,
+    };
+
+    if (typing) {
+      html.style.overflow = 'hidden';
+      body.style.overflow = 'hidden';
+      body.style.position = 'fixed';
+      body.style.top = '0px';
+      body.style.width = '100%';
+      window.scrollTo(0, 0);
+    }
+
+    const measure = () => {
+      const node = ref.current;
+      const vv = window.visualViewport;
+      if (!node || !vv) return;
+      if (typing && window.scrollY > 0) window.scrollTo(0, 0);
+      const top = Math.max(0, node.getBoundingClientRect().top);
+      const keyboardGap = Math.max(0, window.innerHeight - vv.height - vv.offsetTop);
+      setFrame({
+        height: Math.max(220, Math.round(vv.height - top)),
+        keyboard: keyboardGap > 80,
+      });
+    };
+
+    measure();
+    const vv = window.visualViewport;
+    const onViewport = () => measure();
+    vv?.addEventListener('resize', onViewport);
+    vv?.addEventListener('scroll', onViewport);
+    window.addEventListener('resize', onViewport);
+    window.addEventListener('orientationchange', onViewport);
+    const pinTimers = typing
+      ? [window.setTimeout(measure, 60), window.setTimeout(measure, 280)]
+      : [];
+
+    return () => {
+      pinTimers.forEach((id) => window.clearTimeout(id));
+      vv?.removeEventListener('resize', onViewport);
+      vv?.removeEventListener('scroll', onViewport);
+      window.removeEventListener('resize', onViewport);
+      window.removeEventListener('orientationchange', onViewport);
+      html.style.overflow = prev.htmlOverflow;
+      body.style.overflow = prev.bodyOverflow;
+      body.style.position = prev.bodyPosition;
+      body.style.top = prev.bodyTop;
+      body.style.width = prev.bodyWidth;
+    };
+  }, [step, typing]);
+
+  return [ref, frame];
+}
+
 export function definitionHint(text) {
   const words = String(text || '').trim().split(/\s+/).filter(Boolean);
   if (!words.length) return '';
@@ -63,6 +128,8 @@ export default function WriteOwnDef({
   const [picked, setPicked] = React.useState(() => new Set((initialCards || []).map((c) => c.id)));
   const [drafts, setDrafts] = React.useState({});
   const writtenRef = React.useRef([]);
+  const [fitRef, frame] = useFitAboveKeyboard(step, typing);
+  const fitStyle = frame.height ? { height: frame.height } : undefined;
 
   const current = list[idx];
   const own = current ? (drafts[current.id] ?? current.ownDefinition ?? '') : '';
@@ -114,7 +181,11 @@ export default function WriteOwnDef({
   const beginPeek = (e) => {
     if (!typing) return;
     e.preventDefault();
-    e.currentTarget.setPointerCapture?.(e.pointerId);
+    try {
+      e.currentTarget.setPointerCapture?.(e.pointerId);
+    } catch {
+      // Peek still works if the browser rejects capture.
+    }
     setPeeking(true);
   };
 
@@ -122,8 +193,8 @@ export default function WriteOwnDef({
 
   if (step === 'add') {
     return (
-      <div className="flex-1 flex flex-col px-5 pt-4">
-        <div className="max-w-md mx-auto w-full flex-1 flex flex-col">
+      <div ref={fitRef} style={fitStyle} className="flex flex-col min-h-0 overflow-hidden px-5 pt-4">
+        <div className="max-w-md mx-auto w-full flex-1 flex flex-col min-h-0">
           <button
             type="button"
             onClick={() => setStep('intro')}
@@ -165,19 +236,21 @@ export default function WriteOwnDef({
               <p className="text-sm text-muted-foreground">No other terms to add.</p>
             )}
           </div>
-          <Button
-            onClick={() => {
-              const chosen = uniqueCards([
-                ...list,
-                ...(allTerms || []).filter((t) => picked.has(t.id)),
-              ]);
-              setList(chosen);
-              setStep('intro');
-            }}
-            className="w-full h-12 rounded-2xl font-semibold"
-          >
-            Done
-          </Button>
+          <div className="shrink-0 pb-safe">
+            <Button
+              onClick={() => {
+                const chosen = uniqueCards([
+                  ...list,
+                  ...(allTerms || []).filter((t) => picked.has(t.id)),
+                ]);
+                setList(chosen);
+                setStep('intro');
+              }}
+              className="w-full h-12 rounded-2xl font-semibold"
+            >
+              Done
+            </Button>
+          </div>
         </div>
       </div>
     );
@@ -185,8 +258,8 @@ export default function WriteOwnDef({
 
   if (step === 'intro') {
     return (
-      <div className="flex-1 flex flex-col px-5 pt-4">
-        <div className="max-w-md mx-auto w-full flex-1 flex flex-col">
+      <div ref={fitRef} style={fitStyle} className="flex flex-col min-h-0 overflow-hidden px-5 pt-4">
+        <div className="max-w-md mx-auto w-full flex-1 flex flex-col min-h-0">
           <h2 className="text-2xl font-bold tracking-tight mb-2">
             {variant === 'defMode' ? 'Write your own def' : 'Feeling stuck?'}
           </h2>
@@ -209,19 +282,21 @@ export default function WriteOwnDef({
               Add more terms
             </button>
           )}
-          <Button onClick={() => startWriting(list)} className="w-full h-12 rounded-2xl font-semibold">
-            Next
-            <ArrowRight className="w-4 h-4 ml-2" />
-          </Button>
-          {onSkip && (
-            <button
-              type="button"
-              onClick={onSkip}
-              className="mt-3 mb-2 text-sm text-muted-foreground hover:text-foreground underline-offset-4 hover:underline"
-            >
-              {skipLabel || 'Keep going'}
-            </button>
-          )}
+          <div className="shrink-0 pb-safe">
+            <Button onClick={() => startWriting(list)} className="w-full h-12 rounded-2xl font-semibold">
+              Next
+              <ArrowRight className="w-4 h-4 ml-2" />
+            </Button>
+            {onSkip && (
+              <button
+                type="button"
+                onClick={onSkip}
+                className="mt-3 text-sm text-muted-foreground hover:text-foreground underline-offset-4 hover:underline"
+              >
+                {skipLabel || 'Keep going'}
+              </button>
+            )}
+          </div>
         </div>
       </div>
     );
@@ -230,24 +305,27 @@ export default function WriteOwnDef({
   if (!current) return null;
 
   return (
-    <div className="flex-1 flex flex-col px-5 pt-4">
-      <div className="max-w-md mx-auto w-full flex-1 flex flex-col">
+    <div ref={fitRef} style={fitStyle} className="flex flex-col min-h-0 overflow-hidden px-5 pt-3">
+      <div className="max-w-md mx-auto w-full flex-1 flex flex-col min-h-0">
         {list.length > 1 && (
-          <p className="text-xs text-muted-foreground mb-2">
+          <p className="text-xs text-muted-foreground mb-1 shrink-0">
             {idx + 1}/{list.length}
           </p>
         )}
-        <p className="text-[11px] uppercase tracking-wide text-muted-foreground mb-1">Term</p>
-        <h3 className="text-2xl font-bold tracking-tight mb-2">{current.term}</h3>
-        <p className="text-sm text-muted-foreground leading-relaxed mb-3">
-          {typing
-            ? 'Hold the definition to peek. Let go, then type your own version.'
-            : 'Look at the definition. Try to memorize it. Don’t just rewrite — paraphrase and recall information to build a definition you will remember.'}
-        </p>
+        <p className="text-[11px] uppercase tracking-wide text-muted-foreground mb-1 shrink-0">Term</p>
+        <h3 className="text-xl font-bold tracking-tight mb-2 shrink-0 leading-tight">{current.term}</h3>
+        {!frame.keyboard && (
+          <p className="text-sm text-muted-foreground leading-relaxed mb-3 shrink-0">
+            {typing
+              ? 'Hold the definition to peek. Let go, then type your own version.'
+              : 'Look at the definition. Try to memorize it. Don’t just rewrite — paraphrase and recall information to build a definition you will remember.'}
+          </p>
+        )}
         <div
           className={cn(
-            'relative flex-1 min-h-[8.5rem] rounded-2xl border border-border bg-card p-5 select-none',
-            typing && 'touch-none cursor-pointer',
+            'relative min-h-[4.5rem] flex-1 basis-44 max-h-44 overflow-y-auto rounded-2xl border border-border bg-card p-4 select-none',
+            frame.keyboard && 'basis-28 max-h-28',
+            typing && !peeking && 'touch-none cursor-pointer',
           )}
           style={typing ? { WebkitTouchCallout: 'none' } : undefined}
           onPointerDown={typing ? beginPeek : undefined}
@@ -266,7 +344,7 @@ export default function WriteOwnDef({
             </div>
           )}
         </div>
-        <div className="mt-4">
+        <div className="mt-3 shrink-0">
           {typing ? (
             <Textarea
               value={own}
@@ -275,10 +353,16 @@ export default function WriteOwnDef({
                 const value = e.target.value;
                 setDrafts((prev) => ({ ...prev, [id]: value }));
               }}
+              onFocus={() => {
+                if (window.scrollY > 0) window.scrollTo(0, 0);
+              }}
               autoFocus
-              rows={4}
+              rows={3}
               placeholder="Don’t just rewrite — paraphrase and recall information to build a definition you will remember"
-              className="rounded-2xl text-base min-h-[120px]"
+              className={cn(
+                'rounded-2xl text-base resize-none',
+                frame.keyboard ? 'h-16 min-h-0' : 'h-28 min-h-0',
+              )}
             />
           ) : (
             <Button
@@ -290,7 +374,7 @@ export default function WriteOwnDef({
             </Button>
           )}
         </div>
-        <div className={cn('mt-4', idx > 0 && 'grid grid-cols-2 gap-3')}>
+        <div className={cn('mt-3 shrink-0', frame.keyboard ? 'pb-2' : 'pb-safe', idx > 0 && 'grid grid-cols-2 gap-3')}>
           {idx > 0 && (
             <Button
               variant="outline"

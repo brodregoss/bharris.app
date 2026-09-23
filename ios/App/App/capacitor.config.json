@@ -6,7 +6,14 @@
 	"backgroundColor": "#f8fafc",
 	"server": {
 		"iosScheme": "https",
-		"hostname": "enthusiastic-cram-genius-flow.base44.app"
+		"hostname": "enthusiastic-cram-genius-flow.base44.app",
+		"allowNavigation": [
+			"last-minute-study-899f2.firebaseapp.com",
+			"accounts.google.com",
+			"*.google.com",
+			"*.googleusercontent.com",
+			"*.gstatic.com"
+		]
 	},
 	"ios": {
 		"contentInset": "never",

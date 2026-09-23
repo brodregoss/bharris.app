@@ -84,6 +84,14 @@ function uidOrIdentity(identity) {
   return identity.uid;
 }
 
+export async function deleteUserRow(env, uid) {
+  const { db } = await userShard(env, uid);
+  await ensureUserTable(db);
+  await db.prepare('DELETE FROM users WHERE firebase_uid = ?').bind(uid).run();
+  await env.APP.prepare('DELETE FROM admins WHERE firebase_uid = ?').bind(uid).run();
+  await env.APP.prepare('DELETE FROM bucket_overrides WHERE firebase_uid = ?').bind(uid).run();
+}
+
 export async function markDoReady(env, uid, storeId) {
   const { db } = await userShard(env, uid);
   await db

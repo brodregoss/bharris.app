@@ -11,6 +11,7 @@ import Landing from './pages/Landing';
 import Welcome from './pages/Welcome';
 import Home from './pages/Home';
 import CreateNotes from './pages/CreateNotes';
+import HighlightNotes from './pages/HighlightNotes';
 import ReviewNotes from './pages/ReviewNotes';
 import UploadNotes from './pages/UploadNotes';
 import Triage from './pages/Triage';
@@ -55,6 +56,7 @@ function App() {
                   <Route path="/setup" element={<Home />} />
                   <Route path="/study-mode" element={<StudyMode />} />
                   <Route path="/create-notes" element={<CreateNotes />} />
+                  <Route path="/highlight-notes" element={<HighlightNotes />} />
                   <Route path="/review-notes" element={<ReviewNotes />} />
                   <Route path="/history" element={<PastSessions />} />
                   <Route path="/settings" element={<Settings />} />

@@ -23,7 +23,7 @@ export const PRIVACY_SECTIONS = [
   },
   {
     title: 'What stays with your account',
-    body: 'Study sessions, term definitions, grades, and uploaded note files are stored for your account so you can pick up on another device. Original photos go to private object storage; the app only sees them through signed-in requests.',
+    body: 'Study sessions, term definitions, grades, and uploaded note files are stored for your account so you can pick up on another device. Original photos go to private object storage; the app only sees them through signed-in requests. Delete account in Settings removes that login, those notes, and those sessions.',
   },
   {
     title: 'What leaves your device',

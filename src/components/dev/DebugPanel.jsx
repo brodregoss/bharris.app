@@ -91,7 +91,7 @@ export default function DebugPanel() {
     <>
       {/* Floating dev tools — always visible */}
       {!isOpen && (
-        <div className="fixed z-[9998] bottom-4 right-4 flex items-center gap-2">
+        <div className="fixed z-[9998] bottom-safe-float right-safe flex items-center gap-2">
           <AutoAnswerButton />
           <button
             type="button"
@@ -119,7 +119,7 @@ export default function DebugPanel() {
             initial={{ x: '100%' }}
             animate={{ x: 0 }}
             transition={{ type: 'tween', duration: 0.2 }}
-            className="fixed z-[9999] top-0 right-0 h-[100dvh] w-[min(420px,100vw)] bg-white border-l border-slate-200 shadow-2xl flex flex-col"
+            className="fixed z-[9999] top-0 right-0 flex h-[100dvh] w-[min(420px,100vw)] flex-col border-l border-slate-200 bg-white shadow-2xl pt-[env(safe-area-inset-top)] pr-[env(safe-area-inset-right)] pb-[env(safe-area-inset-bottom)] pl-[max(0px,calc(env(safe-area-inset-left)-max(0px,100vw-min(420px,100vw))))]"
           >
             {/* Header */}
             <div className="flex items-center justify-between px-4 py-3 border-b border-slate-200 bg-slate-900 text-white">

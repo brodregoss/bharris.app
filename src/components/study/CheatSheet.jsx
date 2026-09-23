@@ -15,7 +15,7 @@ export default function CheatSheet({ terms, open, onClose, rankMode }) {
   if (!open) return null;
 
   return (
-    <div className="fixed inset-0 z-[70] bg-background text-foreground flex flex-col">
+    <div className="fixed inset-0 z-[70] bg-background text-foreground flex flex-col px-safe">
       <header className="sticky top-0 z-20 bg-background px-4 pt-safe pb-2 flex items-center gap-2 border-b border-border">
         <button
           type="button"

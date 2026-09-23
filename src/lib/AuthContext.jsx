@@ -6,21 +6,26 @@ import {
   refreshUser,
   cacheUser,
   clearAccountCache,
+  deleteCloudAccount,
 } from '@/lib/accountStore';
 import {
   firebaseCreateAccount,
   firebaseErrorMessage,
   firebaseSignIn,
+  adoptNativeGoogleHandoff,
   firebaseSignInWithApple,
   firebaseSignInWithGoogle,
+  firebaseDeleteAccount,
   firebaseSignOut,
   finishRedirectSignIn,
   listenFirebaseUser,
+  shouldStartHostedGoogleSignIn,
 } from '@/lib/firebase';
 import { firebaseConfigured } from '@/lib/appConfig';
 import { cancelPendingCloudSave, hydrateRemoteSession } from '@/lib/sessionStore';
 import { configurePurchases, logOutPurchases } from '@/lib/premiumAccess';
 import { closeAdminGate } from '@/lib/adminGate';
+import { clearAccountLocalData, getActiveUid } from '@/lib/userStorage';
 import { formatPersonName } from '@/lib/personName';
 
 const AuthContext = createContext();
@@ -36,6 +41,9 @@ export const AuthProvider = ({ children }) => {
   useEffect(() => {
     let unsubscribe = () => {};
     let cancelled = false;
+    const watchdog = setTimeout(() => {
+      if (!cancelled) setIsLoadingAuth(false);
+    }, 8000);
     (async () => {
       if (!firebaseConfigured()) {
         setAuthError('Add Firebase config to .env.local to sign in.');
@@ -43,10 +51,18 @@ export const AuthProvider = ({ children }) => {
         return;
       }
       try {
+        const handoff = await adoptNativeGoogleHandoff();
+        if (cancelled) return;
+        if (handoff === 'cancelled') setAuthError('Google sign-in was closed.');
         const redirectError = await finishRedirectSignIn();
         if (cancelled) return;
         if (redirectError) setAuthError(redirectError);
+        if (shouldStartHostedGoogleSignIn()) {
+          await firebaseSignInWithGoogle();
+          return;
+        }
         unsubscribe = await listenFirebaseUser(async (next) => {
+          clearTimeout(watchdog);
           setFirebaseUser(next || null);
           if (!next) {
             cancelPendingCloudSave();
@@ -60,7 +76,8 @@ export const AuthProvider = ({ children }) => {
             setUser(cloud);
             setAuthError(null);
             configurePurchases(next.uid).catch(() => {});
-            await hydrateRemoteSession();
+            if (!cancelled) setIsLoadingAuth(false);
+            hydrateRemoteSession().catch(() => {});
           } catch (err) {
             const cached = getCurrentUser();
             if (!cached || cached.uid !== next.uid) {
@@ -81,6 +98,7 @@ export const AuthProvider = ({ children }) => {
     })();
     return () => {
       cancelled = true;
+      clearTimeout(watchdog);
       unsubscribe();
     };
   }, []);
@@ -99,7 +117,7 @@ export const AuthProvider = ({ children }) => {
         const cloud = await ensureCloudUser(firebaseUser);
         setUser(cloud);
         configurePurchases(firebaseUser.uid).catch(() => {});
-        await hydrateRemoteSession();
+        hydrateRemoteSession().catch(() => {});
         return cloud;
       } catch (err) {
         setAuthError(err instanceof Error ? err.message : 'Could not reach the study server.');
@@ -116,6 +134,18 @@ export const AuthProvider = ({ children }) => {
       clearAccountCache();
       setUser(null);
     };
+    const deleteAccount = async () => {
+      const uid = firebaseUser?.uid || user?.uid || getActiveUid();
+      cancelPendingCloudSave();
+      await deleteCloudAccount();
+      await firebaseDeleteAccount();
+      closeAdminGate();
+      await logOutPurchases();
+      clearAccountLocalData(uid);
+      await firebaseSignOut();
+      clearAccountCache();
+      setUser(null);
+    };
     return {
       user,
       firebaseUser,
@@ -127,6 +157,7 @@ export const AuthProvider = ({ children }) => {
       appPublicSettings: null,
       authChecked: !isLoadingAuth,
       logout,
+      deleteAccount,
       lock: logout,
       navigateToLogin: () => {},
       checkUserAuth: refresh,
@@ -144,7 +175,7 @@ export const AuthProvider = ({ children }) => {
           setUser(cloud);
           setAuthError(null);
           configurePurchases(fbUser.uid).catch(() => {});
-          await hydrateRemoteSession();
+          hydrateRemoteSession().catch(() => {});
           return cloud;
         } catch (err) {
           throw new Error(firebaseErrorMessage(err));
@@ -158,7 +189,7 @@ export const AuthProvider = ({ children }) => {
           setUser(cloud);
           setAuthError(null);
           configurePurchases(fbUser.uid).catch(() => {});
-          await hydrateRemoteSession();
+          hydrateRemoteSession().catch(() => {});
           return cloud;
         } catch (err) {
           throw new Error(firebaseErrorMessage(err));
@@ -173,7 +204,7 @@ export const AuthProvider = ({ children }) => {
           setUser(cloud);
           setAuthError(null);
           configurePurchases(fbUser.uid).catch(() => {});
-          await hydrateRemoteSession();
+          hydrateRemoteSession().catch(() => {});
           return cloud;
         } catch (err) {
           throw new Error(firebaseErrorMessage(err, 'Google'));
@@ -188,7 +219,7 @@ export const AuthProvider = ({ children }) => {
           setUser(cloud);
           setAuthError(null);
           configurePurchases(fbUser.uid).catch(() => {});
-          await hydrateRemoteSession();
+          hydrateRemoteSession().catch(() => {});
           return cloud;
         } catch (err) {
           throw new Error(firebaseErrorMessage(err, 'Apple'));

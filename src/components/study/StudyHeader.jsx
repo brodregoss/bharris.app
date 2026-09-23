@@ -23,7 +23,7 @@ export default function StudyHeader({ readiness, timeRemainingMs, blockLabel }) 
           <PopoverTrigger asChild>
             <button
               type="button"
-              className="flex items-center justify-center min-h-11 min-w-11 gap-1.5 -mr-1.5 focus:outline-none cursor-pointer"
+              className="flex items-center justify-center min-h-11 min-w-11 gap-1.5 shrink-0 focus:outline-none cursor-pointer"
               aria-label="What does readiness mean?"
             >
               <Brain className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-300" />

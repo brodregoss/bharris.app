@@ -21,6 +21,14 @@ export default function Account() {
     return <Navigate to={safeFrom ? from : afterAuthPath()} replace />;
   }
 
+  if (new URLSearchParams(window.location.search).get('googleStart') === '1') {
+    return (
+      <div className="min-h-[100dvh] bg-background flex items-center justify-center">
+        <div className="w-8 h-8 border-4 border-muted border-t-foreground rounded-full animate-spin" />
+      </div>
+    );
+  }
+
   const handleApple = async () => {
     setSocialError('');
     setAppleLoading(true);
@@ -38,8 +46,8 @@ export default function Account() {
     setSocialError('');
     setGoogleLoading(true);
     try {
-      await signInWithGoogle();
-      navigate(afterAuthPath(), { replace: true });
+      const signedIn = await signInWithGoogle();
+      if (signedIn) navigate(afterAuthPath(), { replace: true });
     } catch (err) {
       setSocialError(err.message || 'Could not sign in with Google.');
     } finally {

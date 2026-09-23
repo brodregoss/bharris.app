@@ -2,6 +2,7 @@ import { errorJson, json, readJson, sessionHistoryLimit } from './util.js';
 import { verifyFirebaseToken } from './auth.js';
 import { withCors, corsHeaders } from './cors.js';
 import {
+  deleteUserRow,
   getUserRow,
   markDoReady,
   toPublicUser,
@@ -16,6 +17,7 @@ import {
   handlePatchNote,
   handleListNotes,
   handleDeleteNote,
+  deleteUserNotes,
 } from './notes.js';
 import { handleRevenueCatWebhook, handleSubscriptionRefresh, handleProUnlock } from './billing.js';
 import { UserStudyDO } from './user-do.js';
@@ -47,6 +49,17 @@ async function handleUsersMe(request, env, identity) {
     name: body.displayName || body.name || identity.name,
   });
   return json({ user: await toPublicUser(env, row) });
+}
+
+async function handleDeleteMe(env, identity) {
+  const uid = identity.uid;
+  const { stub } = userStudyStub(env, uid);
+  await Promise.all([
+    stub.evacuate().catch(() => {}),
+    deleteUserNotes(env, uid),
+  ]);
+  await deleteUserRow(env, uid);
+  return json({ ok: true });
 }
 
 async function handleUsage(env, identity) {
@@ -145,7 +158,9 @@ export default {
 
       let response;
 
-      if (parts[1] === 'users' && parts[2] === 'me' && !parts[3] && (request.method === 'GET' || request.method === 'POST')) {
+      if (parts[1] === 'users' && parts[2] === 'me' && !parts[3] && request.method === 'DELETE') {
+        response = await handleDeleteMe(env, identity);
+      } else if (parts[1] === 'users' && parts[2] === 'me' && !parts[3] && (request.method === 'GET' || request.method === 'POST')) {
         response = await handleUsersMe(request, env, identity);
         if (request.method === 'POST') ctx.waitUntil(warmDo(env, identity.uid).catch(() => {}));
       } else if (parts[1] === 'users' && parts[2] === 'me' && parts[3] === 'usage' && request.method === 'GET') {

@@ -8,6 +8,12 @@ const LEGACY_KEYS = [
   'lms_panic_summary_v1',
 ];
 
+const ACCOUNT_KEYS = [
+  ...LEGACY_KEYS,
+  'lms_greeting_name_v1',
+  'lms_note_sets_v1',
+];
+
 export function getActiveUid() {
   if (typeof window === 'undefined') return '';
   return localStorage.getItem(UID_KEY) || '';
@@ -40,6 +46,19 @@ export function setActiveUid(uid, previousUid = getActiveUid()) {
     clearPhoto();
     window.dispatchEvent(new Event('lms:session'));
   }
+}
+
+export function clearAccountLocalData(uid) {
+  if (typeof window === 'undefined') return;
+  const id = String(uid || getActiveUid() || '');
+  for (const base of ACCOUNT_KEYS) {
+    localStorage.removeItem(base);
+    if (id) localStorage.removeItem(`${base}:${id}`);
+  }
+  localStorage.removeItem('lms_user_v2');
+  localStorage.removeItem('lms_openai_api_key');
+  localStorage.removeItem(UID_KEY);
+  clearPhoto();
 }
 
 export function userStorageKey(base) {

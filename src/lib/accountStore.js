@@ -69,6 +69,10 @@ export function clearAccountCache() {
   cacheUser(null);
 }
 
+export async function deleteCloudAccount() {
+  return workerRequest('DELETE', '/v1/users/me');
+}
+
 export async function ensureCloudUser(firebaseUser) {
   const data = await workerRequest('POST', '/v1/users/me', {
     email: firebaseUser?.email || '',
