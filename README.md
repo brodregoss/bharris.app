@@ -1,4 +1,4 @@
-# Last Minute Study
+# bharris.app
 
 A last-minute exam cram app. Accounts use **Firebase**. Notes, sessions, and AI quota go through a **Cloudflare Worker** (D1 + Durable Objects). Photos are transcribed on the device, then discarded — original JPEGs are not stored. App Store upgrades use **RevenueCat**. The OpenAI key never lives in the iPhone app.
 
@@ -45,8 +45,8 @@ Create an account on `/account/create` or tap **Continue with Google**. That cal
 ### Google sign-in
 
 1. Firebase Console → **Authentication** → **Sign-in method** → enable **Google** → Save.
-2. **Authentication** → **Settings** → **Authorized domains**: keep `localhost` and add `enthusiastic-cram-genius-flow.base44.app` (the Capacitor iOS hostname).
-3. For the iPhone app: Project settings → **Add app** → iOS, bundle id `app.lastminutestudy.cram`. Download `GoogleService-Info.plist` into `ios/App/App/`.
+2. **Authentication** → **Settings** → **Authorized domains**: keep `localhost`, `bharris-app.web.app` (the iPhone app hostname), and `bharris.broderickharris11.workers.dev`.
+3. For the iPhone app: Project settings → **Add app** → iOS, bundle id `app.bharris.cram`. Download `GoogleService-Info.plist` into `ios/App/App/`.
 4. In Xcode, **Info** → **URL Types**, add a URL scheme equal to `REVERSED_CLIENT_ID` from that plist.
 5. `npm run ios:sync` and rebuild in Xcode.
 
@@ -64,7 +64,7 @@ Then open `ios/App/App.xcodeproj`. The shared App scheme points at `ios/StudyApp
 
 Plans in the app: **Free** (5 AI calls/month) and **Study Pro** (30 AI calls/month, $4.99/mo or $39.99/yr). The paywall in Settings shows that comparison. StoreKit / RevenueCat supply the live prices on device.
 
-Add your Firebase auth domain for the Capacitor hostname (`enthusiastic-cram-genius-flow.base44.app`).
+The iPhone app hostname is `bharris-app.web.app`. Password-reset links return through `bharris.broderickharris11.workers.dev`.
 
 ## What uses OpenAI
 
@@ -75,8 +75,8 @@ All model calls go through the Worker (`/v1/ai/:feature`) after a quota check on
 ```bash
 npm run dev            # Vite frontend (proxies /v1 to wrangler)
 npm run worker:dev     # Cloudflare Worker on :8787
-npm run worker:deploy  # wrangler deploy
-npm run build          # Production build → dist/
+npm run worker:deploy  # Build the app, assemble the public site, then wrangler deploy
+npm run build          # Production build → dist/ (iPhone). The public site is web-dist/
 npm run lint           # ESLint
 npm run ios:sync       # Build the web app and copy it into the Xcode project
 npm run ios:open       # Open the iOS project in Xcode
@@ -87,10 +87,23 @@ npm run ios:open       # Open the iOS project in Xcode
 ```bash
 npx wrangler secret put FIREBASE_PROJECT_ID
 npx wrangler secret put OPENAI_API_KEY
+npx wrangler secret put STRIPE_SECRET_KEY
+npx wrangler secret put STRIPE_WEBHOOK_SECRET
+npx wrangler secret put STRIPE_PRICE_SOLO
+npx wrangler secret put STRIPE_PRICE_PARTNER
 npm run worker:deploy
 ```
 
-Set `VITE_WORKER_URL` to the `workers.dev` URL it prints, then `npm run ios:sync`. Opening that URL in a browser now loads the app (`/v1` stays the API). Add the same hostname under Firebase Authentication → Settings → Authorized domains.
+Website plans are Study at $8/month and Partner study at $12/month.
+
+1. In Stripe, create two recurring monthly prices and save their price ids as `STRIPE_PRICE_SOLO` and `STRIPE_PRICE_PARTNER`.
+2. Developers → API keys: save the secret key as `STRIPE_SECRET_KEY`.
+3. Developers → Webhooks: add the Worker URL ending in `/v1/billing/stripe` for `checkout.session.completed`, `customer.subscription.updated`, and `customer.subscription.deleted`. Save the signing secret as `STRIPE_WEBHOOK_SECRET`.
+4. Settings → Billing → Customer portal: turn the portal on so **Manage subscription** on the plans page can cancel, update a card, and show invoices.
+
+Checkout sends the buyer to `/thanks/`. The plans page has a Code field. `beta` starts a 7-day free period with no card and no charge. When that week ends, access ends and the plans page says the free week ended. Each account can use that code once. Set `BETA_PROMO_CODE` to `off` to stop accepting it. A free trial configured on a Stripe price is different: those buyers enter a card, and Stripe charges the plan price when the trial ends. Manage customers, trials, and cancellations in the Stripe Dashboard under Customers and Subscriptions. Partner study creates one code; resetting it voids the old code, and ending that subscription removes access for both people.
+
+Set `VITE_WORKER_URL` to the `workers.dev` URL it prints, then `npm run ios:sync`. Opening that URL in a browser loads the public homepage. The study app is at `/app/` (`/v1` stays the API). Add the same hostname under Firebase Authentication → Settings → Authorized domains.
 
 The live app does not use Vercel. Old `api/llm.js` / `api/account.js` files are leftover and unused.
 
@@ -98,7 +111,7 @@ The live app does not use Vercel. Old `api/llm.js` / `api/account.js` files are 
 
 The iPhone app lives in `ios/App/`. After `npm run ios:sync`, open:
 
-`Last-Minute-Study/ios/App/App.xcodeproj`
+`ios/App/App.xcodeproj`
 
 1. At the top of Xcode, pick an iPhone simulator (for example iPhone 16).
 2. Press the Play button (or Product → Run).
