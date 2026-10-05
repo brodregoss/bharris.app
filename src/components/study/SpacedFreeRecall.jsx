@@ -3,6 +3,7 @@ import { Button } from '@/components/ui/button';
 import { Eye, Check, X } from 'lucide-react';
 import { Textarea } from '@/components/ui/textarea';
 import { flashcardDef } from '@/lib/studyUtils';
+import { savedAttemptForMiss } from '@/lib/spacedCram';
 
 function shuffle(list) {
   const out = [...list];
@@ -29,6 +30,7 @@ export default function SpacedFreeRecall({
   const doneRef = React.useRef(false);
 
   const current = queue[pos];
+  const earlierAttempt = current ? savedAttemptForMiss(current) : '';
 
   const finish = React.useCallback(() => {
     if (doneRef.current) return;
@@ -43,9 +45,8 @@ export default function SpacedFreeRecall({
   const advance = (result) => {
     if (!current) return;
     onLogAttempt?.(current.id, result);
-    onUpdateTerm?.(current.id, {
-      ownDefinition: String(draft || '').trim() || current.ownDefinition,
-    });
+    const typed = String(draft || '').trim();
+    if (typed) onUpdateTerm?.(current.id, { freeAttempt: typed });
     if (pos + 1 >= queue.length) {
       finish();
       return;
@@ -76,20 +77,30 @@ export default function SpacedFreeRecall({
           <p className="text-[11px] uppercase tracking-wide text-muted-foreground mb-2">Term</p>
           <p className="text-3xl font-bold tracking-tight mb-3">{current.term}</p>
           <p className="text-sm text-muted-foreground leading-relaxed mb-3">
-            Write the definition from memory. No peeking until you’re done.
+            Think it or say it out loud. Typing is optional.
           </p>
           <Textarea
             value={draft}
             onChange={(e) => setDraft(e.target.value)}
-            placeholder="Type the definition…"
-            className="min-h-[8rem] rounded-2xl text-base leading-relaxed"
+            placeholder="Type it if you want…"
+            className="min-h-[6rem] rounded-2xl text-base leading-relaxed"
           />
           {revealed && (
-            <div className="mt-4 rounded-2xl border border-border bg-card p-4">
-              <p className="text-[11px] uppercase tracking-wide text-muted-foreground mb-1">
-                Official definition
-              </p>
-              <p className="text-base leading-relaxed">{flashcardDef(current)}</p>
+            <div className="mt-4 grid gap-3 sm:grid-cols-2">
+              {earlierAttempt && (
+                <div className="rounded-2xl border border-border bg-muted/40 p-4">
+                  <p className="text-[11px] uppercase tracking-wide text-muted-foreground mb-1">
+                    What you wrote
+                  </p>
+                  <p className="text-base leading-relaxed">{earlierAttempt}</p>
+                </div>
+              )}
+              <div className={earlierAttempt ? 'rounded-2xl border border-border bg-card p-4' : 'rounded-2xl border border-border bg-card p-4 sm:col-span-2'}>
+                <p className="text-[11px] uppercase tracking-wide text-muted-foreground mb-1">
+                  Definition
+                </p>
+                <p className="text-base leading-relaxed">{flashcardDef(current)}</p>
+              </div>
             </div>
           )}
           <div className="mt-4 pb-4">
@@ -101,20 +112,27 @@ export default function SpacedFreeRecall({
                 <Eye className="w-4 h-4 mr-2" /> Show answer
               </Button>
             ) : (
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-3 gap-2">
                 <Button
                   onClick={() => advance('missed')}
                   variant="destructive"
-                  className="h-12 rounded-2xl font-semibold"
+                  className="h-12 rounded-2xl font-semibold px-2"
                 >
-                  <X className="w-4 h-4 mr-2" /> Missed
+                  <X className="w-4 h-4 mr-1" /> Missed
+                </Button>
+                <Button
+                  onClick={() => advance('partly')}
+                  variant="outline"
+                  className="h-12 rounded-2xl font-semibold px-2"
+                >
+                  Partly
                 </Button>
                 <Button
                   onClick={() => advance('got_it')}
                   variant="success"
-                  className="h-12 rounded-2xl font-semibold"
+                  className="h-12 rounded-2xl font-semibold px-2"
                 >
-                  <Check className="w-4 h-4 mr-2" /> Got it
+                  <Check className="w-4 h-4 mr-1" /> Got it
                 </Button>
               </div>
             )}

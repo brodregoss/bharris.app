@@ -120,13 +120,137 @@ const css = `
   }
   .modes-wrap {
     --phone-short: 16.5rem;
-    width: min(78rem, 100%);
-    padding-top: 5.5rem;
-    padding-bottom: 3.5rem;
+    width: 100%;
+    margin: 0;
+    padding: 0 0 3.5rem;
   }
   .modes-wrap h2 {
     text-align: center;
     font-size: clamp(2.6rem, 6.5vw, 4rem);
+  }
+  .paper-black {
+    background: #0a0a0a;
+    color: #fff;
+    height: calc(100dvh - 3.25rem);
+    min-height: calc(100dvh - 3.25rem);
+    scroll-margin-top: 3.25rem;
+    padding: 1.15rem 1.5rem 4.5rem;
+    display: flex;
+    flex-direction: column;
+  }
+  .paper-slip {
+    width: min(72rem, 100%);
+    margin: 0 auto;
+  }
+  .modes-wrap .paper-slip h2 {
+    margin: 0;
+    text-align: center;
+    font-size: clamp(1.15rem, 2.5vw, 1.85rem);
+    font-weight: 700;
+    letter-spacing: -0.035em;
+    line-height: 1.25;
+    color: #fff;
+  }
+  .paper-sheet {
+    flex: 1;
+    min-height: 0;
+    width: 100%;
+    margin: 1.35rem auto 0;
+    display: flex;
+  }
+  .paper-nos {
+    flex: 1;
+    min-height: 0;
+    height: 100%;
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(15rem, 28vw) auto;
+    grid-template-rows: minmax(0, 1fr);
+    align-items: stretch;
+    gap: 1rem 1.25rem;
+  }
+  .paper-no { text-align: left; align-self: start; }
+  .paper-no p {
+    margin: 0;
+    font-size: clamp(2.8rem, 6.6vw, 6.25rem);
+    font-weight: 700;
+    letter-spacing: -0.05em;
+    line-height: 0.95;
+    text-align: left;
+    white-space: nowrap;
+    color: #fff;
+  }
+  .paper-no p + p { margin-top: 0.18em; }
+  .paper-back {
+    margin: 4.75rem 0.35rem 0 1.25rem;
+    align-self: start;
+    text-align: right;
+    font-size: clamp(1rem, 1.6vw, 1.2rem);
+    line-height: 1.35;
+    letter-spacing: -0.02em;
+    color: #fff;
+  }
+  .paper-mock {
+    position: relative;
+    min-height: 0;
+    height: 100%;
+  }
+  .paper-mock canvas {
+    position: absolute;
+    top: 0;
+    left: 50%;
+    height: 100%;
+    width: auto;
+    max-width: 100%;
+    display: block;
+    transform: translateX(-50%);
+  }
+  .paper-close {
+    margin-top: auto;
+    padding-top: 1.5rem;
+    text-align: center;
+  }
+  .paper-procrastination {
+    margin: 0;
+    text-align: center;
+    white-space: nowrap;
+    font-size: clamp(1.25rem, 2.6vw, 1.7rem);
+    font-weight: 700;
+    letter-spacing: -0.035em;
+    line-height: 1.2;
+    color: #fff;
+  }
+  .paper-skip {
+    margin: 0.85rem 0 0;
+    text-align: center;
+    white-space: nowrap;
+    font-size: clamp(1rem, 2vw, 1.25rem);
+    font-weight: 500;
+    letter-spacing: -0.03em;
+    color: #fff;
+  }
+  a.paper-down {
+    display: inline-flex;
+    margin-top: 1.75rem;
+    color: #fff;
+    text-decoration: none;
+  }
+  a.paper-down svg { width: 2.25rem; height: 2.25rem; }
+  a.paper-down:hover { color: #d4d4d4; }
+  .paper-rest {
+    width: min(78rem, 100%);
+    margin: 0 auto;
+    padding: 4.5rem 1.5rem 0;
+    scroll-margin-top: 3.25rem;
+  }
+  .paper-modes-head { text-align: center; }
+  .paper-sub {
+    margin: 0.7rem 0 0;
+    text-align: center;
+    white-space: nowrap;
+    font-size: clamp(1rem, 2.2vw, 1.35rem);
+    line-height: 1.35;
+    letter-spacing: -0.03em;
+    color: #525252;
   }
   .mode-grid {
     display: grid;
@@ -980,6 +1104,26 @@ const css = `
       gap: 0.85rem;
     }
     .block { scroll-margin-top: 5.6rem; }
+    .paper-black {
+      height: calc(100dvh - 5.6rem);
+      min-height: calc(100dvh - 5.6rem);
+      scroll-margin-top: 5.6rem;
+    }
+    .paper-rest { scroll-margin-top: 5.6rem; }
+    .modes-wrap .paper-slip h2 { font-size: 1.05rem; }
+    .paper-nos {
+      grid-template-columns: minmax(0, 1.15fr) auto;
+      grid-template-rows: auto minmax(0, 1fr);
+      grid-template-areas: "no back" "phone back";
+      gap: 0.45rem 0.7rem;
+    }
+    .paper-no { grid-area: no; }
+    .paper-mock { grid-area: phone; }
+    .paper-back { grid-area: back; margin: 0.35rem 0 0; align-self: center; }
+    .paper-no p { font-size: clamp(1.7rem, 8.6vw, 2.45rem); }
+    .paper-procrastination { font-size: 0.95rem; }
+    .paper-skip { font-size: 0.85rem; }
+    .paper-sub { font-size: 0.95rem; }
     .footer-base { flex-direction: column; align-items: flex-start; }
     .footer-cols { grid-template-columns: 1fr; text-align: left; gap: 1.6rem; }
   }
@@ -1355,10 +1499,11 @@ function trueCramPhone() {
 
 function homePage() {
   const brainScript = readFileSync(path.join(root, 'scripts', 'brain-learn.js'), 'utf8');
+  const mockupScript = readFileSync(path.join(root, 'scripts', 'mockup-scrub.js'), 'utf8');
   return page({
     title: 'bharris.app',
     description: 'Time is money, so we will make sure not to waste yours.',
-    foot: `<script>${brainScript}</script>`,
+    foot: `<script>${brainScript}</script><script>${mockupScript}</script>`,
     body: `${navBar('')}
   <section id="home" class="hero">
     <h1 class="reveal">bharris.app</h1>
@@ -1370,8 +1515,39 @@ function homePage() {
       </svg>
     </a>
   </section>
-  <section id="features" class="block modes-wrap">
-    <h2 class="reveal">Learning modes</h2>
+  <section class="modes-wrap">
+    <div id="features" class="paper-black">
+      <div class="paper-slip reveal">
+        <h2>Your the best in what you do.<br>Its time your studying follows</h2>
+      </div>
+      <div class="paper-sheet reveal" style="--d:80ms">
+        <div class="paper-nos">
+          <div class="paper-no">
+            <p>No ads</p>
+            <p>No distractions</p>
+            <p>No waste</p>
+          </div>
+          <div class="paper-mock">
+            <canvas id="mockup-scrub" data-count="48" aria-label="bharris.app on iPhone"></canvas>
+          </div>
+          <p class="paper-back">so you can<br>get back to<br>what you do<br>best</p>
+        </div>
+      </div>
+      <div class="paper-close reveal" style="--d:120ms">
+        <p class="paper-procrastination">Procrastination was never an option</p>
+        <p class="paper-skip">so we skipped the search to study</p>
+        <a class="paper-down" href="#modes" aria-label="Studying modes">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <path d="M6 9l6 6 6-6"></path>
+          </svg>
+        </a>
+      </div>
+    </div>
+    <div id="modes" class="paper-rest">
+      <div class="paper-modes-head reveal" style="--d:140ms">
+        <h2>Our studying modes</h2>
+        <p class="paper-sub">adapting to you as you work</p>
+      </div>
     <div class="mode-grid">
       <article class="mode-card reveal" style="--d:60ms">
         <h3>Independent Assisted</h3>
@@ -1400,6 +1576,7 @@ function homePage() {
           ${spacedPhone()}
         </div>
       </article>
+    </div>
     </div>
   </section>
   <section id="brain" class="block brain-wrap">
@@ -1611,6 +1788,7 @@ function redirectPage({ title, dest }) {
 await rm(webDir, { recursive: true, force: true });
 await mkdir(path.join(webDir, 'app'), { recursive: true });
 await cp(distDir, path.join(webDir, 'app'), { recursive: true });
+await cp(path.join(root, 'site', 'mockup-frames'), path.join(webDir, 'mockup'), { recursive: true });
 await writeFile(path.join(webDir, 'index.html'), homePage());
 const siteEnv = loadSiteEnv();
 const firebaseConfig = {

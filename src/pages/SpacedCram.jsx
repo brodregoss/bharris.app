@@ -4,22 +4,51 @@ import { ArrowLeft, Moon } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { continueStudyPath, normalizeStudyMode, STUDY_MODE, spacedCramAvailable } from '@/lib/studyUtils';
 import {
+  AHEAD_LINE,
+  START_EARLY_LINE,
+  WAIT_WHY,
+  applyLastLookResults,
   applySittingResults,
   buildSpacedSchedule,
+  changePlanTimes,
+  countdownLabel,
+  countLearned,
+  countShaky,
+  currentTime,
+  emptySrs,
   emptySpacedState,
+  describeSittingQueue,
   ensureSpaced,
-  ensureSpacedTerm,
+  generatePlan,
+  hitAttempts,
   lastSittingIndex,
+  loadSavedClock,
   markTermsIntroduced,
+  mergeAttemptGrades,
+  mergeKeptSittings,
   nextDueAfterSitting,
   nextNewStep,
   nextSittingWaitCopy,
-  planSittingQueue,
+  migrateStudyTerms,
+  offerReminder,
+  openSpacedSession,
+  pickupLine,
+  planEndGlance,
+  recapCopy,
+  recordAttempt,
+  resolveExamTime,
+  saveSavedClock,
   SESSION_TYPE,
   SESSION_TYPE_META,
+  shakyTermNames,
+  settleResume,
+  shouldAutoComplete,
+  shouldPersistSession,
   sittingByIndex,
+  sittingEstimate,
   sittingIsReady,
   SITTING_RETIRE_THRESHOLD,
+  unclearedIds,
 } from '@/lib/spacedCram';
 import SpacedPlan from '@/components/study/SpacedPlan';
 import SpacedFreeRecall from '@/components/study/SpacedFreeRecall';
@@ -29,13 +58,14 @@ import { loadSession, saveSession, saveFinishedSession, clearSession } from '@/l
 import { getActiveUid } from '@/lib/userStorage';
 import { withInferredMastery } from '@/lib/mastery';
 import { useDebug } from '@/lib/DebugContext';
+import { currentReminderMode, scheduleStudyReminder, WEB_REMINDER_NOTE } from '@/lib/studyReminder';
 
 function hydrate(location) {
   const ownerUid = getActiveUid();
   const { terms: rawTerms, setup: incomingSetup, sessionId } = location.state || {};
   if (rawTerms?.length) {
     const existing = loadSession();
-    const terms = rawTerms.map(ensureSpacedTerm);
+    const terms = migrateStudyTerms(rawTerms);
     return {
       id: sessionId || existing?.id,
       ownerUid,
@@ -54,7 +84,7 @@ function hydrate(location) {
     return {
       id: saved.id,
       ownerUid,
-      terms: saved.terms.map(ensureSpacedTerm),
+      terms: migrateStudyTerms(saved.terms),
       setup: saved.setup,
       spaced: ensureSpaced({
         ...(saved.spaced || emptySpacedState()),
@@ -68,43 +98,85 @@ function hydrate(location) {
 }
 
 function drillLabel(sitting, spaced, schedule) {
+  if (spaced?.lastLook) return 'Last look';
+  if (spaced?.bonusRun) return 'Bonus pass';
   const meta = SESSION_TYPE_META[sitting?.type] || {};
+  const last = lastSittingIndex(schedule);
+  const prefix = `Sitting ${sitting?.sitting || 1} of ${last}`;
   const chunkCount = schedule?.chunks?.length || 1;
   if (sitting?.type === SESSION_TYPE.NEW && chunkCount > 1) {
     const n = (spaced.chunkIndex || 0) + 1;
-    if (spaced.subPhase === 'mini_rev') return `Sitting ${sitting.sitting} · mixed review ${n}/${chunkCount}`;
-    return `Sitting ${sitting.sitting} · New ${n}/${chunkCount}`;
+    if (spaced.subPhase === 'mini_rev') return `${prefix} · mixed review ${n}/${chunkCount}`;
+    return `${prefix} · New ${n}/${chunkCount}`;
   }
-  return `Sitting ${sitting?.sitting || 1} · ${meta.label || 'Drill'}`;
+  return `${prefix} · ${meta.label || 'Drill'}`;
 }
 
 export default function SpacedCram() {
   const location = useLocation();
   const navigate = useNavigate();
+  const dbg = useDebug();
   const [init] = React.useState(() => hydrate(location));
-  const [terms, setTerms] = React.useState(() => init?.terms || []);
-  const [spaced, setSpaced] = React.useState(() => init?.spaced || emptySpacedState());
-  const [bedtimeDraft, setBedtimeDraft] = React.useState(() => init?.spaced?.stopTime || '');
+  const devClock = !!dbg?.enabled;
+  const bootNow = currentTime(
+    Date.now() + (devClock ? (dbg?.clockOffset || 0) : 0),
+    devClock && Number.isFinite(dbg?.clockAt) ? dbg.clockAt : null
+  );
+  const [booted] = React.useState(() => {
+    const spaced0 = init?.spaced || emptySpacedState();
+    const terms0 = init?.terms || [];
+    return settleResume(openSpacedSession(spaced0, terms0, bootNow), spaced0, terms0, bootNow);
+  });
+  const [terms, setTerms] = React.useState(booted.terms);
+  const [spaced, setSpaced] = React.useState(booted.spaced);
+  const [sleepDraft, setSleepDraft] = React.useState(() => init?.spaced?.stopTime || loadSavedClock().sleep || '22:30');
+  const [wakeDraft, setWakeDraft] = React.useState(() => init?.spaced?.wakeTime || loadSavedClock().wake || '07:00');
+  const [examDraft, setExamDraft] = React.useState(() => init?.spaced?.examClock || '');
+  const [reminderState, setReminderState] = React.useState('offer');
   const sessionIdRef = React.useRef(init?.id);
   const sittingResultsRef = React.useRef({});
+  const simTainted = React.useRef(false);
   const setup = init?.setup;
-  const dbg = useDebug();
-  const clockOffset = dbg?.clockOffset || 0;
+  const clockOffset = devClock && Number.isFinite(dbg?.clockAt) ? 0 : (devClock ? (dbg?.clockOffset || 0) : 0);
+  const clockAt = devClock && Number.isFinite(dbg?.clockAt) ? dbg.clockAt : null;
   const clockOffsetRef = React.useRef(0);
-  const [now, setNow] = React.useState(() => Date.now() + clockOffset);
+  const clockAtRef = React.useRef(null);
+  if (!shouldPersistSession({ clockAt, clockOffset })) simTainted.current = true;
+  const [now, setNow] = React.useState(bootNow);
 
   React.useEffect(() => {
     clockOffsetRef.current = clockOffset;
-  }, [clockOffset]);
+    clockAtRef.current = clockAt;
+    setNow(currentTime(Date.now() + clockOffset, clockAt));
+  }, [clockOffset, clockAt]);
+
+  const nowRef = React.useRef(bootNow);
+  const termsRef = React.useRef(terms);
+  termsRef.current = terms;
+  const clockReady = React.useRef(false);
+  React.useEffect(() => {
+    nowRef.current = now;
+  }, [now]);
 
   React.useEffect(() => {
-    const iv = setInterval(() => setNow(Date.now() + clockOffsetRef.current), 1000);
+    if (!clockReady.current) {
+      clockReady.current = true;
+      return;
+    }
+    const simulated = currentTime(Date.now() + clockOffset, clockAt);
+    setSpaced((prev) => {
+      const opened = settleResume(openSpacedSession(prev, termsRef.current, simulated), prev, termsRef.current, simulated);
+      if (opened.terms !== termsRef.current) setTerms(opened.terms);
+      return opened.spaced;
+    });
+  }, [clockAt, clockOffset]);
+
+  React.useEffect(() => {
+    const iv = setInterval(() => {
+      setNow(currentTime(Date.now() + clockOffsetRef.current, clockAtRef.current));
+    }, 1000);
     return () => clearInterval(iv);
   }, []);
-
-  React.useEffect(() => {
-    setNow(Date.now() + clockOffset);
-  }, [clockOffset]);
 
   React.useEffect(() => {
     if (!init) return;
@@ -112,6 +184,7 @@ export default function SpacedCram() {
       navigate('/', { replace: true });
       return;
     }
+    if (simTainted.current || !shouldPersistSession({ clockAt, clockOffset })) return;
     const saved = saveSession({
       id: sessionIdRef.current,
       setup,
@@ -151,9 +224,48 @@ export default function SpacedCram() {
 
   const byId = React.useMemo(() => new Map(terms.map((t) => [t.id, t])), [terms]);
   const schedule = React.useMemo(
-    () => buildSpacedSchedule({ examTiming: setup?.examTiming, hours: setup?.hours, terms }),
-    [setup?.examTiming, setup?.hours, terms]
+    () => buildSpacedSchedule({
+      examTiming: setup?.examTiming,
+      hours: setup?.hours,
+      terms,
+      sleepTime: spaced.stopTime,
+      wakeTime: spaced.wakeTime,
+      examTime: spaced.examTime,
+      sittings: Array.isArray(spaced.sittings) ? spaced.sittings : undefined,
+      coreOnly: !!spaced.coreOnly,
+    }),
+    [setup?.examTiming, setup?.hours, terms, spaced.stopTime, spaced.wakeTime, spaced.examTime, spaced.sittings, spaced.coreOnly]
   );
+  const needTimes = !spaced.stopTime || !spaced.wakeTime || !spaced.examTime;
+  const skipKeyRef = React.useRef('');
+  React.useEffect(() => {
+    if (!init || needTimes || spaced.editingTimes) return;
+    if (spaced.phase !== 'plan' && spaced.phase !== 'done') return;
+    const current = sittingByIndex(schedule, spaced.sittingIndex || 1);
+    const built = describeSittingQueue(terms, { ...spaced, lastLook: false, bonusRun: false }, schedule);
+    if (!shouldAutoComplete(current, built.queue.length)) return;
+    const key = String(current.sitting);
+    if (skipKeyRef.current === key) return;
+    skipKeyRef.current = key;
+    const finishedId = current.sitting;
+    const sittings = (spaced.sittings || []).map((s) => (
+      s.sitting === finishedId ? { ...s, done: true } : s
+    ));
+    setSpaced((prev) => (
+      prev.sittingIndex !== finishedId ? prev : {
+        ...prev,
+        sittings,
+        phase: 'done',
+        sittingIndex: finishedId + 1,
+        queue: [],
+        pendingCarry: [],
+        carryIds: [],
+        aheadNote: true,
+        lastFinishedAt: nowRef.current,
+        nextDueAt: nextDueAfterSitting(current, { sittings }),
+      }
+    ));
+  }, [init, needTimes, schedule, spaced, terms]);
 
   if (!init) return <Navigate to="/" replace />;
   if (!spacedCramAvailable(setup?.examTiming)) {
@@ -171,8 +283,6 @@ export default function SpacedCram() {
   const sittingTerms = queue.map((id) => byId.get(id)).filter(Boolean);
   const ready = sittingIsReady(spaced, now);
   const waitCopy = nextSittingWaitCopy(spaced.nextDueAt, now);
-  const needBedtime = !spaced.stopTime;
-
   const persistSitting = (nextSpaced, nextTerms) => {
     setSpaced(nextSpaced);
     if (nextTerms) setTerms(nextTerms);
@@ -180,34 +290,94 @@ export default function SpacedCram() {
 
   const completeSitting = (currentTerms, fromSpaced = spaced) => {
     const finished = sittingByIndex(schedule, fromSpaced.sittingIndex || 1);
-    const gradedAt = Date.now();
+    const gradedAt = now;
+    const finishedId = finished?.sitting || fromSpaced.sittingIndex;
+    const sittings = (fromSpaced.sittings || []).map((s) => (
+      s.sitting === finishedId ? { ...s, done: true } : s
+    ));
     persistSitting(
       {
         ...fromSpaced,
-        phase: (fromSpaced.sittingIndex || 1) >= lastN ? 'complete' : 'done',
+        sittings,
+        phase: 'done',
         sittingIndex: (fromSpaced.sittingIndex || 1) + 1,
         chunkIndex: 0,
         subPhase: 'new',
         queue: [],
+        carryIds: Array.isArray(fromSpaced.pendingCarry) ? fromSpaced.pendingCarry : [],
+        pendingCarry: [],
+        bonusRun: false,
+        lastLook: false,
+        resumeIds: [],
+        resumeSitting: 0,
+        resumeLine: '',
+        clearedIds: [],
+        pickingUp: '',
+        aheadNote: !!fromSpaced.aheadNote,
         lastFinishedAt: gradedAt,
-        nextDueAt: nextDueAfterSitting(finished, { stopTime: fromSpaced.stopTime, now: gradedAt }),
+        nextDueAt: nextDueAfterSitting(finished, { sittings }),
       },
       currentTerms
     );
   };
 
   const startSitting = (override = {}) => {
-    const nextSpaced = { ...spaced, ...override };
-    const nextQueue = planSittingQueue(terms, nextSpaced, schedule);
+    const keepResults = !!override.keepResults;
+    const rest = { ...override };
+    delete rest.keepResults;
+    const resuming = !rest.lastLook && !rest.bonusRun
+      && spaced.resumeIds?.length
+      && (!spaced.resumeSitting || spaced.resumeSitting === (spaced.sittingIndex || 1));
+    if (!keepResults) {
+      sittingResultsRef.current = {};
+      setTerms((prev) => prev.map((t) => ({
+        ...t,
+        srs: { ...emptySrs(), ...t.srs, missCount: 0 },
+      })));
+    }
+    const nextSpaced = {
+      ...spaced,
+      ...rest,
+      welcomeLine: '',
+      aheadNote: false,
+      shakyBefore: rest.lastLook ? spaced.shakyBefore : countShaky(terms),
+      clearedIds: rest.lastLook ? spaced.clearedIds : [],
+      resumeIds: rest.lastLook ? spaced.resumeIds : (resuming ? spaced.resumeIds : []),
+      resumeSitting: rest.lastLook ? spaced.resumeSitting : (resuming ? (spaced.resumeSitting || spaced.sittingIndex || 1) : 0),
+    };
+    const built = describeSittingQueue(terms, nextSpaced, schedule);
+    const nextQueue = built.queue;
     if (!nextQueue.length) {
-      completeSitting(terms, nextSpaced);
+      if (nextSpaced.bonusRun || nextSpaced.lastLook) {
+        persistSitting({
+          ...nextSpaced,
+          phase: 'plan',
+          bonusRun: false,
+          lastLook: false,
+          queue: [],
+          pendingCarry: [],
+          aheadNote: true,
+        });
+        return;
+      }
+      const current = sittingByIndex(schedule, nextSpaced.sittingIndex || 1);
+      if (shouldAutoComplete(current, 0)) {
+        completeSitting(terms, { ...nextSpaced, pendingCarry: [], aheadNote: true });
+        return;
+      }
+      completeSitting(terms, { ...nextSpaced, pendingCarry: built.leftoverIds, aheadNote: false });
       return;
     }
-    sittingResultsRef.current = {};
     persistSitting({
       ...nextSpaced,
       phase: 'drill',
       queue: nextQueue.map((t) => t.id),
+      pendingCarry: built.leftoverIds,
+      aheadNote: false,
+      drillTotal: nextQueue.length,
+      pickingUp: resuming ? pickupLine(nextQueue.length) : '',
+      resumeIds: rest.lastLook ? nextSpaced.resumeIds : [],
+      clearedIds: [],
     });
   };
 
@@ -216,7 +386,13 @@ export default function SpacedCram() {
   };
 
   const logAttempt = (id, result) => {
-    sittingResultsRef.current[id] = result;
+    const attempt = recordAttempt(sittingResultsRef.current, id, result);
+    if (result === 'got_it') {
+      setSpaced((prev) => ({
+        ...prev,
+        clearedIds: [...new Set([...(prev.clearedIds || []), id])],
+      }));
+    }
     const at = Date.now();
     setTerms((prev) =>
       prev.map((t) =>
@@ -224,7 +400,11 @@ export default function SpacedCram() {
           ? {
               ...t,
               seen: true,
-              recallHistory: [...(t.recallHistory || []), { result: result === 'got_it' ? 'got' : 'missed', at }],
+              recallHistory: [...(t.recallHistory || []), {
+                result: result === 'got_it' ? 'got' : result === 'partly' ? 'partly' : 'missed',
+                at,
+              }],
+              srs: { ...emptySrs(), ...t.srs, missCount: attempt.missCount, lastGrade: attempt.lastGrade },
             }
           : t
       )
@@ -232,44 +412,117 @@ export default function SpacedCram() {
   };
 
   const onDrillDone = () => {
-    const currentSitting = sittingByIndex(schedule, sittingN);
-    let nextTerms = applySittingResults(terms, sittingResultsRef.current);
-    if (currentSitting?.type === SESSION_TYPE.NEW) {
+    const gradedAt = nowRef.current;
+    const gradeContext = { at: gradedAt, wakeTime: spaced.wakeTime, sleepTime: spaced.stopTime };
+    if (spaced.lastLook) {
+      const nextTerms = applyLastLookResults(terms, sittingResultsRef.current);
+      sittingResultsRef.current = {};
+      persistSitting({
+        ...spaced,
+        phase: 'plan',
+        lastLook: false,
+        queue: [],
+        pendingCarry: [],
+        aheadNote: false,
+        clearedIds: [],
+      }, nextTerms);
+      return;
+    }
+    if (spaced.bonusRun) {
+      let nextTerms = applySittingResults(terms, sittingResultsRef.current, gradeContext);
       nextTerms = markTermsIntroduced(nextTerms, spaced.queue);
+      sittingResultsRef.current = {};
+      persistSitting({
+        ...spaced,
+        phase: 'plan',
+        bonusRun: false,
+        queue: [],
+        pendingCarry: [],
+        aheadNote: false,
+        clearedIds: [],
+      }, nextTerms);
+      return;
+    }
+    const currentSitting = sittingByIndex(schedule, sittingN);
+    if (currentSitting?.type === SESSION_TYPE.NEW) {
       const step = nextNewStep(spaced, schedule);
-      if (step.kind === 'mini_rev') {
-        persistSitting(
-          { ...spaced, phase: 'chunk_break', subPhase: 'mini_rev', chunkIndex: step.chunkIndex, queue: [] },
-          nextTerms
+      if (step.kind === 'mini_rev' || step.kind === 'next_chunk') {
+        const progressed = markTermsIntroduced(
+          mergeAttemptGrades(terms, sittingResultsRef.current),
+          spaced.queue
         );
-        return;
-      }
-      if (step.kind === 'next_chunk') {
+        const keptHits = { ...(spaced.pendingGrades || {}), ...hitAttempts(sittingResultsRef.current) };
+        sittingResultsRef.current = {};
         persistSitting(
-          { ...spaced, phase: 'chunk_break', subPhase: 'new', chunkIndex: step.chunkIndex, queue: [] },
-          nextTerms
+          {
+            ...spaced,
+            phase: 'chunk_break',
+            subPhase: step.subPhase,
+            chunkIndex: step.chunkIndex,
+            queue: [],
+            pendingGrades: keptHits,
+          },
+          progressed
         );
         return;
       }
     }
-    completeSitting(nextTerms);
+    const results = { ...(spaced.pendingGrades || {}), ...(sittingResultsRef.current || {}) };
+    let nextTerms = applySittingResults(terms, results, gradeContext);
+    if (currentSitting?.type === SESSION_TYPE.NEW || currentSitting?.fullRev || currentSitting?.prioritized) {
+      nextTerms = markTermsIntroduced(nextTerms, spaced.queue);
+    }
+    sittingResultsRef.current = {};
+    completeSitting(nextTerms, { ...spaced, pendingGrades: {}, aheadNote: false });
+  };
+
+  const remindLater = async () => {
+    const due = Number(spaced.nextDueAt) || 0;
+    const result = await scheduleStudyReminder(due);
+    if (!result.ok) {
+      setReminderState('hidden');
+      return;
+    }
+    setReminderState('set');
   };
 
   const endToHome = () => {
     let nextTerms = terms;
+    let nextSpaced = {
+      ...spaced,
+      bonusRun: false,
+      phase: spaced.phase === 'complete' ? 'complete' : 'plan',
+    };
     if (spaced.phase === 'drill') {
-      nextTerms = applySittingResults(terms, sittingResultsRef.current);
-      if (sitting?.type === SESSION_TYPE.NEW) {
+      nextTerms = mergeAttemptGrades(terms, sittingResultsRef.current);
+      if (!spaced.lastLook && sitting?.type === SESSION_TYPE.NEW) {
         nextTerms = markTermsIntroduced(nextTerms, spaced.queue);
       }
+      if (!spaced.lastLook) {
+        const left = unclearedIds(spaced.queue, sittingResultsRef.current);
+        nextSpaced = {
+          ...nextSpaced,
+          queue: left,
+          resumeIds: left,
+          resumeSitting: spaced.sittingIndex || 1,
+          resumeLine: pickupLine(left.length),
+          pickingUp: '',
+          clearedIds: [],
+          pendingGrades: { ...(spaced.pendingGrades || {}), ...hitAttempts(sittingResultsRef.current) },
+        };
+      }
       setTerms(nextTerms);
+    }
+    if (simTainted.current || !shouldPersistSession({ clockAt, clockOffset })) {
+      navigate('/');
+      return;
     }
     saveSession({
       id: sessionIdRef.current,
       setup,
       terms: nextTerms,
       phase: 'spaced_break',
-      spaced: { ...spaced, phase: spaced.phase === 'complete' ? 'complete' : 'plan' },
+      spaced: nextSpaced,
       stopTime: spaced.stopTime || null,
       title: init.title || setup?.title,
       noteId: init.noteId || null,
@@ -278,6 +531,10 @@ export default function SpacedCram() {
   };
 
   const finishAll = () => {
+    if (simTainted.current || !shouldPersistSession({ clockAt, clockOffset })) {
+      navigate('/');
+      return;
+    }
     saveFinishedSession({
       id: sessionIdRef.current,
       terms: withInferredMastery(terms),
@@ -289,18 +546,57 @@ export default function SpacedCram() {
     navigate('/');
   };
 
-  const confirmBedtime = () => {
-    if (!bedtimeDraft) return;
-    persistSitting({ ...spaced, stopTime: bedtimeDraft });
+  const confirmTimes = () => {
+    if (!examDraft) return;
+    const examTime = resolveExamTime({ now, examTiming: setup?.examTiming, examClock: examDraft });
+    saveSavedClock(sleepDraft, wakeDraft);
+    const keepFinished = (spaced.sittings || []).some((s) => s.done);
+    persistSitting(changePlanTimes({
+      ...spaced,
+      lastFinishedAt: keepFinished ? spaced.lastFinishedAt : 0,
+    }, terms, {
+      sleepTime: sleepDraft,
+      wakeTime: wakeDraft,
+      examTime,
+      examClock: examDraft,
+      now,
+    }));
   };
 
-  if (needBedtime && spaced.phase !== 'drill') {
+  const chooseCore = (coreOnly) => {
+    const plan = generatePlan({
+      now,
+      sleepTime: spaced.stopTime,
+      wakeTime: spaced.wakeTime,
+      examTime: spaced.examTime,
+      terms,
+      coreOnly,
+    });
+    const merged = mergeKeptSittings(spaced.sittings, plan.sittings, now);
+    const next = merged.sittings.find((s) => !s.done);
+    persistSitting({
+      ...spaced,
+      coreOnly,
+      sittings: merged.sittings,
+      sittingIndex: merged.sittingIndex,
+      welcomeLine: '',
+      catchUpKey: '',
+      queue: [],
+      phase: 'plan',
+      nextDueAt: next && next.at > now + 15000 ? next.at : 0,
+    });
+  };
+
+  if ((needTimes || spaced.editingTimes) && spaced.phase !== 'drill' && spaced.phase !== 'chunk_break') {
     return (
       <div className="min-h-[100dvh] bg-background text-foreground flex flex-col">
         <header className="px-3 pt-safe pb-2">
           <button
             type="button"
-            onClick={() => navigate('/')}
+            onClick={() => {
+              if (spaced.editingTimes) persistSitting({ ...spaced, editingTimes: false });
+              else navigate('/');
+            }}
             aria-label="Home"
             className="w-11 h-11 rounded-full flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-accent transition"
           >
@@ -308,22 +604,33 @@ export default function SpacedCram() {
           </button>
         </header>
         <main className="flex-1 px-6 pb-4 overflow-y-auto flex flex-col items-center text-center">
-          <div className="m-auto flex flex-col items-center w-full max-w-xs">
+          <div className="flex flex-col items-center w-full max-w-xs py-4">
             <Moon className="w-10 h-10 text-muted-foreground mb-4" />
-            <h2 className="text-xl font-bold tracking-tight mb-2">What time are you planning to sleep?</h2>
+            <h2 className="text-xl font-bold tracking-tight mb-2">When should this plan run?</h2>
             <p className="text-sm text-muted-foreground max-w-xs mb-6">
-              The plan parks a full review right before bed. Sleep is the gap that makes this work.
+              Sleep, wake, and exam time. Sittings stay inside waking hours, and the last pass is about an hour and a half before the exam.
             </p>
-            <SleepTimePicker value={bedtimeDraft} onChange={setBedtimeDraft} />
-            <Button
-              disabled={!bedtimeDraft}
-              onClick={confirmBedtime}
-              className="h-12 px-8 rounded-2xl font-semibold"
-            >
-              Set sleep time
-            </Button>
+            <div className="w-full text-left">
+              <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground mb-1">Sleep</p>
+              <SleepTimePicker value={sleepDraft} onChange={setSleepDraft} />
+              <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground mb-1">Wake</p>
+              <SleepTimePicker value={wakeDraft} onChange={setWakeDraft} />
+              <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground mb-1">Exam</p>
+              <SleepTimePicker value={examDraft} onChange={setExamDraft} requireChoice />
+            </div>
           </div>
         </main>
+        <footer className="px-6 pt-2 pb-safe">
+          <div className="max-w-md mx-auto w-full">
+            <Button
+              disabled={!sleepDraft || !wakeDraft || !examDraft}
+              onClick={confirmTimes}
+              className="w-full h-14 rounded-2xl text-base font-semibold"
+            >
+              Build my plan
+            </Button>
+          </div>
+        </footer>
       </div>
     );
   }
@@ -355,7 +662,7 @@ export default function SpacedCram() {
         </main>
         <footer className="px-6 pt-2 pb-safe">
           <div className="max-w-md mx-auto w-full flex flex-col gap-3">
-            <Button className="h-14 rounded-2xl text-base font-semibold" onClick={() => startSitting()}>
+            <Button className="h-14 rounded-2xl text-base font-semibold" onClick={() => startSitting({ keepResults: true })}>
               Continue
             </Button>
             <Button variant="outline" className="h-14 rounded-2xl text-base font-semibold" onClick={endToHome}>
@@ -367,18 +674,65 @@ export default function SpacedCram() {
     );
   }
 
+  const examOver = !!spaced.examOver || (Number(spaced.examTime) > 0 && now >= spaced.examTime);
+  if (examOver && spaced.phase !== 'drill' && spaced.phase !== 'chunk_break') {
+    return (
+      <div className="min-h-[100dvh] bg-background text-foreground flex flex-col">
+        <header className="px-3 pt-safe pb-2">
+          <button
+            type="button"
+            onClick={() => navigate('/')}
+            aria-label="Home"
+            className="w-11 h-11 rounded-full flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-accent transition"
+          >
+            <ArrowLeft className="w-5 h-5" />
+          </button>
+        </header>
+        <main className="flex-1 px-6 pb-4 flex flex-col items-center justify-center text-center">
+          <h1 className="text-2xl font-bold tracking-tight">Plan complete</h1>
+        </main>
+      </div>
+    );
+  }
+
   if (spaced.phase === 'plan' || spaced.phase === 'done' || spaced.phase === 'complete' || allDone) {
     const justFinished = spaced.phase === 'done';
-    const finishedAll = spaced.phase === 'complete' || allDone;
-    const statusLine = finishedAll
-      ? 'That’s the last sitting. Sleep if you can — then you’re as ready as this plan gets.'
-      : justFinished && waitCopy
-        ? `Sitting done. ${waitCopy}.`
-        : justFinished
-          ? 'Sitting done. Start the next one when you’re ready.'
-          : waitCopy && !ready
-            ? waitCopy
-            : null;
+    const finishedAll = allDone;
+    const statusLine = spaced.welcomeLine
+      ? spaced.welcomeLine
+      : spaced.aheadNote
+        ? AHEAD_LINE
+        : finishedAll
+          ? 'That’s the last sitting. Sleep if you can — then you’re as ready as this plan gets.'
+          : justFinished && waitCopy
+            ? `Sitting done. ${waitCopy}.`
+            : justFinished
+              ? 'Sitting done. Start the next one when you’re ready.'
+              : waitCopy && !ready
+                ? waitCopy
+                : null;
+    const finishedNumber = Math.max(0, sittingN - 1);
+    const shakyNow = countShaky(terms);
+    const shakyNames = shakyTermNames(terms);
+    const glance = planEndGlance(terms);
+    const showRecap = justFinished && Number.isFinite(spaced.shakyBefore);
+    const recap = recapCopy({
+      sittingNumber: finishedNumber,
+      learned: countLearned(terms),
+      shakyBefore: spaced.shakyBefore,
+      shakyAfter: shakyNow,
+    });
+    const solidNames = terms
+      .filter((t) => t?.srs?.introduced && t.pile === 'solid')
+      .map((t) => t.term)
+      .filter(Boolean);
+    const resumeNote = spaced.resumeIds?.length
+      ? (spaced.resumeLine || pickupLine(spaced.resumeIds.length))
+      : '';
+    const upcoming = finishedAll
+      ? []
+      : describeSittingQueue(terms, { ...spaced, lastLook: false, bonusRun: false }, schedule).queue;
+    const preview = sittingEstimate(upcoming.length);
     return (
       <div className="min-h-[100dvh] bg-background text-foreground flex flex-col">
         <header className="px-3 pt-safe pb-2">
@@ -396,6 +750,39 @@ export default function SpacedCram() {
             {statusLine && (
               <p className="text-sm text-muted-foreground mb-4 leading-relaxed">{statusLine}</p>
             )}
+            {resumeNote && (
+              <p className="text-sm font-medium mb-3">{resumeNote}</p>
+            )}
+            {showRecap && (
+              <div className="mb-4 space-y-1">
+                <p className="text-sm font-medium text-foreground">{recap.text}</p>
+                {shakyNames.length > 0 && (
+                  <ul className="text-sm leading-relaxed">
+                    {shakyNames.map((name) => <li key={name}>{name}</li>)}
+                  </ul>
+                )}
+                <p className="text-sm text-muted-foreground">{solidNames.length ? solidNames.join(', ') : `Solid: ${glance.solid}`}</p>
+              </div>
+            )}
+            {finishedAll && (
+              <div className="mb-4">
+                <p className="text-sm font-medium">Solid {glance.solid} · Shaky {glance.shaky}</p>
+                {glance.shakyTerms.length > 0 && (
+                  <ul className="text-sm mt-1 leading-relaxed">
+                    {glance.shakyTerms.map((name) => <li key={name}>{name}</li>)}
+                  </ul>
+                )}
+              </div>
+            )}
+            {!finishedAll && !ready && (
+              <div className="mb-4 text-center">
+                <p className="text-sm">{WAIT_WHY}</p>
+                <p className="text-2xl font-bold tabular-nums mt-1">{countdownLabel(spaced.nextDueAt, now)}</p>
+              </div>
+            )}
+            {preview.line && (
+              <p className="text-sm text-muted-foreground mb-3">{preview.line}</p>
+            )}
             <SpacedPlan
               schedule={schedule}
               currentSitting={finishedAll ? lastN + 1 : sittingN}
@@ -411,17 +798,57 @@ export default function SpacedCram() {
                 {justFinished ? 'Start next sitting' : 'Start this sitting'}
               </Button>
             )}
+            {Number(spaced.examTime) > now && (
+              <Button
+                variant="outline"
+                className="h-12 rounded-2xl text-base font-semibold"
+                onClick={() => startSitting({ lastLook: true })}
+              >
+                Last look
+              </Button>
+            )}
+            {schedule?.large && schedule.bonusCount > 0 && (
+              <button
+                type="button"
+                onClick={() => chooseCore(!spaced.coreOnly)}
+                className="text-sm text-muted-foreground hover:text-foreground underline-offset-4 hover:underline self-center"
+              >
+                {spaced.coreOnly ? 'Include bonus' : 'Core only'}
+              </button>
+            )}
+            <button
+              type="button"
+              onClick={() => persistSitting({ ...spaced, editingTimes: true })}
+              className="text-sm text-muted-foreground hover:text-foreground underline-offset-4 hover:underline self-center"
+            >
+              Change times
+            </button>
             {!finishedAll && !ready && (
               <>
                 <Button disabled className="h-14 rounded-2xl text-base font-semibold bg-muted text-muted-foreground">
                   {waitCopy || 'Come back later'}
                 </Button>
+                {offerReminder(finishedNumber) && currentReminderMode() !== 'off' && reminderState !== 'hidden' && (
+                  <button
+                    type="button"
+                    onClick={remindLater}
+                    className="text-sm text-muted-foreground hover:text-foreground self-center text-center"
+                  >
+                    <span className="underline underline-offset-4">
+                      {reminderState === 'set' ? 'Reminder set' : 'Remind me'}
+                    </span>
+                    {currentReminderMode() === 'web' && (
+                      <span className="block mt-1">{WEB_REMINDER_NOTE}</span>
+                    )}
+                  </button>
+                )}
                 <button
                   type="button"
                   onClick={() => startSitting()}
-                  className="text-sm text-muted-foreground hover:text-foreground underline-offset-4 hover:underline self-center"
+                  className="text-sm text-muted-foreground hover:text-foreground self-center text-center"
                 >
-                  Start anyway
+                  <span className="underline underline-offset-4">Start anyway</span>
+                  <span className="block mt-1">{START_EARLY_LINE}</span>
                 </button>
               </>
             )}
@@ -439,9 +866,11 @@ export default function SpacedCram() {
     );
   }
 
-  const mixReverse = sitting?.type === SESSION_TYPE.REV || sitting?.type === SESSION_TYPE.REV_PLUS;
-  const fastPass = !!sitting?.fast;
-  const isFree = sitting?.type === SESSION_TYPE.FREE;
+  const drillingBonus = !!spaced.bonusRun;
+  const drillingLast = !!spaced.lastLook;
+  const mixReverse = !drillingLast && (drillingBonus || sitting?.type === SESSION_TYPE.REV || sitting?.type === SESSION_TYPE.REV_PLUS);
+  const fastPass = drillingLast || (!drillingBonus && !!sitting?.fast);
+  const isFree = !drillingLast && !drillingBonus && sitting?.type === SESSION_TYPE.FREE;
 
   return (
     <div className="min-h-[100dvh] bg-background text-foreground flex flex-col">
@@ -457,6 +886,21 @@ export default function SpacedCram() {
         <p className="min-w-0 flex-1 text-center text-sm font-semibold truncate">{drillLabel(sitting, spaced, schedule)}</p>
         <span className="w-11 shrink-0" />
       </header>
+      <div className="px-4 pt-3">
+        {spaced.pickingUp && (
+          <p className="text-sm font-medium text-center mb-2">{spaced.pickingUp}</p>
+        )}
+        <div className="h-1.5 rounded-full bg-muted overflow-hidden" aria-hidden="true">
+          <div
+            className="h-full bg-primary rounded-full"
+            style={{ width: `${Math.min(100, Math.round((((spaced.clearedIds || []).length) / Math.max(1, spaced.drillTotal || queue.length)) * 100))}%` }}
+          />
+        </div>
+        <p className="text-[11px] text-muted-foreground mt-1 text-center">
+          {sittingEstimate(spaced.drillTotal || queue.length).line}
+          {(spaced.clearedIds || []).length > 0 ? ` · ${(spaced.clearedIds || []).length} done` : ''}
+        </p>
+      </div>
       <div className="flex-1 flex flex-col min-h-0">
         {sittingTerms.length ? (
           isFree ? (

@@ -1,5 +1,5 @@
-import base44 from "@base44/vite-plugin"
 import react from '@vitejs/plugin-react'
+import { fileURLToPath, URL } from 'node:url'
 import { defineConfig, loadEnv } from 'vite'
 import { llmDevPlugin } from './server/llmDevPlugin.js'
 
@@ -21,12 +21,13 @@ export default defineConfig(({ mode }) => {
   return {
     // Relative asset URLs so the built app works inside the Xcode / Capacitor webview.
     base: './',
+    resolve: {
+      alias: {
+        '@': fileURLToPath(new URL('./src', import.meta.url)),
+      },
+    },
     plugins: [
       llmDevPlugin(),
-      // Keeps /api proxy to your Base44 backend for leftover SDK calls.
-      base44({
-        legacySDKImports: process.env.BASE44_LEGACY_SDK_IMPORTS === 'true',
-      }),
       react(),
     ],
     server: {
@@ -41,12 +42,12 @@ export default defineConfig(({ mode }) => {
           changeOrigin: true,
         },
         '/__/auth': {
-          target: 'https://last-minute-study-899f2.firebaseapp.com',
+          target: 'https://bharris-app.firebaseapp.com',
           changeOrigin: true,
           secure: true,
         },
         '/__/firebase': {
-          target: 'https://last-minute-study-899f2.firebaseapp.com',
+          target: 'https://bharris-app.firebaseapp.com',
           changeOrigin: true,
           secure: true,
         },

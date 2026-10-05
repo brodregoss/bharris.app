@@ -24,8 +24,24 @@ async function fetchSubscriber(env, uid) {
   return payload;
 }
 
+export function webPlanActive(row) {
+  const plan = row?.billing_plan;
+  return plan === 'solo' || plan === 'partner' || plan === 'guest';
+}
+
+export async function appleEntitlementActive(env, uid) {
+  try {
+    if (!env.REVENUECAT_SECRET_KEY) return false;
+    const subscriber = await fetchSubscriber(env, uid);
+    return entitlementActive(subscriber, env.REVENUECAT_ENTITLEMENT_ID || 'Study Pro');
+  } catch {
+    return false;
+  }
+}
+
 export async function applyEntitlement(env, uid, isPro) {
-  const tier = isPro ? 'pro' : 'free';
+  const existing = await getUserRow(env, uid);
+  const tier = isPro || webPlanActive(existing) ? 'pro' : 'free';
   const row = await updateQuota(env, uid, {
     tier,
     limit: quotaLimit(env, tier),

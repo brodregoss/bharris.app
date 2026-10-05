@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Last Minute Study — system flow &amp; algorithms</title>
+  <title>bharris.app — system flow &amp; algorithms</title>
   <style>
     :root {
       --bg: #f4f4f5;
@@ -185,7 +185,7 @@
 </head>
 <body>
   <header class="top">
-    <h1>Last Minute Study — complete system flow</h1>
+    <h1>bharris.app — complete system flow</h1>
     <p>Wireframe of every screen, background AI call, prompt, and algorithm. Hover (or tap) a box — the note panel explains idea and purpose.</p>
     <nav>
       <a href="#journey">User journey</a>
@@ -340,7 +340,7 @@
             <h3>Panic notes</h3>
             <p class="sub">Cached markdown page</p>
           </article>
-          <article class="box page" tabindex="0" data-kind="Screen" data-title="Settings /#/settings" data-note="Dark mode via next-themes (lms-theme). NativeChrome sets iOS status bar LIGHT (black icons) vs DARK (white icons). Purpose: readability of time/battery on the device chrome.">
+          <article class="box page" tabindex="0" data-kind="Screen" data-title="Settings /#/settings" data-note="Dark mode via next-themes (bharris-theme). NativeChrome sets iOS status bar LIGHT (black icons) vs DARK (white icons). Purpose: readability of time/battery on the device chrome.">
             <p class="tag">#/settings</p>
             <h3>Settings</h3>
             <p class="sub">Dark mode · sleep copy</p>
@@ -368,8 +368,8 @@
         </tbody>
       </table>
 
-      <h2 class="sec" id="ai">3. Background AI (base44 InvokeLLM)</h2>
-      <p class="lede">Four LLM calls. All go through <code>base44.integrations.Core.InvokeLLM</code>. Hover a box, or expand a prompt for the exact template.</p>
+      <h2 class="sec" id="ai">3. Background AI</h2>
+      <p class="lede">Four LLM calls. All go through the Worker. Hover a box, or expand a prompt for the exact template.</p>
 
       <div class="row" style="margin-bottom:16px">
         <article class="box ai" tabindex="0" data-kind="AI" data-title="Triage term generation" data-note="Runs only when source.items is empty (photo/count path). Asks for exactly N≤15 terms with difficulty 1–10 and depends_on graph. Then rankTerms() bins them into Blank/Shaky/Know it. Manual and sample decks skip this call.">
@@ -679,9 +679,9 @@ signature = pieces joined by ";;"</span>
           <h3>lms_panic_summary_v1</h3>
           <p class="sub">Panic markdown cache</p>
         </article>
-        <article class="box store" tabindex="0" data-kind="Storage" data-title="lms-theme + NativeChrome" data-note="next-themes storageKey lms-theme. NativeChrome: dark → SystemBarsStyle.Dark (white time/battery), light → Light (black icons). Requires UIViewControllerBasedStatusBarAppearance=true. html.dark { color-scheme: dark }.">
+        <article class="box store" tabindex="0" data-kind="Storage" data-title="bharris-theme + NativeChrome" data-note="next-themes storageKey bharris-theme. NativeChrome: dark → SystemBarsStyle.Dark (white time/battery), light → Light (black icons). Requires UIViewControllerBasedStatusBarAppearance=true. html.dark { color-scheme: dark }.">
           <p class="tag">theme + iOS</p>
-          <h3>lms-theme</h3>
+          <h3>bharris-theme</h3>
           <p class="sub">Status bar follows app theme</p>
         </article>
         <article class="box store" tabindex="0" data-kind="Storage" data-title="lms_onboarded_v2" data-note="Set when setup continues to triage. Landing uses it to skip Welcome on later launches.">
@@ -689,7 +689,7 @@ signature = pieces joined by ";;"</span>
           <h3>lms_onboarded_v2</h3>
           <p class="sub">Has seen notes-first flow</p>
         </article>
-        <article class="box store" tabindex="0" data-kind="Native" data-title="Capacitor iOS" data-note="HashRouter inside WKWebView. ios.contentInset never + viewport-fit=cover. CSS pt-safe / pb-safe = max(1.25rem, safe-area-inset + 0.75rem). InvokeLLM still hits Base44 app 6a6155d14517fbb12343f754.">
+        <article class="box store" tabindex="0" data-kind="Native" data-title="Capacitor iOS" data-note="HashRouter inside WKWebView. ios.contentInset never + viewport-fit=cover. CSS pt-safe / pb-safe = max(1.25rem, safe-area-inset + 0.75rem). AI calls go through the Worker.">
           <p class="tag">Capacitor 8</p>
           <h3>iOS webview</h3>
           <p class="sub">Edge-to-edge + hosted LLM</p>

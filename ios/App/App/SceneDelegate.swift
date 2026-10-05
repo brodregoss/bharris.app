@@ -10,30 +10,30 @@ class SceneDelegate: UIResponder, UIWindowSceneDelegate {
 
         window = UIWindow(windowScene: windowScene)
         window?.backgroundColor = UIColor(red: 0.973, green: 0.980, blue: 0.988, alpha: 1.0)
-        window?.rootViewController = CAPBridgeViewController()
+        window?.rootViewController = StudyBridgeViewController()
         window?.makeKeyAndVisible()
 
         lockWebViewZoom()
         DispatchQueue.main.async { [weak self] in self?.lockWebViewZoom() }
 
         if let url = connectionOptions.urlContexts.first?.url {
-            deliverGoogleHandoff(url)
+            deliverAppLink(url)
         }
         SceneDelegateProxy.shared.scene(scene, willConnectTo: session, options: connectionOptions)
     }
 
-    /// Safari finishes Google sign-in, then opens lmsstudy:// so the account comes back into the app.
-    private func deliverGoogleHandoff(_ url: URL, attempt: Int = 0) {
-        guard url.scheme == "lmsstudy" else { return }
-        guard let controller = window?.rootViewController as? CAPBridgeViewController,
-              let webView = controller.webView else {
-            if attempt < 20 {
-                DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) { [weak self] in
-                    self?.deliverGoogleHandoff(url, attempt: attempt + 1)
-                }
-            }
+    private let localHost = "bharris-app.web.app"
+
+    /// bharris://auth finishes Google sign-in. bharris://signin opens the sign-in screen.
+    private func deliverAppLink(_ url: URL) {
+        guard url.scheme == "bharris" else { return }
+        let host = (url.host ?? "").lowercased()
+        if host == "signin" {
+            loadLocal(hash: "/account/signin", query: "")
             return
         }
+        guard host == "auth" else { return }
+        if GoogleAuthSessionPlugin.sessionActive { return }
         let items = URLComponents(url: url, resolvingAgainstBaseURL: false)?.queryItems ?? []
         let query = ["googleIdToken", "googleCancelled"].compactMap { name -> String? in
             guard let value = items.first(where: { $0.name == name })?.value,
@@ -42,7 +42,21 @@ class SceneDelegate: UIResponder, UIWindowSceneDelegate {
             }
             return "\(name)=\(encoded)"
         }.joined(separator: "&")
-        let local = "capacitor://enthusiastic-cram-genius-flow.base44.app/?\(query)#/account"
+        loadLocal(hash: "/account", query: query)
+    }
+
+    private func loadLocal(hash: String, query: String, attempt: Int = 0) {
+        guard let controller = window?.rootViewController as? CAPBridgeViewController,
+              let webView = controller.webView else {
+            if attempt < 20 {
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) { [weak self] in
+                    self?.loadLocal(hash: hash, query: query, attempt: attempt + 1)
+                }
+            }
+            return
+        }
+        let prefix = query.isEmpty ? "" : "?\(query)"
+        let local = "capacitor://\(localHost)/\(prefix)#\(hash)"
         if let localURL = URL(string: local) {
             webView.load(URLRequest(url: localURL))
         }
@@ -66,8 +80,8 @@ class SceneDelegate: UIResponder, UIWindowSceneDelegate {
     }
 
     func scene(_ scene: UIScene, openURLContexts URLContexts: Set<UIOpenURLContext>) {
-        if let url = URLContexts.first?.url, url.scheme == "lmsstudy" {
-            deliverGoogleHandoff(url)
+        if let url = URLContexts.first?.url, url.scheme == "bharris" {
+            deliverAppLink(url)
             return
         }
         SceneDelegateProxy.shared.scene(scene, openURLContexts: URLContexts)

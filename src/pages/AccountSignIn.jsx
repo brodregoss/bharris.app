@@ -1,5 +1,5 @@
 import React from 'react';
-import { Link, Navigate, useNavigate } from 'react-router-dom';
+import { Link, Navigate, useLocation, useNavigate } from 'react-router-dom';
 import { Loader2, Lock, Mail } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -8,10 +8,11 @@ import AuthShell from '@/components/AuthShell';
 import AppleSignInButton from '@/components/account/AppleSignInButton';
 import GoogleSignInButton from '@/components/account/GoogleSignInButton';
 import { useAuth } from '@/lib/AuthContext';
-import { afterAuthPath } from '@/lib/onboarding';
+import { afterAuthPath, leaveForAuthReturn, rememberAuthReturn } from '@/lib/onboarding';
 
 export default function AccountSignIn() {
   const navigate = useNavigate();
+  const { search } = useLocation();
   const { isAuthenticated, signIn, signInWithApple, signInWithGoogle } = useAuth();
   const [email, setEmail] = React.useState('');
   const [password, setPassword] = React.useState('');
@@ -20,7 +21,16 @@ export default function AccountSignIn() {
   const [appleLoading, setAppleLoading] = React.useState(false);
   const [googleLoading, setGoogleLoading] = React.useState(false);
 
+  React.useEffect(() => {
+    rememberAuthReturn();
+  }, []);
+
+  const finish = () => {
+    if (!leaveForAuthReturn()) navigate(afterAuthPath(), { replace: true });
+  };
+
   if (isAuthenticated) {
+    if (leaveForAuthReturn()) return null;
     return <Navigate to={afterAuthPath()} replace />;
   }
 
@@ -30,7 +40,7 @@ export default function AccountSignIn() {
     setLoading(true);
     try {
       await signIn(email, password);
-      navigate(afterAuthPath(), { replace: true });
+      finish();
     } catch (err) {
       setError(err.message || 'Could not sign in.');
     } finally {
@@ -43,7 +53,7 @@ export default function AccountSignIn() {
     setAppleLoading(true);
     try {
       await signInWithApple();
-      navigate(afterAuthPath(), { replace: true });
+      finish();
     } catch (err) {
       setError(err.message || 'Could not sign in with Apple.');
     } finally {
@@ -56,7 +66,7 @@ export default function AccountSignIn() {
     setGoogleLoading(true);
     try {
       const signedIn = await signInWithGoogle();
-      if (signedIn) navigate(afterAuthPath(), { replace: true });
+      if (signedIn) finish();
     } catch (err) {
       setError(err.message || 'Could not sign in with Google.');
     } finally {
@@ -137,7 +147,7 @@ export default function AccountSignIn() {
       </form>
       <p className="text-center text-sm text-muted-foreground mt-6">
         New here?{' '}
-        <Link to="/account/create" className="text-foreground font-medium underline underline-offset-4">
+        <Link to={{ pathname: '/account/create', search }} className="text-foreground font-medium underline underline-offset-4">
           Create an account
         </Link>
       </p>

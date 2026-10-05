@@ -10,9 +10,11 @@ import {
   Shield,
   FileText,
   ChevronRight,
+  Clipboard,
   Sparkles,
   LogOut,
   KeyRound,
+  Pencil,
   Trash2,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -21,7 +23,8 @@ import { Label } from '@/components/ui/label';
 import { Progress } from '@/components/ui/progress';
 import { useAuth } from '@/lib/AuthContext';
 import ChangePasswordSheet from '@/components/account/ChangePasswordSheet';
-import { getUsage } from '@/lib/accountStore';
+import EditNameSheet from '@/components/account/EditNameSheet';
+import { cancelWebsitePlan, getUsage, removePartner, resetPartnerCode } from '@/lib/accountStore';
 import { formatPersonName } from '@/lib/personName';
 import { greetingLine, greetingNameStyle, setGreetingNameStyle } from '@/lib/greeting';
 import { usePaywall } from '@/lib/PaywallContext';
@@ -49,6 +52,7 @@ import {
   PRIVACY_SECTIONS,
   TERMS_SECTIONS,
 } from '@/lib/legal';
+import { devToolsUnlocked, tryUnlockDevTools } from '@/lib/devToolsLock';
 
 const DOCS = {
   about: {
@@ -63,7 +67,7 @@ const DOCS = {
   },
   terms: {
     title: 'Terms of Service',
-    description: 'The rules for using Last Minute Study.',
+    description: 'The rules for using bharris.app.',
     sections: TERMS_SECTIONS,
   },
 };
@@ -99,6 +103,30 @@ function Row({ icon: Icon, label, value, onClick }) {
   );
 }
 
+function maskPartnerCode(code) {
+  const value = String(code || '');
+  if (value.length <= 2) return value;
+  return `${value.slice(0, 2)}${'*'.repeat(value.length - 2)}`;
+}
+
+function formatPlanDate(iso) {
+  const date = new Date(iso || '');
+  if (Number.isNaN(date.getTime())) return '';
+  return date.toLocaleDateString(undefined, { month: 'long', day: 'numeric', year: 'numeric' });
+}
+
+function trialRemainingLabel(iso) {
+  const end = new Date(iso || '');
+  if (Number.isNaN(end.getTime())) return '';
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const endDay = new Date(end.getFullYear(), end.getMonth(), end.getDate());
+  const days = Math.round((endDay.getTime() - today.getTime()) / 86400000);
+  if (days <= 0) return 'Your free trial ends today.';
+  if (days === 1) return '1 day left in your free trial.';
+  return `${days} days left in your free trial.`;
+}
+
 function usedPct(person) {
   if (!person || person.unlimited || !person.aiQuotaLimit) return 0;
   return Math.min(100, ((person.aiQuotaUsed || 0) / person.aiQuotaLimit) * 100);
@@ -128,7 +156,7 @@ function UsageBlock({ heading, person, onUpgrade }) {
           </div>
           <Progress value={usedPct(person)} className="h-2" />
           <p className="text-xs text-muted-foreground">
-            {used} used · {person?.subscriptionTier === 'pro' ? 'Study Pro' : 'Free'}
+            {used} used · {planLabel(person)}
           </p>
         </>
       ) : (
@@ -153,11 +181,22 @@ export default function Settings() {
   const [ready, setReady] = React.useState(false);
   const [doc, setDoc] = React.useState(null);
   const [changePasswordOpen, setChangePasswordOpen] = React.useState(false);
+  const [editNameOpen, setEditNameOpen] = React.useState(false);
   const [usage, setUsage] = React.useState(null);
   const [nameStyle, setNameStyle] = React.useState(() => greetingNameStyle());
   const [deleteOpen, setDeleteOpen] = React.useState(false);
   const [deleting, setDeleting] = React.useState(false);
   const [deleteError, setDeleteError] = React.useState('');
+  const [partnerBusy, setPartnerBusy] = React.useState(false);
+  const [partnerNote, setPartnerNote] = React.useState('');
+  const [codeShown, setCodeShown] = React.useState(false);
+  const [manageOpen, setManageOpen] = React.useState(false);
+  const [cancelOpen, setCancelOpen] = React.useState(false);
+  const [canceling, setCanceling] = React.useState(false);
+  const [cancelError, setCancelError] = React.useState('');
+  const [devCode, setDevCode] = React.useState('');
+  const [devUnlocked, setDevUnlocked] = React.useState(() => devToolsUnlocked());
+  const [devCodeError, setDevCodeError] = React.useState(false);
 
   React.useEffect(() => {
     setReady(true);
@@ -179,12 +218,31 @@ export default function Settings() {
   const dark = ready && (resolvedTheme || theme) === 'dark';
   const open = DOCS[doc];
   const me = usage?.me || usage?.user || user;
+  const onTrial = me?.subscriptionStatus === 'trialing' && !!me?.trialEndsAt;
+  const trialLabel = onTrial ? trialRemainingLabel(me.trialEndsAt) : '';
+  const accessUntil = formatPlanDate(me?.subscriptionStatus === 'trialing' ? me?.trialEndsAt : me?.periodEndsAt);
+  const websitePlan = me?.billingPlan === 'solo' || me?.billingPlan === 'partner';
+  const canCancel = websitePlan && !!me?.subscriptionStatus && !me?.cancelAtPeriodEnd;
   const displayName = me?.displayName || firebaseUser?.displayName || '';
   const greetingPreview = greetingLine(displayName, new Date(), nameStyle);
 
   const chooseGreetingName = (style) => {
     setGreetingNameStyle(style);
     setNameStyle(style);
+  };
+
+  const runPartner = async (action) => {
+    setPartnerBusy(true);
+    setPartnerNote('');
+    setCodeShown(false);
+    try {
+      const data = await action();
+      if (data?.user) setUsage((current) => ({ ...(current || {}), me: data.user, user: data.user }));
+    } catch (err) {
+      setPartnerNote(err instanceof Error ? err.message : 'Could not update the partner code.');
+    } finally {
+      setPartnerBusy(false);
+    }
   };
 
   return (
@@ -202,10 +260,20 @@ export default function Settings() {
               <div className="w-11 h-11 rounded-full bg-muted flex items-center justify-center shrink-0">
                 <User className="w-5 h-5 text-muted-foreground" />
               </div>
-              <div className="min-w-0">
-                <p className="text-sm font-bold tracking-tight truncate">
-                  {formatPersonName(me?.displayName) || me?.email || APP_NAME}
-                </p>
+              <div className="min-w-0 flex-1">
+                <div className="flex items-center gap-1 min-w-0">
+                  <p className="min-w-0 truncate text-sm font-bold tracking-tight">
+                    {formatPersonName(me?.displayName) || me?.email || APP_NAME}
+                  </p>
+                  <button
+                    type="button"
+                    onClick={() => setEditNameOpen(true)}
+                    aria-label="Edit name"
+                    className="shrink-0 rounded-md p-1 text-muted-foreground hover:bg-accent/60 hover:text-foreground"
+                  >
+                    <Pencil className="w-3.5 h-3.5" />
+                  </button>
+                </div>
                 <p className="text-xs text-muted-foreground mt-0.5 truncate">
                   {me?.email || 'Notes sync to this account.'}
                 </p>
@@ -219,14 +287,102 @@ export default function Settings() {
           </section>
 
           <section className="rounded-2xl border border-border bg-card overflow-hidden divide-y divide-border">
-            <Row
-              icon={Sparkles}
-              label="Plan"
-              value={planLabel(me)}
-              onClick={openPaywall}
-            />
+            <div>
+              <Row
+                icon={Sparkles}
+                label="Manage plan"
+                value={planLabel(me)}
+                onClick={() => {
+                  setCancelError('');
+                  setManageOpen(true);
+                }}
+              />
+              {trialLabel && (
+                <p className="pl-12 pr-5 pb-3.5 -mt-1.5 text-sm leading-5 text-muted-foreground">
+                  {trialLabel}
+                </p>
+              )}
+            </div>
             <UsageBlock heading="AI this month" person={me} onUpgrade={openPaywall} />
+            {me?.billingNotice === 'beta_ended' && !me?.billingPlan && (
+              <div className="px-5 pb-5">
+                <p className="text-xs text-muted-foreground">Your free week ended.</p>
+              </div>
+            )}
+            {me?.billingPlan === 'guest' && (
+              <div className="px-5 pb-5">
+                <p className="text-xs text-muted-foreground">
+                  You're on a friend's partner study plan. If they cancel, this plan ends.
+                </p>
+              </div>
+            )}
           </section>
+
+          {me?.billingPlan === 'partner' && (
+            <section className="rounded-2xl border border-border bg-card p-5">
+              <div className="flex items-center justify-between gap-3">
+                <p className="text-sm font-bold tracking-tight">Partner code</p>
+                <button
+                  type="button"
+                  title="Copy code"
+                  aria-label="Copy code"
+                  disabled={!me.partnerCode || partnerBusy}
+                  className="inline-flex items-center gap-1.5 text-sm font-semibold text-foreground disabled:opacity-40"
+                  onClick={async () => {
+                    if (!me.partnerCode) return;
+                    await navigator.clipboard.writeText(me.partnerCode);
+                    setPartnerNote('Code copied.');
+                  }}
+                >
+                  <Clipboard className="w-4 h-4" />
+                  Copy code
+                </button>
+              </div>
+              <button
+                type="button"
+                className="mt-2 text-left font-mono text-sm tracking-wide break-all"
+                aria-label={codeShown ? 'Cover code' : 'Reveal code'}
+                disabled={!me.partnerCode}
+                onClick={() => setCodeShown((shown) => !shown)}
+              >
+                {me.partnerCode
+                  ? (codeShown ? me.partnerCode : maskPartnerCode(me.partnerCode))
+                  : 'Your code will show here after the plan is active.'}
+              </button>
+              <div className="mt-3 flex flex-col gap-2">
+                <Button
+                  type="button"
+                  variant="outline"
+                  className="h-11 rounded-xl"
+                  disabled={partnerBusy || !me.partnerCode}
+                  onClick={() => {
+                    if (!window.confirm('Reset the code? The old one will stop working.')) return;
+                    runPartner(resetPartnerCode);
+                  }}
+                >
+                  Reset code
+                </Button>
+                {me.partnerLinked && (
+                  <Button
+                    type="button"
+                    variant="outline"
+                    className="h-11 rounded-xl"
+                    disabled={partnerBusy}
+                    onClick={() => {
+                      if (!window.confirm('Remove your partner? They lose access now.')) return;
+                      runPartner(removePartner);
+                    }}
+                  >
+                    Remove partner
+                  </Button>
+                )}
+              </div>
+              <p className="text-xs text-muted-foreground mt-3">
+                Resetting makes the old code stop working. Canceling in Manage plan ends access for both of you when the period ends.
+              </p>
+              {partnerNote && <p className="text-sm mt-2">{partnerNote}</p>}
+            </section>
+          )}
 
           <section className="rounded-2xl border border-border bg-card p-5">
             <p className="text-sm font-bold tracking-tight">Greeting name</p>
@@ -279,6 +435,47 @@ export default function Settings() {
             </div>
           </section>
 
+          <section className="rounded-2xl border border-border bg-card p-5">
+            <p className="text-sm font-bold tracking-tight">Dev tools</p>
+            {devUnlocked ? (
+              <p className="text-xs text-muted-foreground mt-1">On</p>
+            ) : (
+              <form
+                className="mt-3 flex items-center gap-2"
+                onSubmit={(event) => {
+                  event.preventDefault();
+                  if (tryUnlockDevTools(devCode)) {
+                    setDevUnlocked(true);
+                    setDevCode('');
+                    setDevCodeError(false);
+                    return;
+                  }
+                  setDevCodeError(true);
+                }}
+              >
+                <input
+                  type="password"
+                  inputMode="numeric"
+                  autoComplete="off"
+                  value={devCode}
+                  onChange={(event) => {
+                    setDevCode(event.target.value);
+                    setDevCodeError(false);
+                  }}
+                  aria-label="Dev tools code"
+                  placeholder="Code"
+                  className="h-11 min-w-0 flex-1 rounded-xl border border-border bg-background px-3 text-sm"
+                />
+                <Button type="submit" variant="outline" className="h-11 rounded-xl shrink-0">
+                  Unlock
+                </Button>
+              </form>
+            )}
+            {devCodeError && (
+              <p className="text-xs text-destructive mt-2">Wrong code</p>
+            )}
+          </section>
+
           <section className="rounded-2xl border border-border bg-card overflow-hidden divide-y divide-border">
             <Row label="Version" value={APP_VERSION} />
             <Row icon={Info} label="About" onClick={() => setDoc('about')} />
@@ -329,6 +526,7 @@ export default function Settings() {
             <AlertDialogDescription>
               This removes your login, notes, and study sessions. It cannot be undone.
               An App Store subscription still has to be cancelled in iPhone Settings.
+              A website subscription is cancelled with the account.
             </AlertDialogDescription>
           </AlertDialogHeader>
           {deleteError && (
@@ -358,11 +556,104 @@ export default function Settings() {
         </AlertDialogContent>
       </AlertDialog>
 
+      <EditNameSheet
+        open={editNameOpen}
+        onOpenChange={setEditNameOpen}
+        displayName={displayName}
+        onSaved={(nextUser) => {
+          if (nextUser) setUsage((current) => ({ ...(current || {}), me: nextUser, user: nextUser }));
+        }}
+      />
+
       <ChangePasswordSheet
         open={changePasswordOpen}
         onOpenChange={setChangePasswordOpen}
         firebaseUser={firebaseUser}
       />
+
+      <Sheet open={manageOpen} onOpenChange={setManageOpen}>
+        <SheetContent side="bottom" className="rounded-t-3xl">
+          <SheetHeader className="text-left pr-10">
+            <SheetTitle>Manage plan</SheetTitle>
+            <SheetDescription>{planLabel(me)}</SheetDescription>
+          </SheetHeader>
+          <div className="space-y-3 pt-4 pb-6">
+            {trialLabel && (
+              <p className="text-sm text-muted-foreground">{trialLabel}</p>
+            )}
+            {websitePlan && me?.cancelAtPeriodEnd && accessUntil && (
+              <p className="text-sm text-muted-foreground">Access until {accessUntil}. You won't be billed again.</p>
+            )}
+            {websitePlan && !me?.cancelAtPeriodEnd && me?.billingPromo === 'beta' && accessUntil && (
+              <p className="text-sm text-muted-foreground">Free trial ends {accessUntil}. You won't be charged.</p>
+            )}
+            {websitePlan && !me?.cancelAtPeriodEnd && me?.billingPromo !== 'beta' && accessUntil && (
+              <p className="text-sm text-muted-foreground">Next billing date {accessUntil}.</p>
+            )}
+            {me?.billingPlan === 'guest' && (
+              <p className="text-sm text-muted-foreground">
+                Your friend manages this plan.{accessUntil ? ` It runs until ${accessUntil}.` : ''}
+              </p>
+            )}
+            {!websitePlan && me?.billingPlan !== 'guest' && me?.subscriptionTier === 'pro' && (
+              <p className="text-sm text-muted-foreground">Study Pro is billed through Apple.</p>
+            )}
+            {!websitePlan && me?.billingPlan !== 'guest' && me?.subscriptionTier !== 'pro' && (
+              <p className="text-sm text-muted-foreground">You're on Free.</p>
+            )}
+            {cancelError && <p className="text-sm text-destructive">{cancelError}</p>}
+            {canCancel && (
+              <Button
+                variant="outline"
+                className="w-full h-11 rounded-2xl"
+                onClick={() => {
+                  setCancelError('');
+                  setCancelOpen(true);
+                }}
+              >
+                Cancel plan
+              </Button>
+            )}
+          </div>
+        </SheetContent>
+      </Sheet>
+
+      <AlertDialog open={cancelOpen} onOpenChange={(open) => { if (!canceling) setCancelOpen(open); }}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Cancel {planLabel(me)}?</AlertDialogTitle>
+            <AlertDialogDescription>
+              {accessUntil
+                ? `You'll keep access until ${accessUntil}, and you won't be billed again.`
+                : "You won't be billed again."}
+              {me?.billingPlan === 'partner' ? ' Your friend loses access then too.' : ''}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={canceling}>Keep plan</AlertDialogCancel>
+            <Button
+              variant="destructive"
+              disabled={canceling}
+              onClick={async () => {
+                setCanceling(true);
+                setCancelError('');
+                try {
+                  const data = await cancelWebsitePlan();
+                  if (data?.user) setUsage((current) => ({ ...(current || {}), me: data.user, user: data.user }));
+                  setCancelOpen(false);
+                } catch (err) {
+                  setCancelError(err instanceof Error ? err.message : 'Could not cancel the plan.');
+                  setCancelOpen(false);
+                } finally {
+                  setCanceling(false);
+                }
+              }}
+            >
+              {canceling ? 'Canceling…' : 'Cancel plan'}
+            </Button>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
 
       <Sheet open={!!doc} onOpenChange={(on) => { if (!on) setDoc(null); }}>
         <SheetContent side="bottom" className="rounded-t-3xl max-h-[85dvh] overflow-y-auto">

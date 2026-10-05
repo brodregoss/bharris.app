@@ -2,7 +2,7 @@ import React from 'react';
 import { Check } from 'lucide-react';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { cn } from '@/lib/utils';
-import { SESSION_TYPE_META, sittingDetail, planProgress } from '@/lib/spacedCram';
+import { SESSION_TYPE_META, describeSittingQueue, planProgress, sittingDetail, sittingEstimate } from '@/lib/spacedCram';
 
 const KEY_ORDER = ['new', 'rev', 'rev_plus', 'free'];
 
@@ -33,12 +33,41 @@ function SleepRow() {
   );
 }
 
-function SittingRow({ sitting, schedule, currentSitting, defaultOpen, leftover }) {
+function sittingSubtitle(sitting, { isCurrent, leftover, chunkN, meta }) {
+  const notes = [];
+  if (sitting.includesShortRev) notes.push('the 25-min review');
+  if (sitting.includesBonusReview) notes.push('a review of the bonus terms');
+  else if (sitting.includesBonus) notes.push('the bonus terms');
+  if (notes.length) {
+    return `Includes ${notes.join(' and ')}`;
+  }
+  if (isCurrent && leftover) return leftover;
+  if (sitting.light) return '~3 min · shaky terms only';
+  if (sitting.short) return 'Short pass · the exam is soon after you wake';
+  if (sitting.type === 'new' && chunkN > 1) return `${meta?.label} · ${chunkN} chunks`;
+  return meta?.meaning;
+}
+
+function rowEstimate(sitting, schedule, terms, spaced) {
+  if (!terms?.length || sitting?.done) return '';
+  const built = describeSittingQueue(terms, {
+    ...(spaced || {}),
+    sittingIndex: sitting.sitting,
+    lastLook: false,
+    bonusRun: false,
+    resumeIds: sitting.sitting === spaced?.resumeSitting ? (spaced?.resumeIds || []) : [],
+    resumeSitting: sitting.sitting === spaced?.resumeSitting ? spaced?.resumeSitting : 0,
+  }, schedule);
+  return sittingEstimate(built.queue.length).line;
+}
+
+function SittingRow({ sitting, schedule, currentSitting, defaultOpen, leftover, estimate }) {
   const [open, setOpen] = React.useState(defaultOpen);
-  const isCurrent = sitting.sitting === currentSitting;
-  const isDone = sitting.sitting < currentSitting;
+  const isCurrent = sitting.sitting === currentSitting && !sitting.done;
+  const isDone = !!sitting.done || sitting.sitting < currentSitting;
   const meta = SESSION_TYPE_META[sitting.type];
   const chunkN = schedule?.chunks?.length || 1;
+  const subtitle = sittingSubtitle(sitting, { isCurrent, leftover, chunkN, meta });
 
   return (
     <Collapsible open={open} onOpenChange={setOpen}>
@@ -73,12 +102,11 @@ function SittingRow({ sitting, schedule, currentSitting, defaultOpen, leftover }
               )}
             </div>
             <p className="text-xs text-muted-foreground mt-0.5 leading-snug">
-              {isCurrent && leftover
-                ? leftover
-                : sitting.type === 'new' && chunkN > 1
-                  ? `${meta?.label} · ${chunkN} chunks`
-                  : meta?.meaning}
+              {subtitle}
             </p>
+            {estimate && (
+              <p className="text-xs text-foreground mt-0.5">{estimate}</p>
+            )}
           </div>
         </CollapsibleTrigger>
         <CollapsibleContent>
@@ -97,6 +125,8 @@ export default function SpacedPlan({ schedule, currentSitting = 1, spaced, terms
   const items = schedule?.items || [];
   const progress = planProgress(schedule, spaced, terms);
   const leftover = progress.finishedAll ? null : progress.leftLine;
+  const current = (schedule?.sittings || []).find((s) => s.sitting === currentSitting && !s.done);
+  const hereEstimate = current ? rowEstimate(current, schedule, terms, spaced) : '';
 
   return (
     <div className="space-y-3">
@@ -108,12 +138,29 @@ export default function SpacedPlan({ schedule, currentSitting = 1, spaced, terms
         {schedule?.summaryLine && (
           <p className="text-sm text-foreground mt-1.5 font-medium">{schedule.summaryLine}</p>
         )}
+        {schedule?.foldNote && (
+          <p className="text-sm text-foreground mt-1.5 leading-relaxed">{schedule.foldNote}</p>
+        )}
+        {schedule?.large && schedule.bonusCount > 0 && (
+          <p className="text-sm text-foreground mt-1.5 font-medium">
+            {schedule.coreCount} core + {schedule.bonusCount} bonus
+          </p>
+        )}
       </div>
 
       <div className="rounded-2xl border border-primary bg-primary/5 px-4 py-3">
         <p className="text-[10px] font-bold uppercase tracking-wide text-primary">You are here</p>
         <p className="text-base font-bold tracking-tight mt-0.5">{progress.hereLine}</p>
+        {progress.nextLine && (
+          <p className="text-sm font-medium mt-0.5">{progress.nextLine}</p>
+        )}
         <p className="text-sm text-muted-foreground mt-1 leading-snug">{progress.leftLine}</p>
+        {hereEstimate && (
+          <p className="text-sm font-medium mt-1">{hereEstimate}</p>
+        )}
+        {progress.skipLine && (
+          <p className="text-sm text-foreground mt-1.5 leading-snug">{progress.skipLine}</p>
+        )}
         <div className="h-1.5 rounded-full bg-muted mt-3 overflow-hidden">
           <div
             className="h-full bg-primary rounded-full"
@@ -160,6 +207,7 @@ export default function SpacedPlan({ schedule, currentSitting = 1, spaced, terms
               currentSitting={currentSitting}
               defaultOpen={item.sitting === currentSitting}
               leftover={item.sitting === currentSitting ? leftover : null}
+              estimate={rowEstimate(item, schedule, terms, spaced)}
             />
           )
         )}

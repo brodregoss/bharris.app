@@ -34,6 +34,16 @@ function nameParts(displayName) {
   return parts;
 }
 
+export function splitPersonName(displayName) {
+  const parts = formatPersonName(displayName).split(' ').filter(Boolean);
+  if (!parts.length) return { first: '', last: '' };
+  return { first: parts[0], last: parts.slice(1).join(' ') };
+}
+
+export function joinPersonName(first, last) {
+  return formatPersonName([first, last].filter(Boolean).join(' '));
+}
+
 // "Broderick Harris Jr" → first "Broderick", last "Harris".
 export function greetingName(displayName, style) {
   const parts = nameParts(displayName);

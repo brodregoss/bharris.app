@@ -1,6 +1,7 @@
 import React from 'react';
+import { useLocation, useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import { Bug, X, RotateCcw, Trash2, Pencil } from 'lucide-react';
+import { Bug, X, RotateCcw, Trash2, Pencil, Clapperboard } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useDebug } from '@/lib/DebugContext';
 import { priority } from '@/lib/studyUtils';
@@ -15,6 +16,12 @@ function fmtMs(ms) {
   const m = Math.floor((s % 3600) / 60);
   const sec = s % 60;
   return `${h}h ${m}m ${sec}s`;
+}
+
+function toLocalInput(ms) {
+  const d = new Date(ms);
+  const pad = (n) => String(n).padStart(2, '0');
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
 }
 
 function fmtTs(ts) {
@@ -42,6 +49,8 @@ const TERM_COLS = [
 
 export default function DebugPanel() {
   const dbg = useDebug();
+  const navigate = useNavigate();
+  const { pathname } = useLocation();
   const [sortKey, setSortKey] = React.useState('tier');
   const [sortDir, setSortDir] = React.useState('asc');
 
@@ -75,9 +84,9 @@ export default function DebugPanel() {
     return arr;
   }, [dbg?.termsSnap, sortKey, sortDir]);
 
-  if (!dbg) return null;
+  if (!dbg || pathname === '/dev/video') return null;
 
-  const { enabled, setEnabled, isOpen, setOpen, snapshot, events, clockOffset, bumpClock, resetClock, clearEvents } = dbg;
+  const { enabled, setEnabled, isOpen, setOpen, snapshot, events, clockOffset, clockAt, setClockAt, bumpClock, resetClock, clearEvents } = dbg;
 
   const toggleSort = (key) => {
     if (sortKey === key) setSortDir((d) => (d === 'asc' ? 'desc' : 'asc'));
@@ -133,6 +142,24 @@ export default function DebugPanel() {
             </div>
 
             <div className="flex-1 overflow-y-auto p-4 space-y-5 text-sm">
+              <section>
+                <h3 className="text-xs font-bold uppercase tracking-wide text-slate-500 mb-2">Video test</h3>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={() => {
+                    setOpen(false);
+                    navigate('/dev/video');
+                  }}
+                >
+                  <Clapperboard className="w-3.5 h-3.5 mr-1" />
+                  Test
+                </Button>
+                <p className="text-[11px] text-slate-400 mt-2">
+                  Opens a preview home for Smith, then a psych flashcard deck. Nothing is saved.
+                </p>
+              </section>
+
               {/* Flow chart */}
               <section>
                 <h3 className="text-xs font-bold uppercase tracking-wide text-slate-500 mb-2">Session flow</h3>
@@ -191,8 +218,20 @@ export default function DebugPanel() {
                     <RotateCcw className="w-3.5 h-3.5 mr-1" /> Reset
                   </Button>
                 </div>
+                <label className="block mt-3 text-[11px] text-slate-400">
+                  Simulate current time
+                  <input
+                    type="datetime-local"
+                    className="mt-1 w-full rounded-lg border border-slate-200 bg-white px-2 py-1.5 text-xs text-slate-800"
+                    value={Number.isFinite(clockAt) ? toLocalInput(clockAt) : ''}
+                    onChange={(e) => {
+                      const ms = new Date(e.target.value).getTime();
+                      if (Number.isFinite(ms)) setClockAt(ms);
+                    }}
+                  />
+                </label>
                 <p className="text-[11px] text-slate-400 mt-1">
-                  Fast-forwards the session clock to skip Spaced Cram sitting waits, budget trimming, and sleep stop-time.
+                  Fast-forwards the session clock to skip Spaced Cram sitting waits, budget trimming, and sleep stop-time. The time override is frozen until you move it.
                 </p>
               </section>
 

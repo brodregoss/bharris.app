@@ -73,6 +73,14 @@ export async function deleteCloudAccount() {
   return workerRequest('DELETE', '/v1/users/me');
 }
 
+export async function updateDisplayName(displayName) {
+  const data = await workerRequest('POST', '/v1/users/me', {
+    displayName,
+    updateName: true,
+  });
+  return cacheUser(data.user);
+}
+
 export async function ensureCloudUser(firebaseUser) {
   const data = await workerRequest('POST', '/v1/users/me', {
     email: firebaseUser?.email || '',
@@ -105,6 +113,24 @@ export async function unlockStudyPro(password) {
 
 export async function refreshSubscription() {
   const data = await workerRequest('POST', '/v1/users/me/subscription/refresh', {});
+  if (data.user) cacheUser(data.user);
+  return data;
+}
+
+export async function cancelWebsitePlan() {
+  const data = await workerRequest('POST', '/v1/billing/cancel', {});
+  if (data.user) cacheUser(data.user);
+  return data;
+}
+
+export async function resetPartnerCode() {
+  const data = await workerRequest('POST', '/v1/billing/partner/reset', {});
+  if (data.user) cacheUser(data.user);
+  return data;
+}
+
+export async function removePartner() {
+  const data = await workerRequest('POST', '/v1/billing/partner/remove', {});
   if (data.user) cacheUser(data.user);
   return data;
 }

@@ -36,6 +36,8 @@ export function planForUser(user) {
 }
 
 export function planLabel(user) {
+  if (user?.billingPlan === 'partner' || user?.billingPlan === 'guest') return 'Partner study';
+  if (user?.billingPlan === 'solo') return 'Study';
   return planForUser(user).name;
 }
 

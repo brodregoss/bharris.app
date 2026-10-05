@@ -20,8 +20,16 @@ import {
   deleteUserNotes,
 } from './notes.js';
 import { handleRevenueCatWebhook, handleSubscriptionRefresh, handleProUnlock } from './billing.js';
+import { handleCheckout, handlePortal, handleStripeWebhook, handleCancel, refreshBillingSchedule, cancelStripeSubscription } from './stripeBilling.js';
+import {
+  handlePartnerRedeem,
+  handlePartnerRemove,
+  handlePartnerReset,
+  releasePartnerOnDelete,
+} from './partner.js';
 import { UserStudyDO } from './user-do.js';
-import { isFirebaseAuthProxyPath, proxyFirebaseAuth } from './firebaseAuthProxy.js';
+import { isFirebaseAuthProxyPath, nativeGoogleHandoffResponse, proxyFirebaseAuth } from './firebaseAuthProxy.js';
+import { openAppPage, passwordResetRedirect } from './passwordReset.js';
 
 export { UserStudyDO };
 
@@ -43,16 +51,27 @@ async function warmDo(env, uid) {
 
 async function handleUsersMe(request, env, identity) {
   const body = request.method === 'GET' ? {} : await readJson(request);
+  const updateName = body.updateName === true;
+  const submitted = String(body.displayName || body.name || '').trim().replace(/\s+/g, ' ');
+  if (updateName && (!submitted || submitted.length > 80)) {
+    return errorJson(submitted ? 'That name is too long.' : 'Enter your name.', 400);
+  }
   const row = await upsertUser(env, {
     uid: identity.uid,
     email: body.email || identity.email,
-    name: body.displayName || body.name || identity.name,
+    name: updateName ? submitted : (submitted || identity.name),
+    updateName,
   });
   return json({ user: await toPublicUser(env, row) });
 }
 
 async function handleDeleteMe(env, identity) {
   const uid = identity.uid;
+  const row = await getUserRow(env, uid);
+  await releasePartnerOnDelete(env, uid);
+  if (row?.stripe_subscription_id) {
+    await cancelStripeSubscription(env, row.stripe_subscription_id).catch(() => {});
+  }
   const { stub } = userStudyStub(env, uid);
   await Promise.all([
     stub.evacuate().catch(() => {}),
@@ -63,7 +82,7 @@ async function handleDeleteMe(env, identity) {
 }
 
 async function handleUsage(env, identity) {
-  const row = await getUserRow(env, identity.uid);
+  const row = await refreshBillingSchedule(env, identity.uid);
   if (!row) return errorJson('Account not found', 404);
   const user = await toPublicUser(env, row);
   return json({ me: user, user });
@@ -133,7 +152,14 @@ async function handlePanic(request, env, identity, sessionId) {
 export default {
   async fetch(request, env, ctx) {
     const url = new URL(request.url);
+    const donePage = openAppPage(url);
+    if (donePage) return donePage;
+
     if (isFirebaseAuthProxyPath(url.pathname)) {
+      const resetPage = passwordResetRedirect(url);
+      if (resetPage) return resetPage;
+      const handoff = nativeGoogleHandoffResponse(url);
+      if (handoff) return handoff;
       return proxyFirebaseAuth(request, env);
     }
 
@@ -145,6 +171,9 @@ export default {
     try {
       if (request.method === 'POST' && parts[0] === 'v1' && parts[1] === 'billing' && parts[2] === 'revenuecat') {
         return withCors(await handleRevenueCatWebhook(request, env), request, env);
+      }
+      if (request.method === 'POST' && parts[0] === 'v1' && parts[1] === 'billing' && parts[2] === 'stripe') {
+        return withCors(await handleStripeWebhook(request, env), request, env);
       }
 
       if (parts[0] !== 'v1') {
@@ -181,6 +210,18 @@ export default {
         && request.method === 'POST'
       ) {
         response = await handleProUnlock(request, env, identity);
+      } else if (parts[1] === 'billing' && parts[2] === 'checkout' && request.method === 'POST') {
+        response = await handleCheckout(request, env, identity);
+      } else if (parts[1] === 'billing' && parts[2] === 'cancel' && request.method === 'POST') {
+        response = await handleCancel(env, identity);
+      } else if (parts[1] === 'billing' && parts[2] === 'portal' && request.method === 'POST') {
+        response = await handlePortal(request, env, identity);
+      } else if (parts[1] === 'billing' && parts[2] === 'partner' && parts[3] === 'redeem' && request.method === 'POST') {
+        response = await handlePartnerRedeem(request, env, identity);
+      } else if (parts[1] === 'billing' && parts[2] === 'partner' && parts[3] === 'reset' && request.method === 'POST') {
+        response = await handlePartnerReset(env, identity);
+      } else if (parts[1] === 'billing' && parts[2] === 'partner' && parts[3] === 'remove' && request.method === 'POST') {
+        response = await handlePartnerRemove(env, identity);
       } else if (parts[1] === 'ai' && request.method === 'POST') {
         response = await handleAi(request, env, identity, parts[2] || 'complete');
       } else if (parts[1] === 'notes' && request.method === 'GET' && !parts[2]) {

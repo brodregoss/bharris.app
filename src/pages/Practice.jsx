@@ -2,6 +2,8 @@ import React from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { ArrowLeft, BookOpen, ChevronDown, ClipboardList, GraduationCap, PenLine } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import ScreenSwap from '@/components/ScreenSwap';
+import { useEdgeClaim, useEdgeSwipe } from '@/components/edgeSwipe';
 import PracticeTest from '@/components/study/PracticeTest';
 import PracticeFlashcards from '@/components/practice/PracticeFlashcards';
 import SmartDefMode from '@/components/practice/SmartDefMode';
@@ -111,6 +113,13 @@ export default function Practice() {
   const rankMode = sessionRankMode(sourceRef.current?.session?.setup, terms, {
     title: sourceRef.current?.session?.title,
   });
+  const sheetRef = React.useRef(null);
+  const modeSwipe = useEdgeSwipe({
+    enabled: mode !== 'hub',
+    sheetRef,
+    onCommit: () => setMode('hub'),
+  });
+  useEdgeClaim(mode !== 'hub');
 
   if (!terms.length) {
     return (
@@ -131,72 +140,49 @@ export default function Practice() {
     );
   }
 
-  const header = (
+  const renderHeader = (which) => (
     <header className="flex items-center gap-1 px-3 pt-safe pb-2">
       <Button
         variant="ghost"
         size="icon"
-        onClick={() => (mode === 'hub' ? navigate('/') : setMode('hub'))}
+        onClick={() => (which === 'hub' ? navigate('/') : setMode('hub'))}
         aria-label="Back"
       >
         <ArrowLeft className="w-5 h-5" />
       </Button>
       <h1 className="min-w-0 truncate text-base font-bold tracking-tight">
-        {mode === 'hub' ? 'Practice' : MODES.find((m) => m.id === mode)?.title || 'Practice'}
+        {which === 'hub' ? 'Practice' : MODES.find((m) => m.id === which)?.title || 'Practice'}
       </h1>
     </header>
   );
 
+  let body = null;
   if (mode === 'flashcards') {
-    return (
-      <div className="min-h-[100dvh] bg-background text-foreground flex flex-col">
-        {header}
-        <PracticeFlashcards terms={drillTerms} onUpdateTerm={updateTerm} onDone={() => setMode('hub')} />
-      </div>
+    body = <PracticeFlashcards terms={drillTerms} onUpdateTerm={updateTerm} onDone={() => setMode('hub')} />;
+  } else if (mode === 'smartdef') {
+    body = <SmartDefMode terms={drillTerms} rankMode={rankMode} onUpdateTerm={updateTerm} onDone={() => setMode('hub')} />;
+  } else if (mode === 'test') {
+    body = (
+      <PracticeTest
+        terms={drillTerms}
+        rankMode={rankMode}
+        examType={sourceRef.current?.session?.setup?.examType || 'mixed'}
+        budgetMs={12 * 60 * 1000}
+        priorMissed={workTerms.map((t) => t.id)}
+        onDone={({ missedIds, questionIds }) => {
+          const miss = new Set(missedIds);
+          commit((prev) =>
+            prev.map((t) => {
+              if (!questionIds.includes(t.id)) return t;
+              return { ...t, mastery: bumpFromPractice(t.mastery, { correct: !miss.has(t.id) }) };
+            })
+          );
+          setMode('hub');
+        }}
+      />
     );
-  }
-
-  if (mode === 'smartdef') {
-    return (
-      <div className="min-h-[100dvh] bg-background text-foreground flex flex-col">
-        {header}
-        <SmartDefMode terms={drillTerms} rankMode={rankMode} onUpdateTerm={updateTerm} onDone={() => setMode('hub')} />
-      </div>
-    );
-  }
-
-  if (mode === 'test') {
-    return (
-      <div className="min-h-[100dvh] bg-background text-foreground flex flex-col">
-        {header}
-        <PracticeTest
-          terms={drillTerms}
-          rankMode={rankMode}
-          examType={sourceRef.current?.session?.setup?.examType || 'mixed'}
-          budgetMs={12 * 60 * 1000}
-          priorMissed={workTerms.map((t) => t.id)}
-          onDone={({ missedIds, questionIds }) => {
-            const miss = new Set(missedIds);
-            commit((prev) =>
-              prev.map((t) => {
-                if (!questionIds.includes(t.id)) return t;
-                return { ...t, mastery: bumpFromPractice(t.mastery, { correct: !miss.has(t.id) }) };
-              })
-            );
-            setMode('hub');
-          }}
-        />
-      </div>
-    );
-  }
-
-  if (mode === 'explain') {
-    return (
-      <div className="min-h-[100dvh] bg-background text-foreground flex flex-col">
-        {header}
-        <ExplainIt terms={drillTerms} onUpdateTerm={updateTerm} onDone={() => setMode('hub')} />
-      </div>
-    );
+  } else if (mode === 'explain') {
+    body = <ExplainIt terms={drillTerms} onUpdateTerm={updateTerm} onDone={() => setMode('hub')} />;
   }
 
   const groups = [
@@ -204,9 +190,7 @@ export default function Practice() {
     { key: 'known', title: 'Known terms', items: knownTerms },
   ].filter((g) => g.items.length);
 
-  return (
-    <div className="min-h-[100dvh] bg-background text-foreground flex flex-col">
-      {header}
+  const hub = (
       <main className="flex-1 px-5 pb-safe overflow-y-auto">
         <div className="max-w-md mx-auto w-full">
           <h2 className="text-2xl font-bold tracking-tight mt-2">How do you want to practice?</h2>
@@ -305,6 +289,35 @@ export default function Practice() {
           </div>
         </div>
       </main>
+  );
+
+  if (body) {
+    return (
+      <div className="relative min-h-[100dvh]">
+        <div className="fixed inset-0 z-20 overflow-hidden pointer-events-none bg-background" aria-hidden>
+          <div className="min-h-[100dvh] bg-background text-foreground flex flex-col">
+            {renderHeader('hub')}
+            {hub}
+          </div>
+        </div>
+        <div
+          ref={sheetRef}
+          className="relative z-30 min-h-[100dvh] bg-background text-foreground flex flex-col touch-pan-y"
+          onPointerDown={modeSwipe.onPointerDown}
+        >
+          {renderHeader(mode)}
+          <ScreenSwap viewKey={mode} className="flex-1 flex flex-col min-h-0">
+            {body}
+          </ScreenSwap>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="min-h-[100dvh] bg-background text-foreground flex flex-col">
+      {renderHeader('hub')}
+      {hub}
     </div>
   );
 }

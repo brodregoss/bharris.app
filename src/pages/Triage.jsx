@@ -317,7 +317,7 @@ function Triage() {
           <Moon className="w-5 h-5" />
         </div>
         <div className="flex-1">
-          <h1 className="text-base font-bold tracking-tight leading-none">Last Minute Study</h1>
+          <h1 className="text-base font-bold tracking-tight leading-none">bharris.app</h1>
           <p className="text-[11px] text-muted-foreground leading-none mt-1">Triage — {sourceTitle}</p>
         </div>
         {!loading && (

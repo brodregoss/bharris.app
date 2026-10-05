@@ -1,14 +1,14 @@
 {
-  "appId": "app.lastminutestudy.cram",
-  "appName": "Last Minute Study",
+  "appId": "app.bharris.cram",
+  "appName": "bharris.app",
   "webDir": "dist",
   "bundledWebRuntime": false,
   "backgroundColor": "#f8fafc",
   "server": {
     "iosScheme": "https",
-    "hostname": "enthusiastic-cram-genius-flow.base44.app",
+    "hostname": "bharris-app.web.app",
     "allowNavigation": [
-      "last-minute-study-899f2.firebaseapp.com",
+      "bharris-app.firebaseapp.com",
       "accounts.google.com",
       "*.google.com",
       "*.googleusercontent.com",

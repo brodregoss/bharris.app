@@ -10,6 +10,7 @@ import PracticeTest from '@/components/study/PracticeTest';
 import ConfidenceSheet from '@/components/study/ConfidenceSheet';
 import CheatSheet from '@/components/study/CheatSheet';
 import RoadMapDialog from '@/components/study/RoadMapDialog';
+import ScreenSwap from '@/components/ScreenSwap';
 import { NotesOfferPrompt, NotesSkim } from '@/components/study/NotesOffer';
 import {
   priority,
@@ -548,13 +549,13 @@ function StudyFlow() {
           </button>
         </div>
       )}
-      <div className="flex-1 flex flex-col min-h-0">
+      <ScreenSwap viewKey={phase} className="flex-1 flex flex-col min-h-0">
         {content || (
           <div className="px-8 py-16 text-center">
             <p className="text-sm text-muted-foreground">Nothing to show for this step.</p>
           </div>
         )}
-      </div>
+      </ScreenSwap>
       <footer className="px-5 pt-3 pb-safe flex items-center justify-center bg-card/90 backdrop-blur mt-auto">
         <RoadMapDialog terms={terms} phase={phase} />
       </footer>

@@ -1,7 +1,8 @@
 import { Toaster } from "@/components/ui/toaster"
 import { QueryClientProvider } from '@tanstack/react-query'
 import { queryClientInstance } from '@/lib/query-client'
-import { HashRouter as Router, Navigate, Route, Routes } from 'react-router-dom';
+import { useEffect, useState } from 'react';
+import { HashRouter as Router, Navigate, Route, Routes, useLocation } from 'react-router-dom';
 import { ThemeProvider } from 'next-themes';
 import NativeChrome from '@/components/NativeChrome';
 import PageNotFound from './lib/PageNotFound';
@@ -28,15 +29,70 @@ import AccountCreate from './pages/AccountCreate';
 import AccountSignIn from './pages/AccountSignIn';
 import ForgotPassword from './pages/ForgotPassword';
 import AccountResetPassword from './pages/AccountResetPassword';
+import VideoPreview from './pages/VideoPreview';
 import RequireAccount from '@/components/RequireAccount';
 import { PaywallProvider } from '@/lib/PaywallContext';
 import { DebugProvider } from '@/lib/DebugContext';
 import DebugPanel from '@/components/dev/DebugPanel';
+import { devToolsUnlocked } from '@/lib/devToolsLock';
+import PageTransition from '@/components/PageTransition';
+import { clearStaleAuthReturn } from '@/lib/onboarding';
 
+function DevToolsGate() {
+  const [unlocked, setUnlocked] = useState(devToolsUnlocked);
+  useEffect(() => {
+    const sync = () => setUnlocked(devToolsUnlocked());
+    window.addEventListener('bharris-dev-tools', sync);
+    return () => window.removeEventListener('bharris-dev-tools', sync);
+  }, []);
+  if (!unlocked) return null;
+  return <DebugPanel />;
+}
+
+function AuthReturnScope() {
+  const { pathname } = useLocation();
+  useEffect(() => {
+    if (!pathname.startsWith('/account')) clearStaleAuthReturn();
+  }, [pathname]);
+  return null;
+}
+
+function AppRoutes({ location }) {
+  return (
+    <Routes location={location}>
+      <Route path="/account" element={<Account />} />
+      <Route path="/account/signin" element={<AccountSignIn />} />
+      <Route path="/account/create" element={<AccountCreate />} />
+      <Route path="/account/forgot" element={<ForgotPassword />} />
+      <Route path="/account/reset" element={<AccountResetPassword />} />
+      <Route element={<RequireAccount />}>
+        <Route path="/" element={<Landing />} />
+        <Route path="/welcome" element={<Welcome />} />
+        <Route path="/setup" element={<Home />} />
+        <Route path="/study-mode" element={<StudyMode />} />
+        <Route path="/create-notes" element={<CreateNotes />} />
+        <Route path="/highlight-notes" element={<HighlightNotes />} />
+        <Route path="/review-notes" element={<ReviewNotes />} />
+        <Route path="/history" element={<PastSessions />} />
+        <Route path="/settings" element={<Settings />} />
+        <Route path="/settings/accounts" element={<Navigate to="/settings" replace />} />
+        <Route path="/practice" element={<Practice />} />
+        <Route path="/upload-notes" element={<UploadNotes />} />
+        <Route path="/triage" element={<Triage />} />
+        <Route path="/study" element={<StudyFlow />} />
+        <Route path="/true-cram" element={<TrueCram />} />
+        <Route path="/spaced-cram" element={<SpacedCram />} />
+        <Route path="/panic" element={<PanicReview />} />
+        <Route path="/dev/video" element={<VideoPreview />} />
+        <Route path="*" element={<PageNotFound />} />
+      </Route>
+    </Routes>
+  );
+}
 
 function App() {
   return (
-    <ThemeProvider attribute="class" defaultTheme="light" enableSystem={false} storageKey="lms-theme">
+    <ThemeProvider attribute="class" defaultTheme="light" enableSystem={false} storageKey="bharris-theme">
       <NativeChrome />
       <AuthProvider>
         <PaywallProvider>
@@ -44,34 +100,11 @@ function App() {
           <DebugProvider>
             <Router>
               <ScrollToTop />
-              <Routes>
-                <Route path="/account" element={<Account />} />
-                <Route path="/account/signin" element={<AccountSignIn />} />
-                <Route path="/account/create" element={<AccountCreate />} />
-                <Route path="/account/forgot" element={<ForgotPassword />} />
-                <Route path="/account/reset" element={<AccountResetPassword />} />
-                <Route element={<RequireAccount />}>
-                  <Route path="/" element={<Landing />} />
-                  <Route path="/welcome" element={<Welcome />} />
-                  <Route path="/setup" element={<Home />} />
-                  <Route path="/study-mode" element={<StudyMode />} />
-                  <Route path="/create-notes" element={<CreateNotes />} />
-                  <Route path="/highlight-notes" element={<HighlightNotes />} />
-                  <Route path="/review-notes" element={<ReviewNotes />} />
-                  <Route path="/history" element={<PastSessions />} />
-                  <Route path="/settings" element={<Settings />} />
-                  <Route path="/settings/accounts" element={<Navigate to="/settings" replace />} />
-                  <Route path="/practice" element={<Practice />} />
-                  <Route path="/upload-notes" element={<UploadNotes />} />
-                  <Route path="/triage" element={<Triage />} />
-                  <Route path="/study" element={<StudyFlow />} />
-                  <Route path="/true-cram" element={<TrueCram />} />
-                  <Route path="/spaced-cram" element={<SpacedCram />} />
-                  <Route path="/panic" element={<PanicReview />} />
-                  <Route path="*" element={<PageNotFound />} />
-                </Route>
-              </Routes>
-              <DebugPanel />
+              <AuthReturnScope />
+              <PageTransition>
+                {(location) => <AppRoutes location={location} />}
+              </PageTransition>
+              <DevToolsGate />
             </Router>
             <Toaster />
           </DebugProvider>

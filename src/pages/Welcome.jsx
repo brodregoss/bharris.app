@@ -78,7 +78,7 @@ export default function Welcome() {
           <div className="pt-6 pb-8 text-center">
             <p className="text-sm font-medium tracking-wide text-muted-foreground">Welcome To</p>
             <h1 className="text-4xl sm:text-5xl font-bold tracking-tight mt-2 leading-[1.05]">
-              Last Minute Study
+              bharris.app
             </h1>
             <p className="text-base text-muted-foreground mt-4">Lets get moving</p>
           </div>

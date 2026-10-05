@@ -2,7 +2,7 @@ import React from 'react';
 import { Navigate, useLocation, useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { useAuth } from '@/lib/AuthContext';
-import { afterAuthPath } from '@/lib/onboarding';
+import { afterAuthPath, leaveForAuthReturn } from '@/lib/onboarding';
 import AppleSignInButton from '@/components/account/AppleSignInButton';
 import GoogleSignInButton from '@/components/account/GoogleSignInButton';
 
@@ -18,6 +18,7 @@ export default function Account() {
   const safeFrom = from === '/' || from === '/welcome' || from === '/settings' || from === '/history' || from === '/practice';
 
   if (isAuthenticated) {
+    if (leaveForAuthReturn()) return null;
     return <Navigate to={safeFrom ? from : afterAuthPath()} replace />;
   }
 
@@ -34,7 +35,7 @@ export default function Account() {
     setAppleLoading(true);
     try {
       await signInWithApple();
-      navigate(afterAuthPath(), { replace: true });
+      if (!leaveForAuthReturn()) navigate(afterAuthPath(), { replace: true });
     } catch (err) {
       setSocialError(err.message || 'Could not sign in with Apple.');
     } finally {
@@ -47,7 +48,7 @@ export default function Account() {
     setGoogleLoading(true);
     try {
       const signedIn = await signInWithGoogle();
-      if (signedIn) navigate(afterAuthPath(), { replace: true });
+      if (signedIn && !leaveForAuthReturn()) navigate(afterAuthPath(), { replace: true });
     } catch (err) {
       setSocialError(err.message || 'Could not sign in with Google.');
     } finally {
@@ -60,7 +61,7 @@ export default function Account() {
       <div className="flex-1 flex flex-col items-center justify-center px-6 pt-safe text-center">
         <p className="text-sm font-medium tracking-wide text-muted-foreground">Welcome To</p>
         <h1 className="text-4xl sm:text-5xl font-bold tracking-tight mt-2 leading-[1.05]">
-          Last Minute Study
+          bharris.app
         </h1>
         <p className="text-base text-muted-foreground mt-4">Create an account or sign back in</p>
         {(authError || socialError) && (

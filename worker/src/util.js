@@ -35,17 +35,28 @@ export function sessionHistoryLimit(tier) {
   return tier === 'pro' ? 30 : 10;
 }
 
-export function publicUser(row, { isAdmin = false } = {}) {
+export function publicUser(row, { isAdmin = false, partnerCode = '', partnerLinked = false } = {}) {
   const used = Number(row.ai_quota_used) || 0;
   const limit = Number(row.ai_quota_limit) || 0;
   const remaining = Math.max(0, limit - used);
   const unlimited = row.subscription_tier === 'pro' && limit >= 100000;
+  const billingPlan = row.billing_plan || '';
   return {
     uid: row.firebase_uid,
     email: row.email || '',
     displayName: row.display_name || '',
     isAdmin,
     subscriptionTier: row.subscription_tier || 'free',
+    billingPlan,
+    hasBilling: !!row.stripe_customer_id,
+    billingNotice: row.billing_notice === 'beta_ended' ? 'beta_ended' : '',
+    subscriptionStatus: row.stripe_status || '',
+    trialEndsAt: row.stripe_trial_end || '',
+    periodEndsAt: row.stripe_period_end || '',
+    cancelAtPeriodEnd: Number(row.stripe_cancel_at_period_end) === 1,
+    billingPromo: row.stripe_promo === 'beta' ? 'beta' : '',
+    partnerCode: billingPlan === 'partner' ? partnerCode : '',
+    partnerLinked: billingPlan === 'partner' && partnerLinked,
     doStatus: row.do_status || 'pending',
     aiQuotaUsed: used,
     aiQuotaLimit: limit,

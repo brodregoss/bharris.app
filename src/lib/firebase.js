@@ -25,7 +25,9 @@ import {
   updatePassword,
   updateProfile,
 } from 'firebase/auth';
-import { Capacitor } from '@capacitor/core';
+import { Capacitor, registerPlugin } from '@capacitor/core';
+
+const GoogleAuthSession = registerPlugin('GoogleAuthSession');
 import { formatPersonName } from '@/lib/personName';
 import { APP_CONFIG, firebaseConfigured } from '@/lib/appConfig';
 
@@ -56,7 +58,7 @@ function nativeGoogleReturnUrl() {
   const raw = new URLSearchParams(window.location.search).get('googleReturn') || '';
   try {
     const url = new URL(raw);
-    if (url.protocol === 'lmsstudy:' && url.hostname === 'auth') return 'lmsstudy://auth';
+    if (url.protocol === 'bharris:' && url.hostname === 'auth') return 'bharris://auth';
     if (url.protocol === 'capacitor:' && url.hostname === APP_CONFIG.nativeAppHost) return `${url.origin}/`;
     return '';
   } catch {
@@ -126,6 +128,20 @@ async function nativeGoogleUser(auth) {
   const credential = GoogleAuthProvider.credential(idToken);
   const cred = await signInWithCredential(auth, credential);
   return cred.user;
+}
+
+export async function firebaseUpdateDisplayName(displayName) {
+  const auth = await getFirebaseAuth();
+  const user = auth.currentUser;
+  if (!user) throw new Error('Sign in to update your name.');
+  const name = formatPersonName(displayName);
+  await updateProfile(user, { displayName: name });
+  try {
+    await user.getIdToken(true);
+  } catch {
+    // The profile name is saved. The next sign-in refreshes the token.
+  }
+  return auth.currentUser || user;
 }
 
 export async function firebaseCreateAccount(email, password, displayName) {
@@ -245,18 +261,139 @@ export async function adoptNativeGoogleHandoff() {
   return 'signed-in';
 }
 
+async function requestGoogleAuthUri() {
+  const worker = String(APP_CONFIG.workerUrl || '').replace(/\/$/, '');
+  if (!worker) {
+    const error = new Error('Google sign-in is not available in the app yet.');
+    error.code = 'auth/use-legacy-google';
+    throw error;
+  }
+  const continueUri = `https://${APP_CONFIG.firebase.authDomain}/`;
+  const response = await fetch(
+    `https://identitytoolkit.googleapis.com/v1/accounts:createAuthUri?key=${encodeURIComponent(APP_CONFIG.firebase.apiKey)}`,
+    {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        providerId: 'google.com',
+        continueUri,
+        oauthScope: 'openid email profile',
+        customParameter: { prompt: 'select_account' },
+      }),
+    },
+  );
+  const data = await response.json().catch(() => ({}));
+  const authUri = data?.authUri || '';
+  if (!response.ok || !authUri) {
+    throw new Error(data?.error?.message || 'Could not open Google sign-in.');
+  }
+  const authUrl = new URL(authUri);
+  if (authUrl.hostname !== 'accounts.google.com') {
+    const error = new Error('Google sign-in opened on the wrong page.');
+    error.code = 'auth/use-legacy-google';
+    throw error;
+  }
+  const redirectUri = `${worker}/__/auth/handler`;
+  const nonce = (crypto.randomUUID?.() || String(Date.now())).replace(/-/g, '');
+  authUrl.searchParams.set('redirect_uri', redirectUri);
+  authUrl.searchParams.set('state', `bh.${nonce}`);
+  authUrl.searchParams.set('nonce', nonce);
+  authUrl.searchParams.set('scope', 'openid email profile');
+  // Ask Google for the account token in the link, so the app can sign in
+  // without Firebase exchanging a code that was issued for a different page.
+  authUrl.searchParams.set('response_type', 'id_token');
+  authUrl.searchParams.set('response_mode', 'query');
+  authUrl.searchParams.delete('code_challenge');
+  authUrl.searchParams.delete('code_challenge_method');
+  return { authUri: authUrl.toString(), redirectUri };
+}
+
+async function exchangeGoogleCallback(auth, started, callback) {
+  const params = callback.searchParams;
+  if (params.get('error')) {
+    const error = new Error('Google sign-in was closed.');
+    error.code = 'auth/popup-closed-by-user';
+    throw error;
+  }
+  const googleIdToken = params.get('id_token') || params.get('googleIdToken') || '';
+  if (googleIdToken) {
+    const cred = await signInWithCredential(auth, GoogleAuthProvider.credential(googleIdToken));
+    return cred.user;
+  }
+  const code = params.get('code') || '';
+  if (!code) throw new Error('Google did not return a sign-in token.');
+  const response = await fetch(
+    `https://identitytoolkit.googleapis.com/v1/accounts:signInWithIdp?key=${encodeURIComponent(APP_CONFIG.firebase.apiKey)}`,
+    {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        requestUri: started.redirectUri,
+        returnSecureToken: true,
+        returnIdpCredential: true,
+        postBody: new URLSearchParams({
+          code,
+          providerId: 'google.com',
+        }).toString(),
+      }),
+    },
+  );
+  const data = await response.json().catch(() => ({}));
+  const oauthIdToken = data?.oauthIdToken || '';
+  const oauthAccessToken = data?.oauthAccessToken || '';
+  if (!response.ok || (!oauthIdToken && !oauthAccessToken)) {
+    throw new Error('Google sign-in could not be verified. Try again.');
+  }
+  const cred = await signInWithCredential(
+    auth,
+    GoogleAuthProvider.credential(oauthIdToken || undefined, oauthAccessToken || undefined),
+  );
+  return cred.user;
+}
+
+async function legacyGooglePopup(auth) {
+  if (!APP_CONFIG.workerUrl) throw new Error('Google sign-in is not available in the app yet.');
+  const start = new URL(`${APP_CONFIG.workerUrl}/`);
+  start.searchParams.set('googleStart', '1');
+  start.searchParams.set('googleReturn', 'bharris://auth');
+  start.hash = '/account';
+  const result = await GoogleAuthSession.start({ url: start.toString() });
+  const callback = new URL(String(result?.url || ''));
+  if (callback.searchParams.get('googleCancelled') === '1') {
+    const error = new Error('Google sign-in was closed.');
+    error.code = 'auth/popup-closed-by-user';
+    throw error;
+  }
+  const idToken = callback.searchParams.get('googleIdToken') || '';
+  if (!idToken) throw new Error('Google did not return a sign-in token.');
+  const cred = await signInWithCredential(auth, GoogleAuthProvider.credential(idToken));
+  return cred.user;
+}
+
+async function nativeGooglePopup(auth) {
+  let started;
+  try {
+    started = await requestGoogleAuthUri();
+  } catch (err) {
+    if (err?.code === 'auth/popup-closed-by-user') throw err;
+    return legacyGooglePopup(auth);
+  }
+  const result = await GoogleAuthSession.start({ url: started.authUri });
+  const callback = new URL(String(result?.url || ''));
+  if (callback.searchParams.get('googleCancelled') === '1') {
+    const error = new Error('Google sign-in was closed.');
+    error.code = 'auth/popup-closed-by-user';
+    throw error;
+  }
+  return exchangeGoogleCallback(auth, started, callback);
+}
+
 export async function firebaseSignInWithGoogle() {
   const auth = await getFirebaseAuth();
-  // Open Safari, where the Google account is already signed in. The in-app
-  // page has no Google session, so it asks for the email again.
+  // Stay on the sign-in screen. iOS asks to use accounts.google.com, then
+  // shows Google in a sheet and brings the account back into the app.
   if (isNativeCapacitorPage()) {
-    if (!APP_CONFIG.workerUrl) throw new Error('Google sign-in is not available in the app yet.');
-    const start = new URL(`${APP_CONFIG.workerUrl}/`);
-    start.searchParams.set('googleStart', '1');
-    start.searchParams.set('googleReturn', 'lmsstudy://auth');
-    start.hash = '/account';
-    window.location.assign(start.toString());
-    return null;
+    return nativeGooglePopup(auth);
   }
   if (Capacitor.isNativePlatform() && !isIosBrowser()) {
     return nativeGoogleUser(auth);
@@ -333,33 +470,58 @@ export async function firebaseSignOut() {
   }
 }
 
+function workerOrigin() {
+  return String(APP_CONFIG.workerUrl || '').replace(/\/$/, '');
+}
+
 export function passwordResetContinueUrl() {
   if (typeof window !== 'undefined') {
     const origin = window.location.origin;
     if (/^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/i.test(origin)) {
-      return `${origin}/`;
+      return `${origin}/#/account/signin`;
     }
   }
-  return 'https://enthusiastic-cram-genius-flow.base44.app/';
+  const worker = workerOrigin();
+  return worker ? `${worker}/open-app` : '';
+}
+
+function isResetLinkDomainError(err) {
+  return err?.code === 'auth/invalid-hosting-link-domain'
+    || err?.code === 'auth/unauthorized-continue-uri'
+    || err?.code === 'auth/invalid-continue-uri';
 }
 
 export async function firebaseResetPassword(email) {
   const auth = await getFirebaseAuth();
   const trimmed = email.trim();
+  const continueUrl = passwordResetContinueUrl();
+  if (!continueUrl) {
+    await sendPasswordResetEmail(auth, trimmed);
+    return;
+  }
+  const worker = workerOrigin();
+  const settings = { handleCodeInApp: false, url: continueUrl };
+  if (worker) settings.linkDomain = new URL(worker).host;
+
+  const send = (next) => sendPasswordResetEmail(auth, trimmed, next);
   try {
-    await sendPasswordResetEmail(auth, trimmed, {
-      url: passwordResetContinueUrl(),
-      handleCodeInApp: false,
-    });
+    await send(settings);
   } catch (err) {
     if (err?.code === 'auth/user-not-found') {
       throw new Error('No account exists with that email.');
     }
-    if (err?.code === 'auth/unauthorized-continue-uri' || err?.code === 'auth/invalid-continue-uri') {
+    if (!isResetLinkDomainError(err)) throw err;
+    const withoutDomain = { ...settings };
+    delete withoutDomain.linkDomain;
+    try {
+      await send(withoutDomain);
+    } catch (retryErr) {
+      if (retryErr?.code === 'auth/user-not-found') {
+        throw new Error('No account exists with that email.');
+      }
+      if (!isResetLinkDomainError(retryErr)) throw retryErr;
       await sendPasswordResetEmail(auth, trimmed);
-      return;
     }
-    throw err;
   }
 }
 

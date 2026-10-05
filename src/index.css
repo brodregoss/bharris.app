@@ -177,3 +177,82 @@
     bottom: max(1rem, env(safe-area-inset-bottom, 0px));
   }
 }
+
+/* Short settle on route and in-page screen changes. Ends at transform: none so
+   position:fixed layers are not trapped after the animation. */
+@keyframes page-in {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+.page-in {
+  /* backwards only: a finished animation must not keep a transform */
+  animation: page-in 260ms cubic-bezier(0.22, 1, 0.36, 1) backwards;
+}
+
+@keyframes page-slide-over {
+  from { transform: translate3d(100%, 0, 0); }
+  to { transform: none; }
+}
+@keyframes page-slide-away {
+  from { transform: none; }
+  to { transform: translate3d(100%, 0, 0); }
+}
+
+.page-slide-over,
+.page-slide-away {
+  animation-duration: 320ms;
+  animation-timing-function: cubic-bezier(0.32, 0.72, 0, 1);
+  animation-fill-mode: both;
+  box-shadow: -24px 0 48px hsl(0 0% 0% / 0.16);
+  will-change: transform;
+}
+.page-slide-over { animation-name: page-slide-over; }
+.page-slide-away { animation-name: page-slide-away; }
+
+html.page-transitioning {
+  overflow-x: hidden;
+}
+
+@keyframes brain-prompt-in {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: none; }
+}
+
+.brain-prompt-in {
+  animation: brain-prompt-in 0.28s cubic-bezier(0.22, 0.8, 0.28, 1) both;
+}
+
+@keyframes brain-caret {
+  50% { opacity: 0; }
+}
+
+.brain-caret {
+  display: inline-block;
+  width: 1.5px;
+  height: 0.9em;
+  margin-left: 1px;
+  background: currentColor;
+  vertical-align: -1px;
+  animation: brain-caret 0.85s steps(1) infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .page-in,
+  .page-slide-over,
+  .page-slide-away {
+    animation: none;
+    box-shadow: none;
+  }
+
+  .brain-prompt-in,
+  .brain-caret {
+    animation: none;
+  }
+}

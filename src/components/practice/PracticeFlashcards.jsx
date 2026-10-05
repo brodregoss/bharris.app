@@ -8,8 +8,10 @@ import WriteOwnDef, {
   cardsAtStuckThreshold,
   writtenReviewPlan,
 } from '@/components/study/WriteOwnDef';
+import { ShortcutKey, useFlashcardShortcuts, useIsComputer } from '@/components/study/flashcardKeys';
 
 export default function PracticeFlashcards({ terms, onUpdateTerm, onDone, heading = 'Flashcards' }) {
+  const computer = useIsComputer();
   const byId = React.useMemo(() => Object.fromEntries(terms.map((t) => [t.id, t])), [terms]);
   const [items, setItems] = React.useState(() => sortForPractice(terms).map((t) => t.id));
   const [pos, setPos] = React.useState(0);
@@ -153,6 +155,17 @@ export default function PracticeFlashcards({ terms, onUpdateTerm, onDone, headin
     rotateMiss(id);
   };
 
+  const onCard = !stuck && !defMode && !finished && items.length > 0 && !!current;
+  useFlashcardShortcuts({
+    enabled: onCard,
+    revealed,
+    onFlip: () => setRevealed(true),
+    onMiss,
+    onKnow: () => {
+      if (current) retireIds([current.id]);
+    },
+  });
+
   const writeCards = stuck?.length ? stuck : defMode ? defCards : [];
   const writeFlow = writeCards.length > 0 && (stuck || defMode) ? (
     <div className="flex-1 flex flex-col">
@@ -241,7 +254,9 @@ export default function PracticeFlashcards({ terms, onUpdateTerm, onDone, headin
           {revealed ? (
             <p className="mt-5 text-lg text-muted-foreground leading-relaxed">{flashcardDef(current)}</p>
           ) : (
-            <p className="mt-5 text-xs text-muted-foreground">Tap the card to flip it.</p>
+            <p className="mt-5 text-xs text-muted-foreground">
+              {computer ? 'Press space to flip it.' : 'Tap the card to flip it.'}
+            </p>
           )}
         </button>
 
@@ -249,25 +264,31 @@ export default function PracticeFlashcards({ terms, onUpdateTerm, onDone, headin
           {!revealed ? (
             <Button
               onClick={() => setRevealed(true)}
+              aria-keyshortcuts="Space"
               className="w-full h-12 rounded-2xl font-semibold"
             >
               <Eye className="w-4 h-4 mr-2" /> Flip card
+              {computer && <ShortcutKey>Space</ShortcutKey>}
             </Button>
           ) : (
             <div className="grid grid-cols-2 gap-3">
               <Button
                 onClick={onMiss}
                 variant="destructive"
+                aria-keyshortcuts="ArrowLeft"
                 className="h-12 rounded-2xl font-semibold"
               >
                 <X className="w-4 h-4 mr-2" /> Needs work
+                {computer && <ShortcutKey>←</ShortcutKey>}
               </Button>
               <Button
                 onClick={() => retireIds([current.id])}
                 variant="success"
+                aria-keyshortcuts="ArrowRight"
                 className="h-12 rounded-2xl font-semibold"
               >
                 <Check className="w-4 h-4 mr-2" /> Got it
+                {computer && <ShortcutKey>→</ShortcutKey>}
               </Button>
             </div>
           )}

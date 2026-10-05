@@ -119,7 +119,7 @@ export default function Home() {
           <Timer className="w-5 h-5" />
         </div>
         <div className="min-w-0">
-          <h1 className="text-base font-bold tracking-tight leading-none truncate">Last Minute Study</h1>
+          <h1 className="text-base font-bold tracking-tight leading-none truncate">bharris.app</h1>
           <p className="text-[11px] text-muted-foreground leading-none mt-1 truncate">How much time do you have?</p>
         </div>
       </header>

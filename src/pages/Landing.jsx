@@ -94,7 +94,7 @@ export default function Landing() {
     <div className="min-h-[100dvh] bg-background text-foreground flex flex-col">
       <header className="flex items-start justify-between gap-3 px-5 pt-safe">
         <h1 className="min-w-0 text-4xl font-bold tracking-tight leading-[1.05] pt-1">
-          Last Minute Study
+          bharris.app
         </h1>
         <div className="flex items-center shrink-0">
           <button

@@ -1,6 +1,19 @@
 import { periodKey, publicUser, quotaLimit } from './util.js';
 import { userShard } from './routing.js';
 
+const USER_EXTRA_COLUMNS = [
+  ['billing_plan', 'TEXT'],
+  ['partner_owner_uid', 'TEXT'],
+  ['stripe_customer_id', 'TEXT'],
+  ['stripe_subscription_id', 'TEXT'],
+  ['billing_notice', 'TEXT'],
+  ['stripe_status', 'TEXT'],
+  ['stripe_trial_end', 'TEXT'],
+  ['stripe_period_end', 'TEXT'],
+  ['stripe_cancel_at_period_end', 'INTEGER'],
+  ['stripe_promo', 'TEXT'],
+];
+
 async function ensureUserTable(db) {
   await db.prepare(
     `CREATE TABLE IF NOT EXISTS users (
@@ -19,6 +32,12 @@ async function ensureUserTable(db) {
       revenuecat_app_user_id TEXT
     )`,
   ).run();
+  const info = await db.prepare('PRAGMA table_info(users)').all();
+  const names = new Set((info.results || []).map((column) => column.name));
+  for (const [name, type] of USER_EXTRA_COLUMNS) {
+    if (names.has(name)) continue;
+    await db.prepare(`ALTER TABLE users ADD COLUMN ${name} ${type}`).run();
+  }
 }
 
 export function userStudyStub(env, uid) {
@@ -50,6 +69,10 @@ export async function upsertUser(env, identity) {
   if (existing) {
     const period = existing.ai_quota_period === periodKey() ? existing.ai_quota_period : periodKey();
     const used = existing.ai_quota_period === periodKey() ? existing.ai_quota_used : 0;
+    const incomingName = String(identity.name || '').trim();
+    const currentName = String(existing.display_name || '').trim();
+    // Sign-in refreshes must not replace a name the person already saved.
+    const displayName = identity.updateName ? incomingName : (currentName || incomingName);
     await db
       .prepare(
         `UPDATE users SET email = ?, display_name = ?, updated_at = ?, ai_quota_period = ?, ai_quota_used = ?
@@ -57,7 +80,7 @@ export async function upsertUser(env, identity) {
       )
       .bind(
         identity.email || existing.email,
-        identity.name || existing.display_name,
+        displayName,
         now,
         period,
         used,
@@ -123,11 +146,53 @@ export async function updateQuota(env, uid, { used, limit, tier }) {
   return getUserRow(env, uid);
 }
 
+const BILLING_COLUMNS = {
+  tier: 'subscription_tier',
+  limit: 'ai_quota_limit',
+  billingPlan: 'billing_plan',
+  partnerOwnerUid: 'partner_owner_uid',
+  stripeCustomerId: 'stripe_customer_id',
+  stripeSubscriptionId: 'stripe_subscription_id',
+  billingNotice: 'billing_notice',
+  stripeStatus: 'stripe_status',
+  stripeTrialEnd: 'stripe_trial_end',
+  stripePeriodEnd: 'stripe_period_end',
+  stripeCancelAtPeriodEnd: 'stripe_cancel_at_period_end',
+  stripePromo: 'stripe_promo',
+};
+
+export async function updateUserBilling(env, uid, fields) {
+  const { db } = await userShard(env, uid);
+  await ensureUserTable(db);
+  const sets = ['updated_at = ?'];
+  const binds = [new Date().toISOString()];
+  for (const [key, column] of Object.entries(BILLING_COLUMNS)) {
+    if (fields[key] === undefined) continue;
+    sets.push(`${column} = ?`);
+    binds.push(fields[key]);
+  }
+  binds.push(uid);
+  await db.prepare(`UPDATE users SET ${sets.join(', ')} WHERE firebase_uid = ?`).bind(...binds).run();
+  return getUserRow(env, uid);
+}
+
 export async function toPublicUser(env, row) {
   if (!row) return null;
   const fresh = await alignQuotaLimit(env, row);
   const admin = await isAdminUid(env, fresh.firebase_uid, fresh.email);
-  return publicUser(fresh, { isAdmin: admin });
+  let partnerCode = '';
+  let partnerLinked = false;
+  if (fresh.billing_plan === 'partner') {
+    const { partnerShareForOwner } = await import('./partner.js');
+    const share = await partnerShareForOwner(env, fresh.firebase_uid);
+    partnerCode = share.code;
+    partnerLinked = share.linked;
+  }
+  return publicUser(fresh, {
+    isAdmin: admin,
+    partnerCode,
+    partnerLinked,
+  });
 }
 
 export async function alignQuotaLimit(env, row) {

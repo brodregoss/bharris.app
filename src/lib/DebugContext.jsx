@@ -1,12 +1,13 @@
 import React from 'react';
+import { devToolsUnlocked } from '@/lib/devToolsLock';
 
-// Dev-only debug plumbing: a hidden mode (URL ?dev or Ctrl+Shift+D), a slide-out
-// panel toggle (? key), a live session/terms snapshot, a timestamped event
-// log, and a clock offset used to fast-forward time-based logic for testing.
+// Debug plumbing stays hidden until Settings unlocks it with the dev code.
+// After that, Ctrl+Shift+D toggles dev mode and ? toggles the panel.
 const DebugContext = React.createContext(null);
 const DEV_KEY = 'lms_dev';
 
 function initialEnabled() {
+  if (!devToolsUnlocked()) return false;
   try {
     if (new URLSearchParams(window.location.search).has('dev')) {
       localStorage.setItem(DEV_KEY, '1');
@@ -23,6 +24,8 @@ export function DebugProvider({ children }) {
   const [isOpen, setOpen] = React.useState(false);
   const [events, setEvents] = React.useState([]);
   const [clockOffset, setClockOffset] = React.useState(0);
+  const [clockAt, setClockAtState] = React.useState(null);
+  const clockAtRef = React.useRef(null);
   const [snapshot, setSnapshot] = React.useState({});
   const [termsSnap, setTermsSnap] = React.useState([]);
 
@@ -45,18 +48,40 @@ export function DebugProvider({ children }) {
     [enabled]
   );
 
-  const bumpClock = React.useCallback((ms) => setClockOffset((o) => o + ms), []);
-  const resetClock = React.useCallback(() => setClockOffset(0), []);
+  const bumpClock = React.useCallback((ms) => {
+    if (!devToolsUnlocked()) return;
+    if (Number.isFinite(clockAtRef.current)) {
+      clockAtRef.current += ms;
+      setClockAtState(clockAtRef.current);
+      return;
+    }
+    setClockOffset((o) => o + ms);
+  }, []);
+  const setClockAt = React.useCallback((ms) => {
+    if (!devToolsUnlocked()) return;
+    const next = Number.isFinite(ms) ? ms : null;
+    clockAtRef.current = next;
+    setClockAtState(next);
+    if (next != null) setClockOffset(0);
+  }, []);
+  const resetClock = React.useCallback(() => {
+    if (!devToolsUnlocked()) return;
+    clockAtRef.current = null;
+    setClockAtState(null);
+    setClockOffset(0);
+  }, []);
   const reportSession = React.useCallback((p) => setSnapshot((s) => ({ ...s, ...p })), []);
   const reportTerms = React.useCallback((t) => setTermsSnap(t), []);
   const clearEvents = React.useCallback(() => setEvents([]), []);
 
   // Hidden keyboard shortcuts: Ctrl+Shift+D toggles dev mode, ? toggles panel.
   React.useEffect(() => {
+    if (!devToolsUnlocked()) return undefined;
     const onKey = (e) => {
       if ((e.ctrlKey || e.metaKey) && e.shiftKey && (e.key === 'D' || e.key === 'd')) {
         e.preventDefault();
         setEnabled((en) => {
+          if (!devToolsUnlocked()) return false;
           const next = !en;
           try {
             localStorage.setItem(DEV_KEY, next ? '1' : '0');
@@ -81,15 +106,25 @@ export function DebugProvider({ children }) {
     return () => window.removeEventListener('keydown', onKey);
   }, []);
 
+  const setEnabledSafe = React.useCallback((next) => {
+    if (!devToolsUnlocked()) {
+      setEnabled(false);
+      return;
+    }
+    setEnabled(next);
+  }, []);
+
   const value = {
-    enabled,
-    setEnabled,
+    enabled: devToolsUnlocked() && enabled,
+    setEnabled: setEnabledSafe,
     isOpen,
     setOpen,
     events,
     logEvent,
     clearEvents,
     clockOffset,
+    clockAt,
+    setClockAt,
     bumpClock,
     resetClock,
     snapshot,

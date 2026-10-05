@@ -58,7 +58,7 @@ export default function ForgotPassword() {
       {sent ? (
         <div className="space-y-4">
           <p className="text-sm text-foreground text-center">
-            We sent a password reset link to {email.trim()}. Open the newest email — older links stop working.
+            We sent a reset email to {email.trim()}. Open the newest one and tap Reset password. That button opens a bharris.app page where you choose the new password.
           </p>
           <Button
             type="button"

@@ -16,7 +16,7 @@ export default function StudyHeader({ readiness, timeRemainingMs, blockLabel }) 
       </Link>
       <div className="flex-1 min-w-0">
         <p className="text-[11px] text-muted-foreground leading-none truncate">{blockLabel || 'Study session'}</p>
-        <p className="text-xs font-bold tracking-tight leading-none mt-1">Last Minute Study</p>
+        <p className="text-xs font-bold tracking-tight leading-none mt-1">bharris.app</p>
       </div>
       <div className="flex items-center gap-3">
         <Popover>
