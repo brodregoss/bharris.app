@@ -38,10 +38,20 @@ export default function AutoAnswerButton() {
 
       const card = document.querySelector('.rounded-3xl.border');
       const optionButtons = card ? [...card.querySelectorAll('button')] : [];
+      const promptEl = card?.querySelector('[data-mcq-prompt]');
+      const promptText = promptEl?.textContent?.trim();
+      const prompted = promptText
+        ? terms.find((t) => (promptEl.getAttribute('data-mcq-prompt') === 'definition' ? t.definition : t.term) === promptText)
+        : null;
+      const answerText = prompted
+        ? promptEl.getAttribute('data-mcq-prompt') === 'definition'
+          ? prompted.term
+          : prompted.definition
+        : definition;
 
-      if (optionButtons.length && definition) {
-        // MCQ recognition — pick the correct option, then Continue.
-        const correctBtn = optionButtons.find((b) => b.textContent.trim() === definition);
+      if (optionButtons.length && answerText) {
+        // Multiple choice — definition is shown, the correct choice is the term.
+        const correctBtn = optionButtons.find((b) => b.textContent.trim() === answerText);
         if (correctBtn) correctBtn.click();
         await sleep(150);
         const cont = findButtonByText('Continue') || findButtonByText('Next');

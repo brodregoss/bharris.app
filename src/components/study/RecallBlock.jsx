@@ -8,6 +8,7 @@ import WriteOwnDef, {
   cardsAtStuckThreshold,
   writtenReviewPlan,
 } from '@/components/study/WriteOwnDef';
+import useFillBelow from '@/components/study/useFillBelow';
 
 function shuffle(a) {
   const b = [...a];
@@ -32,23 +33,6 @@ function pickRecallTermDistractors(allTerms, correct, n) {
     if (seen.has(t.term)) continue;
     seen.add(t.term);
     out.push(t.term);
-    if (out.length >= n) break;
-  }
-  return out;
-}
-
-function pickRecallDistractors(allTerms, correct, n) {
-  const depSet = new Set(correct.depends_on || []);
-  const candidates = allTerms.filter((t) => t.id !== correct.id);
-  const cluster = candidates.filter((t) => (t.depends_on || []).some((d) => depSet.has(d)));
-  const sameTier = candidates.filter((t) => t.tier === correct.tier);
-  const pool = [...cluster, ...sameTier, ...candidates];
-  const seen = new Set();
-  const out = [];
-  for (const t of pool) {
-    if (seen.has(t.definition)) continue;
-    seen.add(t.definition);
-    out.push(t.definition);
     if (out.length >= n) break;
   }
   return out;
@@ -185,10 +169,7 @@ export default function RecallBlock({
     advancingRef.current = false;
     setRevealed(false);
     setRecogSelected(null);
-    if (current && style === 'recognition' && !reverse) {
-      const distractors = pickRecallDistractors(terms, current, 3);
-      setRecogOptions(shuffle([current.definition, ...distractors]));
-    } else if (current && reverse && style === 'recognition') {
+    if (current && style === 'recognition') {
       const distractors = pickRecallTermDistractors(terms, current, 3);
       setRecogOptions(shuffle([current.term, ...distractors]));
     } else {
@@ -331,16 +312,17 @@ export default function RecallBlock({
     setCardSeq((n) => n + 1);
   };
 
-  const promptLabel = reverse
-    ? 'Definition'
-    : style === 'explain'
-      ? 'Explain in your own words'
-      : style === 'recognition'
-        ? 'Pick the correct definition'
+  const promptLabel = style === 'recognition'
+    ? 'Pick the term'
+    : reverse
+      ? 'Definition'
+      : style === 'explain'
+        ? 'Explain in your own words'
         : 'Term';
-
+  const recognition = style === 'recognition';
   const defCards = cardsAtStuckThreshold(st.queue, byId, missCountRef.current, writtenRef.current);
   const writeCards = stuck?.length ? stuck : defMode ? defCards : null;
+  const fit = useFillBelow(recognition && !!current && !writeCards?.length);
 
   if (writeCards?.length) {
     return (
@@ -373,30 +355,49 @@ export default function RecallBlock({
   }
 
   return (
-    <div className="flex-1 flex flex-col px-5 pt-4">
-      <div className="flex items-center justify-between mb-3 text-xs text-muted-foreground">
+    <div
+      ref={recognition ? fit.ref : undefined}
+      style={recognition ? fit.style : undefined}
+      className={recognition ? 'flex flex-col px-5 pt-3 pb-safe overflow-hidden' : 'flex-1 flex flex-col px-5 pt-4'}
+    >
+      <div className={`flex items-center justify-between text-xs text-muted-foreground shrink-0 ${recognition ? 'mb-2' : 'mb-3'}`}>
         <span>{reviewing ? 'Practice your wording' : blockLabel}</span>
         <span>
           {timed ? `${fmtTime(timeLeftMs)} left · ` : ''}round {st.round}
         </span>
       </div>
-      <div className="flex-1 flex flex-col items-center justify-center">
-        <div className="w-full max-w-md rounded-3xl border border-border bg-card p-8 shadow-sm text-center min-h-[280px] flex flex-col items-center justify-center">
-          <p className="text-[11px] uppercase tracking-wide text-muted-foreground mb-3">{promptLabel}</p>
-          <p className={reverse ? 'text-lg font-semibold tracking-tight leading-relaxed' : 'text-3xl font-bold tracking-tight'}>
-            {reverse ? flashcardDef(current) : current.term}
-          </p>
+      <div className={`w-full max-w-md mx-auto flex flex-col ${recognition ? 'flex-1 min-h-0' : 'flex-1 items-center justify-center'}`}>
+        <div
+          className={`w-full rounded-3xl border border-border bg-card shadow-sm flex flex-col ${
+            recognition
+              ? 'min-h-0 p-4 text-left overflow-hidden'
+              : 'p-8 text-center min-h-[280px] items-center justify-center'
+          }`}
+        >
+          <p className="text-[11px] uppercase tracking-wide text-muted-foreground mb-2 shrink-0">{promptLabel}</p>
+          {recognition ? (
+            <p
+              data-mcq-prompt="definition"
+              className="text-base font-semibold leading-snug overflow-y-auto min-h-0 overscroll-contain"
+            >
+              {current.definition}
+            </p>
+          ) : (
+            <p className={reverse ? 'text-lg font-semibold tracking-tight leading-relaxed' : 'text-3xl font-bold tracking-tight'}>
+              {reverse ? flashcardDef(current) : current.term}
+            </p>
+          )}
 
-          {style === 'recognition' ? (
-            <div className="mt-5 w-full space-y-2 text-left">
+          {recognition ? (
+            <div className="mt-3 w-full space-y-2 shrink-0">
               {(recogOptions || []).map((opt, i) => {
                 const selected = recogSelected === opt;
-                const isCorrect = opt === (reverse ? current.term : current.definition);
+                const isCorrect = opt === current.term;
                 return (
                   <button
                     key={i}
                     onClick={() => !recogSelected && setRecogSelected(opt)}
-                    className={`w-full text-left rounded-xl border px-4 py-3 text-lg leading-relaxed transition ${
+                    className={`w-full text-left rounded-xl border px-3.5 py-2.5 text-base leading-snug transition ${
                       recogSelected
                         ? isCorrect
                           ? 'border-emerald-500 bg-emerald-50 text-emerald-950 dark:border-emerald-400/40 dark:bg-emerald-400/10 dark:text-emerald-100'
@@ -426,13 +427,11 @@ export default function RecallBlock({
           )}
         </div>
 
-        <div className="w-full max-w-md mt-4">
-          {style === 'recognition' ? (
+        <div className={`w-full shrink-0 ${recognition ? 'pt-3' : 'max-w-md mt-4'}`}>
+          {recognition ? (
             recogSelected ? (
               <Button
-                onClick={() =>
-                  (recogSelected === (reverse ? current.term : current.definition) ? handleGot() : handleMissed())
-                }
+                onClick={() => (recogSelected === current.term ? handleGot() : handleMissed())}
                 className="w-full h-12 rounded-2xl font-semibold"
               >
                 Continue
@@ -469,7 +468,7 @@ export default function RecallBlock({
             </div>
           )}
         </div>
-        <p className="mt-4 text-xs text-muted-foreground">
+        <p className={`text-xs text-muted-foreground shrink-0 ${recognition ? 'mt-2 text-center' : 'mt-4'}`}>
           {singlePass
             ? `${Math.min(st.pos + 1, st.queue.length)}/${st.queue.length} seen`
             : `${gotCount} retired · ${st.queue.length} in rotation`}

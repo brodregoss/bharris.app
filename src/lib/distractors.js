@@ -38,7 +38,7 @@ export async function fillMcqWrongAnswers(questions) {
 
   const payload = jobs.map((q) => {
     const existingWrong = (q.options || []).filter(
-      (o) => normalize(o) && normalize(o) !== normalize(q.definition)
+      (o) => normalize(o) && normalize(o) !== normalize(q.term)
     );
     return {
       term: q.term,
@@ -53,17 +53,19 @@ export async function fillMcqWrongAnswers(questions) {
   const res = await invokeLlm({
     prompt:
       `You are writing wrong answers for a last-minute multiple-choice practice test.\n` +
+      `The student sees a definition and must pick the correct term.\n` +
       `The student only has a few real terms, so extra choices must be invented.\n` +
-      `For each item, write exactly the requested number of plausible but incorrect definitions.\n` +
-      `Match the length and tone of an exam option. Near-misses (related mix-ups) are good; silly answers are not.\n` +
-      `Do not copy the correct definition. Do not copy any already-listed choices. Do not say they are wrong.\n\n` +
+      `For each item, write exactly the requested number of plausible but incorrect terms.\n` +
+      `Each wrong answer is a short term or name, about the same length as the correct term — not a definition or a sentence.\n` +
+      `Near-misses (related mix-ups) are good; silly answers are not.\n` +
+      `Do not copy the correct term. Do not copy any already-listed choices. Do not say they are wrong.\n\n` +
       payload
         .map(
           (p, i) =>
-            `${i + 1}. Term: ${p.term}\n` +
-            `   Correct definition: ${p.definition}\n` +
+            `${i + 1}. Correct term: ${p.term}\n` +
+            `   Definition shown: ${p.definition}\n` +
             `   Already using as other choices: ${p.existingWrong.length ? p.existingWrong.join(' | ') : '(none)'}\n` +
-            `   Write exactly ${p.need} more wrong answers.`
+            `   Write exactly ${p.need} more wrong terms.`
         )
         .join('\n\n'),
     feature: 'distractors',
@@ -101,7 +103,7 @@ export async function fillMcqWrongAnswers(questions) {
   let jobIndex = 0;
   const next = questions.map((q) => {
     if (q.type !== 'mcq' || (q.options?.length || 0) >= MCQ_OPTION_COUNT) return q;
-    const existing = q.options?.length ? q.options : [q.definition];
+    const existing = q.options?.length ? q.options : [q.term];
     const seen = new Set(existing.map(normalize).filter(Boolean));
     const fallback = items[jobIndex];
     jobIndex += 1;

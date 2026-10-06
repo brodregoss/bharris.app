@@ -4,6 +4,7 @@ import { Check, X, Timer, RotateCcw, ArrowRight, Loader2, ChevronDown } from 'lu
 import { invokeLlm } from '@/api/invokeLlm';
 import { fmtTime, localGradeShortAnswer, parseGradeResponse, inferRankMode, tierLabelsFor, tierHintsFor } from '@/lib/studyUtils';
 import { fillMcqWrongAnswers, mcqNeedsGeneratedWrongs } from '@/lib/distractors';
+import useFillBelow from '@/components/study/useFillBelow';
 
 function shuffle(a) {
   const b = [...a];
@@ -17,14 +18,14 @@ function shuffle(a) {
 function pickDistractors(terms, correct, n) {
   const same = terms.filter((t) => t.id !== correct.id && t.tier === correct.tier);
   const other = terms.filter((t) => t.id !== correct.id && t.tier !== correct.tier);
-  const seen = new Set([String(correct.definition || '').trim().toLowerCase()]);
+  const seen = new Set([String(correct.term || '').trim().toLowerCase()]);
   const out = [];
   for (const t of [...same, ...other]) {
-    const def = String(t.definition || '').trim();
-    const key = def.toLowerCase();
-    if (!def || seen.has(key)) continue;
+    const term = String(t.term || '').trim();
+    const key = term.toLowerCase();
+    if (!term || seen.has(key)) continue;
     seen.add(key);
-    out.push(def);
+    out.push(term);
     if (out.length >= n) break;
   }
   return out;
@@ -51,7 +52,7 @@ function buildQuestions(terms, examType, missedIds, distractorPool = terms) {
       definition: t.definition,
       tier: t.tier,
       type,
-      options: type === 'mcq' ? shuffle([t.definition, ...distractors]) : null,
+      options: type === 'mcq' ? shuffle([t.term, ...distractors]) : null,
     };
   });
 }
@@ -99,6 +100,8 @@ export default function PracticeTest({ terms, examType, budgetMs, priorMissed, o
   const [prepError, setPrepError] = React.useState(false);
   const [prepTick, setPrepTick] = React.useState(0);
   const doneRef = React.useRef(false);
+  const taking = phase === 'taking' && !prepping && !prepError;
+  const fit = useFillBelow(taking);
 
   const finish = () => {
     if (doneRef.current) return;
@@ -434,9 +437,15 @@ export default function PracticeTest({ terms, examType, budgetMs, priorMissed, o
 
   const answered = answers[q.id];
 
+  const mcq = q.type === 'mcq';
+
   return (
-    <div className="flex-1 flex flex-col px-5 pt-4">
-      <div className="flex items-center justify-between mb-3 text-xs text-muted-foreground">
+    <div
+      ref={fit.ref}
+      style={fit.style}
+      className="flex flex-col px-5 pt-3 pb-safe overflow-hidden"
+    >
+      <div className="flex items-center justify-between mb-2 text-xs text-muted-foreground shrink-0">
         <span>
           Practice test · {idx + 1}/{questions.length}
         </span>
@@ -445,38 +454,47 @@ export default function PracticeTest({ terms, examType, budgetMs, priorMissed, o
           {fmtTime(qTimeLeft)}
         </span>
       </div>
-      <div className="max-w-md mx-auto w-full flex-1 flex flex-col">
-        <div className="rounded-3xl border border-border bg-card p-6 shadow-sm min-h-[260px] flex flex-col">
-          <p className="text-[11px] uppercase tracking-wide text-muted-foreground mb-2">
-            {q.type === 'mcq' ? 'Multiple choice' : 'Short answer'} · {labels[q.tier] || q.tier}
+      <div className="max-w-md mx-auto w-full flex-1 min-h-0 flex flex-col">
+        <div className="rounded-3xl border border-border bg-card p-4 shadow-sm min-h-0 flex flex-col overflow-hidden">
+          <p className="text-[11px] uppercase tracking-wide text-muted-foreground mb-2 shrink-0">
+            {mcq ? 'Pick the term' : 'Short answer'} · {labels[q.tier] || q.tier}
           </p>
-          <p className="text-3xl font-bold tracking-tight">{q.term}</p>
-          {q.type === 'mcq' ? (
-            <div className="mt-4 space-y-2">
-              {q.options.map((opt, i) => {
-                const selected = answered?.selected === opt;
-                const isCorrect = opt === q.definition;
-                return (
-                  <button
-                    key={i}
-                    onClick={() => !answered && record(q.id, { selected: opt, correct: isCorrect })}
-                    className={`w-full text-left rounded-xl border px-4 py-3 text-lg leading-relaxed transition ${
-                      answered
-                        ? isCorrect
-                          ? 'border-emerald-500 bg-emerald-50 text-emerald-950 dark:border-emerald-400/40 dark:bg-emerald-400/10 dark:text-emerald-100'
-                          : selected
-                          ? 'border-rose-500 bg-rose-50 text-rose-950 dark:border-rose-400/40 dark:bg-rose-400/10 dark:text-rose-100'
-                          : 'border-border'
-                        : 'border-border hover:border-muted-foreground bg-card'
-                    }`}
-                  >
-                    {opt}
-                  </button>
-                );
-              })}
-            </div>
+          {mcq ? (
+            <>
+              <p
+                data-mcq-prompt="definition"
+                className="text-base font-semibold leading-snug overflow-y-auto min-h-0 overscroll-contain"
+              >
+                {q.definition}
+              </p>
+              <div className="mt-3 space-y-2 shrink-0">
+                {q.options.map((opt, i) => {
+                  const selected = answered?.selected === opt;
+                  const isCorrect = opt === q.term;
+                  return (
+                    <button
+                      key={i}
+                      onClick={() => !answered && record(q.id, { selected: opt, correct: isCorrect })}
+                      className={`w-full text-left rounded-xl border px-3.5 py-2.5 text-base leading-snug transition ${
+                        answered
+                          ? isCorrect
+                            ? 'border-emerald-500 bg-emerald-50 text-emerald-950 dark:border-emerald-400/40 dark:bg-emerald-400/10 dark:text-emerald-100'
+                            : selected
+                            ? 'border-rose-500 bg-rose-50 text-rose-950 dark:border-rose-400/40 dark:bg-rose-400/10 dark:text-rose-100'
+                            : 'border-border'
+                          : 'border-border hover:border-muted-foreground bg-card'
+                      }`}
+                    >
+                      {opt}
+                    </button>
+                  );
+                })}
+              </div>
+            </>
           ) : (
-            <div className="mt-4">
+            <>
+              <p className="text-2xl font-bold tracking-tight shrink-0">{q.term}</p>
+              <div className="min-h-0 overflow-y-auto">
               {!submitted ? (
                 <>
                   <textarea
@@ -561,10 +579,11 @@ export default function PracticeTest({ terms, examType, budgetMs, priorMissed, o
                   )}
                 </div>
               )}
-            </div>
+              </div>
+            </>
           )}
         </div>
-        <div className="mt-4">
+        <div className="shrink-0 pt-3">
           {q.type === 'mcq' ? (
             <Button
               disabled={!answered}

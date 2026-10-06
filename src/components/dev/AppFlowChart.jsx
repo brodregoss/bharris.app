@@ -89,13 +89,13 @@ export default function AppFlowChart() {
       </Group>
 
       <Group label="4 · Recall question style (by exam type)">
-        <Branch tag="MCQ">1-in-4 recognition (pick definition), rest free-recall</Branch>
+        <Branch tag="MCQ">1-in-4 recognition (definition shown, pick the term), rest free-recall</Branch>
         <Branch tag="Short">1-in-5 "explain in your own words", rest free-recall</Branch>
         <Branch tag="Mixed">alternate recognition / free-recall card-by-card</Branch>
       </Group>
 
       <Group label="5 · Practice test (by exam type)">
-        <Branch tag="MCQ">all multiple choice · under 4 terms, AI writes extra wrong answers</Branch>
+        <Branch tag="MCQ">all multiple choice · definition shown, pick the term · under 4 terms, AI writes extra wrong terms</Branch>
         <Branch tag="Short">all AI-graded free response</Branch>
         <Branch tag="Mixed">alternate MCQ / short answer</Branch>
       </Group>

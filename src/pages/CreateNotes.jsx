@@ -12,6 +12,32 @@ function blankTerm() {
   return { id: `m${Date.now()}-${Math.random().toString(36).slice(2, 7)}`, term: '', definition: '' };
 }
 
+function fitDefinitionBox(el) {
+  if (!el) return;
+  el.style.height = 'auto';
+  const border = el.offsetHeight - el.clientHeight;
+  el.style.height = `${el.scrollHeight + border}px`;
+}
+
+function DefinitionBox({ value, onChange }) {
+  const ref = React.useRef(null);
+
+  React.useLayoutEffect(() => {
+    fitDefinitionBox(ref.current);
+  }, [value]);
+
+  return (
+    <Textarea
+      ref={ref}
+      value={value}
+      onChange={onChange}
+      placeholder="Definition"
+      rows={2}
+      className="min-h-[72px] resize-none overflow-hidden rounded-xl"
+    />
+  );
+}
+
 export default function CreateNotes() {
   const navigate = useNavigate();
   const location = useLocation();
@@ -128,11 +154,9 @@ export default function CreateNotes() {
                 placeholder="Term"
                 className="h-11 rounded-xl"
               />
-              <Textarea
+              <DefinitionBox
                 value={item.definition}
                 onChange={(e) => update(item.id, { definition: e.target.value })}
-                placeholder="Definition"
-                className="min-h-[72px] rounded-xl"
               />
             </div>
           ))}
