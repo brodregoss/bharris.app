@@ -137,6 +137,7 @@ const css = `
     padding: 1.15rem 1.5rem 4.5rem;
     display: flex;
     flex-direction: column;
+    overflow: hidden;
   }
   .paper-slip {
     width: min(72rem, 100%);
@@ -152,6 +153,7 @@ const css = `
     color: #fff;
   }
   .paper-sheet {
+    position: relative;
     flex: 1;
     min-height: 0;
     width: 100%;
@@ -163,12 +165,12 @@ const css = `
     min-height: 0;
     height: 100%;
     display: grid;
-    grid-template-columns: minmax(0, 1fr) minmax(15rem, 28vw) auto;
+    grid-template-columns: max-content minmax(0, 1fr) max-content;
     grid-template-rows: minmax(0, 1fr);
     align-items: stretch;
     gap: 1rem 1.25rem;
   }
-  .paper-no { text-align: left; align-self: start; }
+  .paper-no { grid-column: 1; position: relative; z-index: 2; text-align: left; align-self: start; }
   .paper-no p {
     margin: 0;
     font-size: clamp(2.8rem, 6.6vw, 6.25rem);
@@ -181,6 +183,9 @@ const css = `
   }
   .paper-no p + p { margin-top: 0.18em; }
   .paper-back {
+    grid-column: 3;
+    position: relative;
+    z-index: 2;
     margin: 4.75rem 0.35rem 0 1.25rem;
     align-self: start;
     text-align: right;
@@ -190,21 +195,33 @@ const css = `
     color: #fff;
   }
   .paper-mock {
-    position: relative;
-    min-height: 0;
-    height: 100%;
-  }
-  .paper-mock canvas {
     position: absolute;
-    top: 0;
+    z-index: 1;
     left: 50%;
-    height: 100%;
-    width: auto;
-    max-width: 100%;
-    display: block;
+    top: 0;
+    width: min(34rem, calc(50vw - 26rem));
+    aspect-ratio: 9 / 16;
+    height: auto;
+    min-height: 0;
+    overflow: hidden;
     transform: translateX(-50%);
+    pointer-events: none;
+  }
+  .paper-mock video {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    max-width: none;
+    display: block;
+    object-fit: fill;
+    transform: none;
+    opacity: 0;
+    pointer-events: none;
   }
   .paper-close {
+    position: relative;
+    z-index: 2;
     margin-top: auto;
     padding-top: 1.5rem;
     text-align: center;
@@ -1117,9 +1134,27 @@ const css = `
       grid-template-areas: "no back" "phone back";
       gap: 0.45rem 0.7rem;
     }
-    .paper-no { grid-area: no; }
-    .paper-mock { grid-area: phone; }
-    .paper-back { grid-area: back; margin: 0.35rem 0 0; align-self: center; }
+    .paper-no { grid-column: auto; grid-area: no; }
+    .paper-mock {
+      position: relative;
+      left: auto;
+      top: auto;
+      grid-area: phone;
+      width: auto;
+      height: 100%;
+      aspect-ratio: auto;
+      transform: none;
+    }
+    .paper-mock video {
+      inset: auto;
+      top: 0;
+      left: 50%;
+      width: auto;
+      height: 100%;
+      max-width: 100%;
+      transform: translateX(-50%);
+    }
+    .paper-back { grid-column: auto; grid-area: back; margin: 0.35rem 0 0; align-self: center; }
     .paper-no p { font-size: clamp(1.7rem, 8.6vw, 2.45rem); }
     .paper-procrastination { font-size: 0.95rem; }
     .paper-skip { font-size: 0.85rem; }
@@ -1421,7 +1456,7 @@ function assistedPhone() {
                 <span class="ph-stat">4:12</span>
               </div>
               <div class="ph-body">
-                <div class="ph-row"><span>Must know</span><span>round 1</span></div>
+                <div class="ph-row"><span>Must know</span><span>Round 1</span></div>
                 <div class="ph-card">
                   <span class="ph-label">Term</span>
                   <p class="ph-term">4th Amendment</p>
@@ -1509,7 +1544,7 @@ function homePage() {
     <h1 class="reveal">bharris.app</h1>
     <p class="tag reveal" style="--d:90ms">Time is money, so we will make sure not to waste yours.</p>
     <a class="jump reveal" style="--d:180ms" href="#features">
-      <span>jump in</span>
+      <span>Jump in</span>
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
         <path d="M6 9l6 6 6-6"></path>
       </svg>
@@ -1528,14 +1563,14 @@ function homePage() {
             <p>No waste</p>
           </div>
           <div class="paper-mock">
-            <canvas id="mockup-scrub" data-count="48" aria-label="bharris.app on iPhone"></canvas>
+            <video id="mockup-scrub" muted playsinline preload="auto" aria-label="bharris.app on iPhone" src="/mockup/phone.mp4?v=2"></video>
           </div>
-          <p class="paper-back">so you can<br>get back to<br>what you do<br>best</p>
+          <p class="paper-back">So you can<br>get back to<br>what you do<br>best</p>
         </div>
       </div>
       <div class="paper-close reveal" style="--d:120ms">
         <p class="paper-procrastination">Procrastination was never an option</p>
-        <p class="paper-skip">so we skipped the search to study</p>
+        <p class="paper-skip">So we skipped the search to study</p>
         <a class="paper-down" href="#modes" aria-label="Studying modes">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
             <path d="M6 9l6 6 6-6"></path>
@@ -1546,7 +1581,7 @@ function homePage() {
     <div id="modes" class="paper-rest">
       <div class="paper-modes-head reveal" style="--d:140ms">
         <h2>Our studying modes</h2>
-        <p class="paper-sub">adapting to you as you work</p>
+        <p class="paper-sub">Adapting to you as you work</p>
       </div>
     <div class="mode-grid">
       <article class="mode-card reveal" style="--d:60ms">
@@ -1788,7 +1823,8 @@ function redirectPage({ title, dest }) {
 await rm(webDir, { recursive: true, force: true });
 await mkdir(path.join(webDir, 'app'), { recursive: true });
 await cp(distDir, path.join(webDir, 'app'), { recursive: true });
-await cp(path.join(root, 'site', 'mockup-frames'), path.join(webDir, 'mockup'), { recursive: true });
+await mkdir(path.join(webDir, 'mockup'), { recursive: true });
+await cp(path.join(root, 'site', 'mockup', 'phone.mp4'), path.join(webDir, 'mockup', 'phone.mp4'));
 await writeFile(path.join(webDir, 'index.html'), homePage());
 const siteEnv = loadSiteEnv();
 const firebaseConfig = {

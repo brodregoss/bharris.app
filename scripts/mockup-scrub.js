@@ -1,91 +1,124 @@
 (function () {
-  var canvas = document.getElementById('mockup-scrub');
-  if (!canvas) return;
+  var video = document.getElementById('mockup-scrub');
+  if (!video) return;
 
-  var count = Number(canvas.getAttribute('data-count')) || 0;
-  if (count < 2) return;
+  var mock = video.parentElement;
+  var black = document.querySelector('.paper-black');
+  var sheet = document.querySelector('.paper-sheet');
+  var title = document.querySelector('.paper-procrastination');
+  var noLine = document.querySelector('.paper-no p:nth-child(2)');
+  var back = document.querySelector('.paper-back');
 
-  var ctx = canvas.getContext('2d', { alpha: false });
-  var frames = new Array(count);
-  var ready = new Array(count);
-  var current = -1;
-  var wanted = 0;
-
-  function src(i) {
-    return '/mockup/f' + String(i).padStart(3, '0') + '.jpg';
+  function clearPlacement() {
+    mock.style.left = '';
+    mock.style.top = '';
+    mock.style.width = '';
+    mock.style.height = '';
+    mock.style.transform = '';
+    video.style.left = '';
+    video.style.top = '';
+    video.style.width = '';
+    video.style.height = '';
+    video.style.right = '';
+    video.style.bottom = '';
   }
 
-  function draw(i) {
-    var img = frames[i];
-    if (!img || !ready[i] || current === i) return;
-    if (canvas.width !== img.naturalWidth || canvas.height !== img.naturalHeight) {
-      canvas.width = img.naturalWidth;
-      canvas.height = img.naturalHeight;
+  // The upright phone sits inside the 9:16 frame, with empty margin around it.
+  var phoneX = 184 / 1080;
+  var phoneY = 284 / 1920;
+  var phoneW = 724 / 1080;
+  var phoneH = 1480 / 1920;
+
+  function layout() {
+    if (!black || !sheet || !title || !noLine || !back) return;
+    if (window.matchMedia('(max-width: 760px)').matches) {
+      clearPlacement();
+      return;
     }
-    current = i;
-    ctx.drawImage(img, 0, 0);
-  }
 
-  function nearest(i) {
-    if (ready[i]) return i;
-    for (var d = 1; d < count; d++) {
-      if (i - d >= 0 && ready[i - d]) return i - d;
-      if (i + d < count && ready[i + d]) return i + d;
+    var sr = sheet.getBoundingClientRect();
+    var tr = title.getBoundingClientRect();
+    var nr = noLine.getBoundingClientRect();
+    var kr = back.getBoundingClientRect();
+    var boxLeft = nr.right + 48;
+    var boxRight = kr.left - 40;
+    var boxTop = sr.top;
+    var boxBottom = tr.top - 18;
+    var boxW = boxRight - boxLeft;
+    var boxH = boxBottom - boxTop;
+    if (boxW < 160 || boxH < 220) {
+      clearPlacement();
+      return;
     }
-    return -1;
+
+    var videoW = Math.min(boxW / phoneW, boxH / ((16 / 9) * phoneH));
+    var videoH = videoW * (16 / 9);
+    var shownW = videoW * phoneW;
+    var shownH = videoH * phoneH;
+    video.style.left = ((boxW - shownW) / 2 - videoW * phoneX) + 'px';
+    video.style.top = ((boxH - shownH) / 2 - videoH * phoneY) + 'px';
+    video.style.right = 'auto';
+    video.style.bottom = 'auto';
+    video.style.width = videoW + 'px';
+    video.style.height = videoH + 'px';
+
+    mock.style.left = (boxLeft - sr.left) + 'px';
+    mock.style.top = (boxTop - sr.top) + 'px';
+    mock.style.width = boxW + 'px';
+    mock.style.height = boxH + 'px';
+    mock.style.transform = 'none';
   }
 
-  function load(i) {
-    if (frames[i]) return;
-    var img = new Image();
-    frames[i] = img;
-    img.decoding = 'async';
-    img.onload = function () {
-      ready[i] = true;
-      var n = nearest(wanted);
-      if (n >= 0) draw(n);
-    };
-    img.src = src(i);
-  }
+  layout();
+  window.addEventListener('resize', layout);
+  if (document.fonts && document.fonts.ready) document.fonts.ready.then(layout);
 
-  function progress() {
-    var rect = canvas.getBoundingClientRect();
-    if (rect.height <= 0) return 0;
-    var entered = (window.innerHeight - rect.top) / rect.height;
-    var p = (entered - 0.9) / 0.6;
-    if (p < 0) return 0;
-    if (p > 1) return 1;
-    return p;
-  }
+  var fade = 0.85;
+  var playing = false;
 
-  function onScroll() {
-    wanted = Math.round(progress() * (count - 1));
-    var n = nearest(wanted);
-    if (n >= 0) draw(n);
-  }
-
-  load(0);
-  var next = 1;
-  function pump() {
-    var budget = 4;
-    while (budget > 0 && next < count) {
-      load(next);
-      next += 1;
-      budget -= 1;
+  function applyFade() {
+    var d = video.duration;
+    var t = video.currentTime || 0;
+    if (!d || !isFinite(d)) {
+      video.style.opacity = '0';
+      return;
     }
-    if (next < count) requestAnimationFrame(pump);
+    var amount = 1;
+    if (t < fade) amount = t / fade;
+    var left = d - t;
+    if (left < fade) amount = Math.min(amount, Math.max(left, 0) / fade);
+    video.style.opacity = String(amount);
   }
-  requestAnimationFrame(pump);
 
-  var ticking = false;
-  window.addEventListener('scroll', function () {
-    if (ticking) return;
-    ticking = true;
-    requestAnimationFrame(function () {
-      ticking = false;
-      onScroll();
-    });
-  }, { passive: true });
-  window.addEventListener('resize', onScroll);
-  onScroll();
+  var looping = false;
+
+  function restart() {
+    if (looping) return;
+    looping = true;
+    video.currentTime = 0;
+    if (playing) video.play().catch(function () {});
+  }
+
+  video.addEventListener('ended', restart);
+  video.addEventListener('loadeddata', applyFade);
+
+  if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+    video.style.opacity = '1';
+    return;
+  }
+
+  var observer = new IntersectionObserver(function (entries) {
+    playing = entries.some(function (entry) { return entry.isIntersecting; });
+    if (playing) video.play().catch(function () {});
+    else video.pause();
+  }, { threshold: 0.45 });
+  observer.observe(video);
+
+  function tick() {
+    applyFade();
+    if (video.currentTime < 0.12) looping = false;
+    if (playing && video.duration && video.currentTime >= video.duration - 0.03) restart();
+    requestAnimationFrame(tick);
+  }
+  requestAnimationFrame(tick);
 })();
