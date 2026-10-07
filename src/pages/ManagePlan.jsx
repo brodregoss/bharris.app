@@ -29,6 +29,7 @@ export default function ManagePlan() {
   const { user } = useAuth();
   const { openPaywall } = usePaywall();
   const [person, setPerson] = React.useState(user);
+  const [refreshing, setRefreshing] = React.useState(true);
   const [busy, setBusy] = React.useState('');
   const [error, setError] = React.useState('');
   const [cancelOpen, setCancelOpen] = React.useState(false);
@@ -41,6 +42,9 @@ export default function ManagePlan() {
       })
       .catch(() => {
         if (!cancelled) setPerson(user);
+      })
+      .finally(() => {
+        if (!cancelled) setRefreshing(false);
       });
     return () => { cancelled = true; };
   }, [user]);
@@ -74,7 +78,10 @@ export default function ManagePlan() {
       <div className="flex-1 overflow-y-auto px-5 pb-24">
         <div className="max-w-md mx-auto w-full flex flex-col gap-4">
           <section className="rounded-2xl border border-border bg-card p-5">
-            <p className="text-lg font-bold tracking-tight">{planLabel(me)}</p>
+            <p className="text-lg font-bold tracking-tight inline-flex items-center gap-2">
+              {planLabel(me)}
+              {refreshing && <Loader2 className="w-4 h-4 animate-spin text-muted-foreground" aria-label="Loading plan" />}
+            </p>
             {price && <p className="text-sm text-muted-foreground mt-1">{price}</p>}
             <div className="mt-3 space-y-2">
               {lines.map((line) => (
@@ -139,7 +146,7 @@ export default function ManagePlan() {
                 setCancelOpen(false);
               })}
             >
-              {busy === 'cancel' ? 'Canceling…' : 'Cancel plan'}
+              {busy === 'cancel' ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Cancel plan'}
             </Button>
           </AlertDialogFooter>
         </AlertDialogContent>

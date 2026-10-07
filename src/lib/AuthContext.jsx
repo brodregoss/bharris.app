@@ -72,6 +72,11 @@ export const AuthProvider = ({ children }) => {
             setIsLoadingAuth(false);
             return;
           }
+          const cached = getCurrentUser();
+          if (cached?.uid === next.uid) {
+            setUser(cached);
+            setIsLoadingAuth(false);
+          }
           try {
             const cloud = await ensureCloudUser(next);
             setUser(cloud);

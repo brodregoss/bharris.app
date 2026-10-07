@@ -16,6 +16,7 @@ import {
   KeyRound,
   Pencil,
   Trash2,
+  Loader2,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Switch } from '@/components/ui/switch';
@@ -115,7 +116,7 @@ function usedPct(person) {
   return Math.min(100, ((person.aiQuotaUsed || 0) / person.aiQuotaLimit) * 100);
 }
 
-function UsageBlock({ heading, person, onUpgrade }) {
+function UsageBlock({ heading, person, onUpgrade, loading = false }) {
   const remaining = person?.remainingQuota ?? 0;
   const used = person?.aiQuotaUsed || 0;
   const limit = person?.aiQuotaLimit || 0;
@@ -124,6 +125,7 @@ function UsageBlock({ heading, person, onUpgrade }) {
       <div className="flex items-center gap-2">
         <Sparkles className="w-4 h-4 text-muted-foreground shrink-0" />
         <p className="text-sm font-bold tracking-tight">{heading}</p>
+        {loading && <Loader2 className="w-3.5 h-3.5 animate-spin text-muted-foreground" aria-label="Loading usage" />}
       </div>
       {person?.unlimited ? (
         <p className="text-sm text-muted-foreground">No monthly limit.</p>
@@ -170,7 +172,8 @@ export default function Settings() {
   const [deleteOpen, setDeleteOpen] = React.useState(false);
   const [deleting, setDeleting] = React.useState(false);
   const [deleteError, setDeleteError] = React.useState('');
-  const [partnerBusy, setPartnerBusy] = React.useState(false);
+  const [partnerBusy, setPartnerBusy] = React.useState('');
+  const [signingOut, setSigningOut] = React.useState(false);
   const [partnerNote, setPartnerNote] = React.useState('');
   const [codeShown, setCodeShown] = React.useState(false);
   const [devCode, setDevCode] = React.useState('');
@@ -208,8 +211,8 @@ export default function Settings() {
     setNameStyle(style);
   };
 
-  const runPartner = async (action) => {
-    setPartnerBusy(true);
+  const runPartner = async (action, key) => {
+    setPartnerBusy(key);
     setPartnerNote('');
     setCodeShown(false);
     try {
@@ -218,7 +221,7 @@ export default function Settings() {
     } catch (err) {
       setPartnerNote(err instanceof Error ? err.message : 'Could not update the partner code.');
     } finally {
-      setPartnerBusy(false);
+      setPartnerBusy('');
     }
   };
 
@@ -277,7 +280,7 @@ export default function Settings() {
                 </p>
               )}
             </div>
-            <UsageBlock heading="AI this month" person={me} onUpgrade={openPaywall} />
+            <UsageBlock heading="AI this month" person={me} onUpgrade={openPaywall} loading={!usage} />
             {me?.billingNotice === 'beta_ended' && !me?.billingPlan && (
               <div className="px-5 pb-5">
                 <p className="text-xs text-muted-foreground">Your free week ended.</p>
@@ -300,7 +303,7 @@ export default function Settings() {
                   type="button"
                   title="Copy code"
                   aria-label="Copy code"
-                  disabled={!me.partnerCode || partnerBusy}
+                  disabled={!me.partnerCode || !!partnerBusy}
                   className="inline-flex items-center gap-1.5 text-sm font-semibold text-foreground disabled:opacity-40"
                   onClick={async () => {
                     if (!me.partnerCode) return;
@@ -328,26 +331,26 @@ export default function Settings() {
                   type="button"
                   variant="outline"
                   className="h-11 rounded-xl"
-                  disabled={partnerBusy || !me.partnerCode}
+                  disabled={!!partnerBusy || !me.partnerCode}
                   onClick={() => {
                     if (!window.confirm('Reset the code? The old one will stop working.')) return;
-                    runPartner(resetPartnerCode);
+                    runPartner(resetPartnerCode, 'reset');
                   }}
                 >
-                  Reset code
+                  {partnerBusy === 'reset' ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Reset code'}
                 </Button>
                 {me.partnerLinked && (
                   <Button
                     type="button"
                     variant="outline"
                     className="h-11 rounded-xl"
-                    disabled={partnerBusy}
+                    disabled={!!partnerBusy}
                     onClick={() => {
                       if (!window.confirm('Remove your partner? They lose access now.')) return;
-                      runPartner(removePartner);
+                      runPartner(removePartner, 'remove');
                     }}
                   >
-                    Remove partner
+                    {partnerBusy === 'remove' ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Remove partner'}
                   </Button>
                 )}
               </div>
@@ -459,14 +462,20 @@ export default function Settings() {
 
           <button
             type="button"
+            disabled={signingOut}
             onClick={async () => {
-              await logout();
-              navigate('/account', { replace: true });
+              setSigningOut(true);
+              try {
+                await logout();
+                navigate('/account', { replace: true });
+              } finally {
+                setSigningOut(false);
+              }
             }}
-            className="flex items-center justify-center gap-2 text-sm text-muted-foreground hover:text-foreground"
+            className="flex items-center justify-center gap-2 text-sm text-muted-foreground hover:text-foreground disabled:opacity-60"
           >
-            <LogOut className="w-4 h-4" />
-            Sign out
+            {signingOut ? <Loader2 className="w-4 h-4 animate-spin" /> : <LogOut className="w-4 h-4" />}
+            {signingOut ? 'Signing out' : 'Sign out'}
           </button>
 
           <button
@@ -524,7 +533,7 @@ export default function Settings() {
                 }
               }}
             >
-              {deleting ? 'Deleting…' : 'Delete account'}
+              {deleting ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Delete account'}
             </Button>
           </AlertDialogFooter>
         </AlertDialogContent>

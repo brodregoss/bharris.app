@@ -13,5 +13,6 @@ if (button && cfg.apiKey && cfg.authDomain && cfg.projectId && cfg.appId) {
   const account = bindSiteAccount(auth);
   onAuthStateChanged(auth, (user) => account.setSignedIn(user));
 } else if (button) {
+  clearAuthWait();
   button.hidden = false;
 }

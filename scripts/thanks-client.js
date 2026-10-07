@@ -16,7 +16,10 @@ function show(on) {
 
 function showCode(code) {
   partnerCode = code || '';
-  if (codeEl) codeEl.textContent = partnerCode || 'Your code is on its way.';
+  if (codeEl) {
+    codeEl.classList.toggle('is-loading', !partnerCode);
+    codeEl.textContent = partnerCode || 'Your code is on its way.';
+  }
   if (copyBtn) {
     copyBtn.hidden = !partnerCode;
     copyBtn.dataset.code = partnerCode;
@@ -41,7 +44,7 @@ function showSignIn() {
 
 async function api(auth) {
   const token = await auth.currentUser.getIdToken();
-  const res = await fetch('/v1/users/me', {
+  const res = await fetch('/v1/users/me?fresh=1', {
     headers: { Authorization: `Bearer ${token}` },
   });
   const data = await res.json().catch(() => ({}));

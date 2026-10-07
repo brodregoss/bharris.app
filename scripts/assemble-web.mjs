@@ -1147,6 +1147,42 @@ const css = `
   button.account-reset:hover { background: #f5f5f5; }
   button.account-reset:disabled { opacity: 0.6; cursor: wait; }
   .account-status { margin: 0.75rem 0 0; min-height: 1.2rem; font-size: 0.9rem; color: #404040; }
+  .spin {
+    display: inline-block;
+    width: 0.95rem;
+    height: 0.95rem;
+    border: 2px solid currentColor;
+    border-right-color: transparent;
+    border-radius: 999px;
+    animation: bh-spin 0.7s linear infinite;
+    flex: none;
+  }
+  .wait-row, .is-loading {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.55rem;
+  }
+  .is-loading::before {
+    content: "";
+    width: 0.95rem;
+    height: 0.95rem;
+    border: 2px solid currentColor;
+    border-right-color: transparent;
+    border-radius: 999px;
+    animation: bh-spin 0.7s linear infinite;
+    flex: none;
+  }
+  button.is-busy { gap: 0.5rem; }
+  .bar-auth-wait {
+    display: inline-flex;
+    width: 2.15rem;
+    height: 2.15rem;
+    align-items: center;
+    justify-content: center;
+  }
+  .bar-auth-wait[hidden],
+  #account-loading[hidden] { display: none !important; }
+  @keyframes bh-spin { to { transform: rotate(360deg); } }
   .account-page { width: min(32rem, 100%); padding-bottom: 4rem; }
   .account-page .plan-card { margin-top: 1rem; }
   .account-plan-name {
@@ -1183,6 +1219,7 @@ const css = `
     dialog.sign-in::backdrop { transition: none; }
     dialog.sign-in,
     dialog.sign-in.closing { transform: none; }
+    .spin, .is-loading::before { animation: none; }
   }
   .stack input,
   .promo input {
@@ -1922,6 +1959,7 @@ function navBar({ prefix = '', back = '/' } = {}) {
       </div>
     </div>
     <div class="bar-end">
+      <span class="bar-auth-wait" id="site-auth-wait" hidden><span class="spin" aria-hidden="true"></span></span>
       <a class="bar-signin" id="site-sign-in" href="${signIn}" hidden>Sign in</a>
       <a class="bar-signin" id="site-account" href="/account/" hidden>Account</a>
       <a class="bar-open" href="/app/">Open bharris.app</a>
@@ -2437,7 +2475,7 @@ function accountPage(firebaseConfig) {
     body: `${navBar({ prefix: '/', back: '/account/' })}
   <main class="block account-page reveal">
     <h2>Account</h2>
-    <p id="account-loading">Loading your account…</p>
+    <p id="account-loading" class="wait-row" role="status"><span class="spin" aria-hidden="true"></span> Loading your account</p>
     <section id="account-signed-out" hidden>
       <p>Sign in to see your plan, billing, and password.</p>
       <a class="plan-btn" href="/app/#/account/signin?return=/account/">Sign in</a>

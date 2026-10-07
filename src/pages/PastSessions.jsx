@@ -277,6 +277,9 @@ export default function PastSessions() {
           <ArrowLeft className="w-5 h-5" />
         </Button>
         <h1 className="min-w-0 truncate text-base font-bold tracking-tight">Past sessions</h1>
+        {loading && (
+          <Loader2 className="w-4 h-4 animate-spin text-muted-foreground" aria-label="Loading sessions" />
+        )}
       </header>
       <p className="px-5 text-xs text-muted-foreground mb-3">
         {loading && !sessions.length
@@ -364,7 +367,7 @@ export default function PastSessions() {
               }}
               className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
             >
-              {deleting ? 'Deleting…' : 'Delete'}
+              {deleting ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Delete'}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

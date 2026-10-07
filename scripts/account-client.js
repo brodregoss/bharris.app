@@ -16,9 +16,10 @@ const statusEl = document.getElementById('account-status');
 let auth = null;
 let me = null;
 let authReady = false;
+let profilePending = false;
 
-function setStatus(message) {
-  if (statusEl) statusEl.textContent = message || '';
+function setStatus(message, busy = false) {
+  setStatusMessage(statusEl, message, busy);
 }
 
 function setPasswordStatus(message) {
@@ -94,7 +95,11 @@ function render() {
   const plan = document.getElementById('account-plan');
   if (name) name.textContent = me?.displayName || auth.currentUser.displayName || '—';
   if (email) email.textContent = me?.email || auth.currentUser.email || '—';
-  if (plan) plan.textContent = me ? sitePlanName(me) : '…';
+  if (plan) {
+    const waiting = profilePending && !me;
+    plan.classList.toggle('is-loading', waiting);
+    plan.textContent = waiting ? 'Loading plan' : (me ? sitePlanName(me) : '—');
+  }
   const hasPassword = !!auth.currentUser?.providerData?.some((provider) => provider.providerId === 'password');
   show('account-password-open', hasPassword);
   show('account-password-note', !hasPassword);
@@ -146,17 +151,22 @@ async function refresh() {
     await loadMe();
   } catch (err) {
     setStatus(err instanceof Error ? err.message : 'Could not load your account.');
+  } finally {
+    profilePending = false;
   }
   render();
 }
 
 document.getElementById('account-billing')?.addEventListener('click', async () => {
-  setStatus('Opening billing information…');
+  const button = document.getElementById('account-billing');
+  setButtonBusy(button, true, 'Opening billing');
+  setStatus('');
   try {
     const data = await api('/v1/billing/portal', { body: {} });
     if (!data.url) throw new Error('Could not open billing.');
     window.location.assign(data.url);
   } catch (err) {
+    setButtonBusy(button, false);
     setStatus(err instanceof Error ? err.message : 'Could not open billing.');
   }
 });
@@ -165,8 +175,8 @@ document.getElementById('account-cancel')?.addEventListener('click', async () =>
   if (!canCancelWebsitePlan(me)) return;
   if (!window.confirm(cancelPlanQuestion(me))) return;
   const button = document.getElementById('account-cancel');
-  if (button) button.disabled = true;
-  setStatus('Canceling plan…');
+  setButtonBusy(button, true, 'Canceling plan');
+  setStatus('');
   try {
     const data = await api('/v1/billing/cancel', { body: {} });
     me = data.user || me;
@@ -175,8 +185,8 @@ document.getElementById('account-cancel')?.addEventListener('click', async () =>
     render();
     setStatus('Plan canceled.');
   } catch (err) {
+    setButtonBusy(button, false);
     setStatus(err instanceof Error ? err.message : 'Could not cancel the plan.');
-    if (button) button.disabled = false;
   }
 });
 
@@ -229,8 +239,8 @@ document.getElementById('account-password-form')?.addEventListener('submit', asy
     return;
   }
   const button = document.getElementById('account-password-save');
-  if (button) button.disabled = true;
-  setPasswordStatus('Updating password…');
+  setButtonBusy(button, true, 'Saving password');
+  setPasswordStatus('');
   try {
     const credential = EmailAuthProvider.credential(email, currentPassword);
     await reauthenticateWithCredential(current, credential);
@@ -250,17 +260,20 @@ document.getElementById('account-password-form')?.addEventListener('submit', asy
       setPasswordStatus(err?.message || 'Could not change the password.');
     }
   } finally {
-    if (button) button.disabled = false;
+    setButtonBusy(button, false);
   }
 });
 
 document.getElementById('account-sign-out')?.addEventListener('click', async () => {
-  setStatus('Signing out…');
+  const button = document.getElementById('account-sign-out');
+  setButtonBusy(button, true, 'Signing out');
+  setStatus('');
   try {
     writePlanCookie(null);
     await signOut(auth);
     window.location.assign('/');
   } catch (err) {
+    setButtonBusy(button, false);
     setStatus(err?.message || 'Could not sign out.');
   }
 });
@@ -271,8 +284,8 @@ document.getElementById('account-delete')?.addEventListener('click', async () =>
   const ok = window.confirm('Remove this account? This deletes your login, notes, and study sessions. It cannot be undone. A website subscription is cancelled with the account. An App Store subscription still has to be cancelled in iPhone Settings.');
   if (!ok) return;
   const button = document.getElementById('account-delete');
-  if (button) button.disabled = true;
-  setStatus('Removing account…');
+  setButtonBusy(button, true, 'Removing account');
+  setStatus('');
   try {
     await api('/v1/users/me', { method: 'DELETE' });
     try {
@@ -287,8 +300,8 @@ document.getElementById('account-delete')?.addEventListener('click', async () =>
     await signOut(auth).catch(() => {});
     window.location.assign('/');
   } catch (err) {
+    setButtonBusy(button, false);
     setStatus(err instanceof Error ? err.message : 'Could not remove the account.');
-    if (button) button.disabled = false;
   }
 });
 
@@ -297,6 +310,14 @@ function watchAuth() {
   onAuthStateChanged(auth, (user) => {
     authReady = true;
     account.setSignedIn(user);
+    if (user) {
+      const cached = readPlanCookie();
+      me = cached?.uid === user.uid ? cached : null;
+      profilePending = true;
+    } else {
+      me = null;
+      profilePending = false;
+    }
     render();
     refresh();
   });

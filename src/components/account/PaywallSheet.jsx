@@ -319,7 +319,7 @@ export default function PaywallSheet({ open, onOpenChange }) {
                 setCancelOpen(false);
               })}
             >
-              {busy === 'cancel' ? 'Canceling…' : 'Cancel plan'}
+              {busy === 'cancel' ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Cancel plan'}
             </Button>
           </AlertDialogFooter>
         </AlertDialogContent>

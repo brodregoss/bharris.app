@@ -18,7 +18,11 @@ const DEFAULT_RANGES = [
   ['USER_07', 'studyapp-user-07', 57344, 65535],
 ];
 
-async function ensureAppSchema(env) {
+let appSchemaReady = null;
+const shardByUid = new Map();
+const SHARD_CACHE_MAX = 500;
+
+async function migrateAppSchema(env) {
   await env.APP.prepare(
     'CREATE TABLE IF NOT EXISTS shard_ranges (shard_binding TEXT PRIMARY KEY, database_name TEXT NOT NULL, bucket_start INTEGER NOT NULL, bucket_end INTEGER NOT NULL)',
   ).run();
@@ -39,14 +43,37 @@ async function ensureAppSchema(env) {
   }
 }
 
+function ensureAppSchema(env) {
+  if (!appSchemaReady) {
+    appSchemaReady = migrateAppSchema(env).catch((err) => {
+      appSchemaReady = null;
+      throw err;
+    });
+  }
+  return appSchemaReady;
+}
+
+function rememberShard(uid, binding) {
+  if (shardByUid.has(uid)) shardByUid.delete(uid);
+  shardByUid.set(uid, binding);
+  if (shardByUid.size <= SHARD_CACHE_MAX) return;
+  const oldest = shardByUid.keys().next().value;
+  shardByUid.delete(oldest);
+}
+
 export async function shardForUid(env, uid) {
+  const cached = shardByUid.get(uid);
+  if (cached) return cached;
   await ensureAppSchema(env);
   const override = await env.APP.prepare(
     'SELECT shard_binding FROM bucket_overrides WHERE firebase_uid = ?',
   )
     .bind(uid)
     .first();
-  if (override?.shard_binding) return override.shard_binding;
+  if (override?.shard_binding) {
+    rememberShard(uid, override.shard_binding);
+    return override.shard_binding;
+  }
 
   const bucket = await uidToBucket(uid);
   const range = await env.APP.prepare(
@@ -54,10 +81,10 @@ export async function shardForUid(env, uid) {
   )
     .bind(bucket, bucket)
     .first();
-  if (range?.shard_binding) return range.shard_binding;
-
   const index = Math.min(SHARD_BINDINGS.length - 1, Math.floor(bucket / (VIRTUAL_BUCKETS / SHARD_BINDINGS.length)));
-  return SHARD_BINDINGS[index];
+  const binding = range?.shard_binding || SHARD_BINDINGS[index];
+  rememberShard(uid, binding);
+  return binding;
 }
 
 export function shardDb(env, binding) {

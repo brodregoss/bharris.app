@@ -21,7 +21,9 @@ export function generatePartnerCode() {
   return chars.join('');
 }
 
-async function ensurePartnerTables(env) {
+let partnerTablesReady = null;
+
+async function migratePartnerTables(env) {
   await env.APP.prepare(
     `CREATE TABLE IF NOT EXISTS partner_links (
       owner_uid TEXT PRIMARY KEY,
@@ -44,6 +46,16 @@ async function ensurePartnerTables(env) {
       attempted_at TEXT NOT NULL
     )`,
   ).run();
+}
+
+function ensurePartnerTables(env) {
+  if (!partnerTablesReady) {
+    partnerTablesReady = migratePartnerTables(env).catch((err) => {
+      partnerTablesReady = null;
+      throw err;
+    });
+  }
+  return partnerTablesReady;
 }
 
 async function linkForOwner(env, ownerUid) {

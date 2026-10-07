@@ -1,6 +1,10 @@
 import { periodKey, publicUser, quotaLimit } from './util.js';
 import { userShard } from './routing.js';
 
+const userTablesReady = new Map();
+const adminCache = new Map();
+const ADMIN_CACHE_MS = 5 * 60 * 1000;
+
 const USER_EXTRA_COLUMNS = [
   ['billing_plan', 'TEXT'],
   ['partner_owner_uid', 'TEXT'],
@@ -12,9 +16,10 @@ const USER_EXTRA_COLUMNS = [
   ['stripe_period_end', 'TEXT'],
   ['stripe_cancel_at_period_end', 'INTEGER'],
   ['stripe_promo', 'TEXT'],
+  ['billing_checked_at', 'TEXT'],
 ];
 
-async function ensureUserTable(db) {
+async function migrateUserTable(db) {
   await db.prepare(
     `CREATE TABLE IF NOT EXISTS users (
       firebase_uid TEXT PRIMARY KEY,
@@ -40,29 +45,44 @@ async function ensureUserTable(db) {
   }
 }
 
+function ensureUserTable(binding, db) {
+  let pending = userTablesReady.get(binding);
+  if (!pending) {
+    pending = migrateUserTable(db).catch((err) => {
+      userTablesReady.delete(binding);
+      throw err;
+    });
+    userTablesReady.set(binding, pending);
+  }
+  return pending;
+}
+
 export function userStudyStub(env, uid) {
   const id = env.USER_STUDY.idFromName(uid);
   return { id, stub: env.USER_STUDY.get(id) };
 }
 
 export async function isAdminUid(env, uid, email) {
+  const hit = adminCache.get(uid);
+  if (hit && hit.expires > Date.now()) return hit.value;
   const row = await env.APP.prepare('SELECT firebase_uid FROM admins WHERE firebase_uid = ?')
     .bind(uid)
     .first();
-  if (row) return true;
   const adminEmail = String(env.ADMIN_EMAIL || '').trim().toLowerCase();
-  return !!(adminEmail && email && email.toLowerCase() === adminEmail);
+  const value = !!row || !!(adminEmail && email && email.toLowerCase() === adminEmail);
+  adminCache.set(uid, { value, expires: Date.now() + ADMIN_CACHE_MS });
+  return value;
 }
 
 export async function getUserRow(env, uid) {
-  const { db } = await userShard(env, uid);
-  await ensureUserTable(db);
+  const { binding, db } = await userShard(env, uid);
+  await ensureUserTable(binding, db);
   return db.prepare('SELECT * FROM users WHERE firebase_uid = ?').bind(uid).first();
 }
 
 export async function upsertUser(env, identity) {
-  const { db } = await userShard(env, uidOrIdentity(identity));
-  await ensureUserTable(db);
+  const { binding, db } = await userShard(env, uidOrIdentity(identity));
+  await ensureUserTable(binding, db);
   const uid = identity.uid;
   const now = new Date().toISOString();
   const existing = await db.prepare('SELECT * FROM users WHERE firebase_uid = ?').bind(uid).first();
@@ -108,8 +128,9 @@ function uidOrIdentity(identity) {
 }
 
 export async function deleteUserRow(env, uid) {
-  const { db } = await userShard(env, uid);
-  await ensureUserTable(db);
+  const { binding, db } = await userShard(env, uid);
+  await ensureUserTable(binding, db);
+  adminCache.delete(uid);
   await db.prepare('DELETE FROM users WHERE firebase_uid = ?').bind(uid).run();
   await env.APP.prepare('DELETE FROM admins WHERE firebase_uid = ?').bind(uid).run();
   await env.APP.prepare('DELETE FROM bucket_overrides WHERE firebase_uid = ?').bind(uid).run();
@@ -159,11 +180,12 @@ const BILLING_COLUMNS = {
   stripePeriodEnd: 'stripe_period_end',
   stripeCancelAtPeriodEnd: 'stripe_cancel_at_period_end',
   stripePromo: 'stripe_promo',
+  billingCheckedAt: 'billing_checked_at',
 };
 
 export async function updateUserBilling(env, uid, fields) {
-  const { db } = await userShard(env, uid);
-  await ensureUserTable(db);
+  const { binding, db } = await userShard(env, uid);
+  await ensureUserTable(binding, db);
   const sets = ['updated_at = ?'];
   const binds = [new Date().toISOString()];
   for (const [key, column] of Object.entries(BILLING_COLUMNS)) {

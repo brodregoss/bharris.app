@@ -75,6 +75,47 @@ function writePlanCookie(user) {
   document.cookie = `${PLAN_COOKIE}=${encodeURIComponent(JSON.stringify(payload))}${base}`;
 }
 
+function setButtonBusy(button, busy, label) {
+  if (!button) return;
+  if (busy) {
+    if (!button.dataset.idleLabel) button.dataset.idleLabel = button.textContent.trim();
+    button.disabled = true;
+    button.classList.add('is-busy');
+    button.replaceChildren();
+    const spin = document.createElement('span');
+    spin.className = 'spin';
+    spin.setAttribute('aria-hidden', 'true');
+    button.append(spin, document.createTextNode(label || button.dataset.idleLabel));
+    return;
+  }
+  button.disabled = false;
+  button.classList.remove('is-busy');
+  button.textContent = button.dataset.idleLabel || button.textContent;
+}
+
+function setStatusMessage(el, message, busy = false) {
+  if (!el) return;
+  el.classList.toggle('is-loading', !!(busy && message));
+  el.textContent = message || '';
+}
+
+let authWaitTimer = 0;
+
+function armAuthWait() {
+  const wait = document.getElementById('site-auth-wait');
+  if (!wait) return;
+  window.clearTimeout(authWaitTimer);
+  authWaitTimer = window.setTimeout(() => {
+    wait.hidden = false;
+  }, 180);
+}
+
+function clearAuthWait() {
+  window.clearTimeout(authWaitTimer);
+  const wait = document.getElementById('site-auth-wait');
+  if (wait) wait.hidden = true;
+}
+
 function sitePlanName(user) {
   const plan = user?.billingPlan || '';
   if (plan === 'partner' || plan === 'guest') return 'Partner study';
@@ -83,6 +124,7 @@ function sitePlanName(user) {
 }
 
 function bindSiteAccount(auth, sendPasswordResetEmail) {
+  armAuthWait();
   const signIn = document.getElementById('site-sign-in');
   const accountBtn = document.getElementById('site-account');
   const dialog = document.getElementById('site-account-dialog');
@@ -98,8 +140,8 @@ function bindSiteAccount(auth, sendPasswordResetEmail) {
   let profile = null;
   let firebaseUser = null;
 
-  function setStatus(message) {
-    if (statusEl) statusEl.textContent = message || '';
+  function setStatus(message, busy = false) {
+    setStatusMessage(statusEl, message, busy);
   }
 
   function paint(user) {
@@ -142,6 +184,7 @@ function bindSiteAccount(auth, sendPasswordResetEmail) {
   }
 
   function setSignedIn(user) {
+    clearAuthWait();
     firebaseUser = user || null;
     if (signIn) signIn.hidden = !!user;
     if (accountBtn) accountBtn.hidden = !user;
@@ -154,16 +197,21 @@ function bindSiteAccount(auth, sendPasswordResetEmail) {
 
   accountBtn?.addEventListener('click', () => {
     if (!dialog) return;
-    setStatus('');
     if (!profile && firebaseUser) {
       const cached = readPlanCookie();
       if (cached?.uid && cached.uid === firebaseUser.uid) profile = cached;
     }
+    const hadProfile = !!profile;
     paint(profile);
+    setStatus(hadProfile ? '' : 'Loading your account', !hadProfile);
     dialog.showModal();
-    loadProfile().catch((err) => {
-      setStatus(err instanceof Error ? err.message : 'Could not load your account.');
-    });
+    loadProfile()
+      .then(() => {
+        if (!hadProfile) setStatus('');
+      })
+      .catch((err) => {
+        setStatus(err instanceof Error ? err.message : 'Could not load your account.');
+      });
   });
 
   document.getElementById('site-account-close')?.addEventListener('click', () => dialog?.close());
@@ -177,15 +225,15 @@ function bindSiteAccount(auth, sendPasswordResetEmail) {
       setStatus('This account has no email for a password reset.');
       return;
     }
-    resetBtn.disabled = true;
-    setStatus('Sending reset email…');
+    setButtonBusy(resetBtn, true, 'Sending email');
+    setStatus('');
     try {
       await sendPasswordResetEmail(auth, email);
       setStatus(`Password reset email sent to ${email}.`);
     } catch (err) {
       setStatus(err?.message || 'Could not send the reset email.');
     } finally {
-      resetBtn.disabled = false;
+      setButtonBusy(resetBtn, false);
     }
   });
 

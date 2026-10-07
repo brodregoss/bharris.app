@@ -266,6 +266,11 @@ export class UserStudyDO extends DurableObject {
     return this.hydrateSession(row);
   }
 
+  async listSessionsCapped(limit) {
+    await this.trimFinishedSessions(limit);
+    return this.listSessions();
+  }
+
   async listSessions() {
     await this.ready;
     return this.ctx.storage.sql

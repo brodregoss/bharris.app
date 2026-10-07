@@ -1,5 +1,6 @@
 import React from 'react';
 import { Navigate, useLocation, useNavigate } from 'react-router-dom';
+import { Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useAuth } from '@/lib/AuthContext';
 import { afterAuthPath, leaveForAuthReturn } from '@/lib/onboarding';
@@ -9,13 +10,22 @@ import GoogleSignInButton from '@/components/account/GoogleSignInButton';
 export default function Account() {
   const navigate = useNavigate();
   const location = useLocation();
-  const { isAuthenticated, authError, firebaseUser, retryCloud, signInWithApple, signInWithGoogle } = useAuth();
+  const { isAuthenticated, isLoadingAuth, authError, firebaseUser, retryCloud, signInWithApple, signInWithGoogle } = useAuth();
   const from = location.state?.from;
   const [retrying, setRetrying] = React.useState(false);
   const [appleLoading, setAppleLoading] = React.useState(false);
   const [googleLoading, setGoogleLoading] = React.useState(false);
   const [socialError, setSocialError] = React.useState('');
   const safeFrom = from === '/' || from === '/welcome' || from === '/settings' || from === '/history' || from === '/practice';
+
+  if (isLoadingAuth) {
+    return (
+      <div className="min-h-[100dvh] bg-background flex items-center justify-center" role="status" aria-live="polite">
+        <div className="w-8 h-8 border-4 border-muted border-t-foreground rounded-full animate-spin" />
+        <span className="sr-only">Loading your account</span>
+      </div>
+    );
+  }
 
   if (isAuthenticated) {
     if (leaveForAuthReturn()) return null;
@@ -83,7 +93,7 @@ export default function Account() {
                   }
                 }}
               >
-                Try again
+                {retrying ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Try again'}
               </Button>
             )}
           </div>

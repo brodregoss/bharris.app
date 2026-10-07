@@ -315,17 +315,50 @@ async function expireBetaTrial(env, row) {
   return getUserRow(env, row.firebase_uid);
 }
 
-export async function billingForRequest(env, ctx, row) {
+export const BILLING_FRESH_MS = 10 * 60 * 1000;
+export const BILLING_FRESH_WAIT_MS = 15 * 1000;
+const billingJobs = new Map();
+
+export function billingCheckedRecently(row, now = Date.now(), windowMs = BILLING_FRESH_MS) {
+  const at = Date.parse(row?.billing_checked_at || '');
+  return Number.isFinite(at) && now - at < windowMs;
+}
+
+export function shouldAwaitBilling(row, { fresh = false, now = Date.now() } = {}) {
+  if (!fresh || !row) return false;
+  const needsStripe = !(row.billing_plan || row.stripe_subscription_id || row.subscription_tier === 'pro');
+  if (!needsStripe) return false;
+  return !billingCheckedRecently(row, now, BILLING_FRESH_WAIT_MS);
+}
+
+function refreshBillingOnce(env, uid) {
+  let job = billingJobs.get(uid);
+  if (!job) {
+    job = refreshBillingSchedule(env, uid).finally(() => {
+      billingJobs.delete(uid);
+    });
+    billingJobs.set(uid, job);
+  }
+  return job;
+}
+
+export async function billingForRequest(env, ctx, row, { fresh = false } = {}) {
   if (!row) return row;
   row = await expireBetaTrial(env, row);
-  const known = !!(row.billing_plan || row.stripe_subscription_id || row.subscription_tier === 'pro');
-  if (!known) return (await refreshBillingSchedule(env, row.firebase_uid)) || row;
-  const job = refreshBillingSchedule(env, row.firebase_uid).catch(() => {});
-  if (ctx && typeof ctx.waitUntil === 'function') ctx.waitUntil(job);
+  if (!row) return row;
+  const now = Date.now();
+  if (shouldAwaitBilling(row, { fresh, now })) {
+    return (await refreshBillingOnce(env, row.firebase_uid)) || row;
+  }
+  if (!billingCheckedRecently(row, now)) {
+    const job = refreshBillingOnce(env, row.firebase_uid);
+    if (ctx && typeof ctx.waitUntil === 'function') ctx.waitUntil(job);
+    else job.catch(() => {});
+  }
   return row;
 }
 
-export async function refreshBillingSchedule(env, uid) {
+async function syncBillingNow(env, uid) {
   const row = await getUserRow(env, uid);
   if (!row) return null;
   if (row.billing_plan === 'guest' && row.partner_owner_uid) {
@@ -359,6 +392,18 @@ export async function refreshBillingSchedule(env, uid) {
     return getUserRow(env, uid);
   }
   return getUserRow(env, uid);
+}
+
+export async function refreshBillingSchedule(env, uid) {
+  const existing = await getUserRow(env, uid);
+  if (!existing) return null;
+  try {
+    return await syncBillingNow(env, uid);
+  } finally {
+    await updateUserBilling(env, uid, {
+      billingCheckedAt: new Date().toISOString(),
+    }).catch(() => {});
+  }
 }
 
 export async function handleCancel(env, identity) {

@@ -29,7 +29,14 @@ export default function AccountSignIn() {
     if (!leaveForAuthReturn()) navigate(afterAuthPath(), { replace: true });
   };
 
-  if (isLoadingAuth) return null;
+  if (isLoadingAuth) {
+    return (
+      <div className="min-h-[100dvh] bg-background flex items-center justify-center" role="status" aria-live="polite">
+        <Loader2 className="w-8 h-8 animate-spin text-muted-foreground" aria-hidden="true" />
+        <span className="sr-only">Loading your account</span>
+      </div>
+    );
+  }
 
   if (isAuthenticated) {
     if (leaveForAuthReturn()) return null;

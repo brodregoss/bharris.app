@@ -5,9 +5,10 @@ const cfg = window.BH_PLANS || {};
 const statusEl = document.getElementById('plans-status');
 let auth = null;
 let me = null;
+let planLoading = false;
 
-function setStatus(message) {
-  if (statusEl) statusEl.textContent = message || '';
+function setStatus(message, busy = false) {
+  setStatusMessage(statusEl, message, busy);
 }
 
 function setRedeemStatus(message) {
@@ -107,6 +108,11 @@ function render() {
   show('copy-code', !!me?.partnerCode);
   show('reset-code', !!me?.partnerCode);
   show('remove-partner', !!me?.partnerLinked);
+  ['solo-subscribe', 'partner-subscribe'].forEach((id) => {
+    const button = document.getElementById(id);
+    if (!button || button.classList.contains('is-busy')) return;
+    button.toggleAttribute('disabled', planLoading && !me);
+  });
 }
 
 async function refresh() {
@@ -147,8 +153,11 @@ async function subscribe(plan) {
     return;
   }
   const code = promoCode();
-  setStatus(code ? 'Checking code…' : 'Opening checkout…');
-  const data = await api('/v1/billing/checkout', { body: { plan, code } });
+  const button = document.getElementById(plan === 'partner' ? 'partner-subscribe' : 'solo-subscribe');
+  setButtonBusy(button, true, code ? 'Checking code' : 'Opening checkout');
+  setStatus('');
+  try {
+    const data = await api('/v1/billing/checkout', { body: { plan, code } });
   const dest = checkoutDestination(plan, data);
   if (!dest) throw new Error('Could not start checkout.');
   try {
@@ -156,10 +165,14 @@ async function subscribe(plan) {
   } catch {
     // The redirect still continues.
   }
-  if (data.granted && data.user) {
-    writePlanCookie({ ...data.user, uid: data.user.uid || auth.currentUser.uid });
+    if (data.granted && data.user) {
+      writePlanCookie({ ...data.user, uid: data.user.uid || auth.currentUser.uid });
+    }
+    window.location.assign(dest);
+  } catch (err) {
+    setButtonBusy(button, false);
+    throw err;
   }
-  window.location.assign(dest);
 }
 
 function bind(id, fn) {
@@ -179,19 +192,32 @@ bind('partner-subscribe', () => subscribe('partner'));
 bind('cancel-plan', async () => {
   if (!canCancelWebsitePlan(me)) return;
   if (!window.confirm(cancelPlanQuestion(me))) return;
-  setStatus('Canceling plan…');
-  const data = await api('/v1/billing/cancel', { body: {} });
-  me = data.user || me;
-  if (me) me.uid = me.uid || auth?.currentUser?.uid || '';
-  writePlanCookie(me);
-  render();
-  setStatus('Plan canceled.');
+  const button = document.getElementById('cancel-plan');
+  setButtonBusy(button, true, 'Canceling plan');
+  setStatus('');
+  try {
+    const data = await api('/v1/billing/cancel', { body: {} });
+    me = data.user || me;
+    if (me) me.uid = me.uid || auth?.currentUser?.uid || '';
+    writePlanCookie(me);
+    render();
+    setStatus('Plan canceled.');
+  } finally {
+    setButtonBusy(button, false);
+  }
 });
 bind('manage', async () => {
-  setStatus('Opening billing…');
-  const data = await api('/v1/billing/portal', { body: {} });
-  if (!data.url) throw new Error('Could not open billing.');
-  window.location.assign(data.url);
+  const button = document.getElementById('manage');
+  setButtonBusy(button, true, 'Opening billing');
+  setStatus('');
+  try {
+    const data = await api('/v1/billing/portal', { body: {} });
+    if (!data.url) throw new Error('Could not open billing.');
+    window.location.assign(data.url);
+  } catch (err) {
+    setButtonBusy(button, false);
+    throw err;
+  }
 });
 bind('copy-code', async () => {
   const code = me?.partnerCode || '';
@@ -201,23 +227,35 @@ bind('copy-code', async () => {
 });
 bind('reset-code', async () => {
   if (!window.confirm('Reset the code? The old one will stop working.')) return;
-  setStatus('Resetting code…');
-  const data = await api('/v1/billing/partner/reset', { body: {} });
-  me = data.user || me;
-  if (me) me.uid = me.uid || auth?.currentUser?.uid || '';
-  writePlanCookie(me);
-  render();
-  setStatus('New code ready. The old one no longer works.');
+  const button = document.getElementById('reset-code');
+  setButtonBusy(button, true, 'Resetting code');
+  setStatus('');
+  try {
+    const data = await api('/v1/billing/partner/reset', { body: {} });
+    me = data.user || me;
+    if (me) me.uid = me.uid || auth?.currentUser?.uid || '';
+    writePlanCookie(me);
+    render();
+    setStatus('New code ready. The old one no longer works.');
+  } finally {
+    setButtonBusy(button, false);
+  }
 });
 bind('remove-partner', async () => {
   if (!window.confirm('Remove your partner? They lose access now.')) return;
-  setStatus('Removing partner…');
-  const data = await api('/v1/billing/partner/remove', { body: {} });
-  me = data.user || me;
-  if (me) me.uid = me.uid || auth?.currentUser?.uid || '';
-  writePlanCookie(me);
-  render();
-  setStatus('Partner removed. This code will not work for anyone else. Reset it to make a new one.');
+  const button = document.getElementById('remove-partner');
+  setButtonBusy(button, true, 'Removing partner');
+  setStatus('');
+  try {
+    const data = await api('/v1/billing/partner/remove', { body: {} });
+    me = data.user || me;
+    if (me) me.uid = me.uid || auth?.currentUser?.uid || '';
+    writePlanCookie(me);
+    render();
+    setStatus('Partner removed. This code will not work for anyone else. Reset it to make a new one.');
+  } finally {
+    setButtonBusy(button, false);
+  }
 });
 
 document.getElementById('sign-in-close')?.addEventListener('click', closeSignIn);
@@ -233,9 +271,16 @@ document.getElementById('redeem-form')?.addEventListener('submit', async (event)
       return;
     }
     const code = document.getElementById('redeem-code')?.value || '';
-    setRedeemStatus('Checking code…');
-    await api('/v1/billing/partner/redeem', { body: { code } });
-    window.location.assign('/thanks/');
+    const button = event.submitter || document.querySelector('#redeem-form button');
+    setButtonBusy(button, true, 'Checking code');
+    setRedeemStatus('');
+    try {
+      await api('/v1/billing/partner/redeem', { body: { code } });
+      window.location.assign('/thanks/');
+    } catch (err) {
+      setButtonBusy(button, false);
+      setRedeemStatus(err instanceof Error ? err.message : 'Could not redeem that code.');
+    }
   } catch (err) {
     setRedeemStatus(err instanceof Error ? err.message : 'Could not redeem that code.');
   }
@@ -247,11 +292,8 @@ if (!cfg.apiKey || !cfg.authDomain || !cfg.projectId || !cfg.appId) {
   const cachedPlan = readPlanCookie();
   if (cachedPlan?.uid || cachedPlan?.billingPlan || cachedPlan?.subscriptionTier === 'pro') {
     me = cachedPlan;
-    render();
-  } else {
-    show('solo-subscribe', false);
-    show('partner-subscribe', false);
   }
+  render();
   auth = getAuth(initializeApp({
     apiKey: cfg.apiKey,
     authDomain: cfg.authDomain,
@@ -263,24 +305,30 @@ if (!cfg.apiKey || !cfg.authDomain || !cfg.projectId || !cfg.appId) {
     account.setSignedIn(user);
     if (!user) {
       me = null;
+      planLoading = false;
       writePlanCookie(null);
+      setStatus('');
       render();
       return;
     }
-    if (user) document.getElementById('sign-in-dialog')?.close();
+    document.getElementById('sign-in-dialog')?.close();
     const saved = readPlanCookie();
     if (saved?.uid === user.uid) {
       me = saved;
-      render();
-      return;
+    } else {
+      me = null;
+      planLoading = true;
+      setStatus('Loading your plan', true);
     }
-    me = null;
-    writePlanCookie(null);
-    show('solo-subscribe', false);
-    show('partner-subscribe', false);
-    refresh().catch((err) => {
-      setStatus(err instanceof Error ? err.message : 'Could not load your account.');
-      render();
-    });
+    render();
+    refresh()
+      .catch((err) => {
+        setStatus(err instanceof Error ? err.message : 'Could not load your account.');
+      })
+      .finally(() => {
+        planLoading = false;
+        if (statusEl?.classList.contains('is-loading')) setStatus('');
+        render();
+      });
   });
 }

@@ -1,10 +1,11 @@
-import { errorJson, json, readJson, sessionHistoryLimit } from './util.js';
+import { errorJson, json, periodKey, readJson, sessionHistoryLimit } from './util.js';
 import { verifyFirebaseToken } from './auth.js';
 import { withCors, corsHeaders } from './cors.js';
 import {
   deleteUserRow,
   getUserRow,
   markDoReady,
+  requireFreshQuota,
   toPublicUser,
   upsertUser,
   userStudyStub,
@@ -50,7 +51,27 @@ async function warmDo(env, uid) {
 }
 
 async function handleUsersMe(request, env, identity, ctx) {
-  const body = request.method === 'GET' ? {} : await readJson(request);
+  const fresh = new URL(request.url).searchParams.get('fresh') === '1';
+  if (request.method === 'GET') {
+    let row = await getUserRow(env, identity.uid);
+    const emailChanged = !!(
+      row
+      && identity.email
+      && identity.email.toLowerCase() !== String(row.email || '').toLowerCase()
+    );
+    if (!row || emailChanged) {
+      row = await upsertUser(env, {
+        uid: identity.uid,
+        email: identity.email,
+        name: identity.name,
+      });
+    } else if (row.ai_quota_period !== periodKey()) {
+      row = await requireFreshQuota(env, row);
+    }
+    row = await billingForRequest(env, ctx, row, { fresh });
+    return json({ user: await toPublicUser(env, row) });
+  }
+  const body = await readJson(request);
   const updateName = body.updateName === true;
   const submitted = String(body.displayName || body.name || '').trim().replace(/\s+/g, ' ');
   if (updateName && (!submitted || submitted.length > 80)) {
@@ -62,7 +83,7 @@ async function handleUsersMe(request, env, identity, ctx) {
     name: updateName ? submitted : (submitted || identity.name),
     updateName,
   });
-  if (!updateName) row = await billingForRequest(env, ctx, row);
+  if (!updateName) row = await billingForRequest(env, ctx, row, { fresh });
   return json({ user: await toPublicUser(env, row) });
 }
 
@@ -95,7 +116,7 @@ async function sessionLimitFor(env, uid) {
   return sessionHistoryLimit(row?.subscription_tier);
 }
 
-async function handleSessions(request, env, identity, id) {
+async function handleSessions(request, env, identity, id, ctx) {
   const { stub } = userStudyStub(env, identity.uid);
   if (request.method === 'DELETE') {
     if (!id || id === 'current' || id === 'list') return errorJson('Session not found', 404);
@@ -114,9 +135,7 @@ async function handleSessions(request, env, identity, id) {
   }
   if (request.method === 'GET' && id === 'list') {
     const limit = await sessionLimitFor(env, identity.uid);
-    await stub.trimFinishedSessions(limit);
-    const sessions = await stub.listSessions();
-    return json({ sessions });
+    return json({ sessions: await stub.listSessionsCapped(limit) });
   }
   if (request.method === 'GET') {
     const session = await stub.getSession(id);
@@ -129,8 +148,11 @@ async function handleSessions(request, env, identity, id) {
     if (id && id !== 'current') incoming.id = incoming.id || id;
     if (!incoming.id) incoming.id = crypto.randomUUID();
     const session = await stub.putSession(incoming);
-    const limit = await sessionLimitFor(env, identity.uid);
-    await stub.trimFinishedSessions(limit);
+    const trim = sessionLimitFor(env, identity.uid)
+      .then((limit) => stub.trimFinishedSessions(limit))
+      .catch(() => {});
+    if (ctx && typeof ctx.waitUntil === 'function') ctx.waitUntil(trim);
+    else await trim;
     return json({ session });
   }
   return errorJson('Method not allowed', 405);
@@ -245,10 +267,9 @@ export default {
         if (request.method === 'GET' && !parts[2] && url.searchParams.get('list') !== '0') {
           const { stub } = userStudyStub(env, identity.uid);
           const limit = await sessionLimitFor(env, identity.uid);
-          await stub.trimFinishedSessions(limit);
-          response = json({ sessions: await stub.listSessions() });
+          response = json({ sessions: await stub.listSessionsCapped(limit) });
         } else {
-          response = await handleSessions(request, env, identity, id);
+          response = await handleSessions(request, env, identity, id, ctx);
         }
       } else {
         response = errorJson('Not found', 404);

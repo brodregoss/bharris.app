@@ -151,7 +151,7 @@ export default function ManageAccounts() {
                   className="w-full h-12 rounded-2xl font-semibold"
                   disabled={saving || (!unlimited && !(Number(amount) >= 0.5))}
                 >
-                  {saving ? 'Saving…' : 'Save cap'}
+                  {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Save cap'}
                 </Button>
                 <button
                   type="button"

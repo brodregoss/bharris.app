@@ -13,7 +13,7 @@ import { afterAuthPath, leaveForAuthReturn, rememberAuthReturn } from '@/lib/onb
 export default function AccountCreate() {
   const navigate = useNavigate();
   const { search } = useLocation();
-  const { isAuthenticated, createAccount, signInWithApple, signInWithGoogle } = useAuth();
+  const { isAuthenticated, isLoadingAuth, createAccount, signInWithApple, signInWithGoogle } = useAuth();
   const [name, setName] = React.useState('');
   const [email, setEmail] = React.useState('');
   const [password, setPassword] = React.useState('');
@@ -30,6 +30,15 @@ export default function AccountCreate() {
   const finish = () => {
     if (!leaveForAuthReturn()) navigate(afterAuthPath(), { replace: true });
   };
+
+  if (isLoadingAuth) {
+    return (
+      <div className="min-h-[100dvh] bg-background flex items-center justify-center" role="status" aria-live="polite">
+        <Loader2 className="w-8 h-8 animate-spin text-muted-foreground" aria-hidden="true" />
+        <span className="sr-only">Loading your account</span>
+      </div>
+    );
+  }
 
   if (isAuthenticated) {
     if (leaveForAuthReturn()) return null;
