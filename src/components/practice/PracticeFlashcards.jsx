@@ -1,6 +1,6 @@
 import React from 'react';
 import { Button } from '@/components/ui/button';
-import { Eye, Check, X, ArrowRight } from 'lucide-react';
+import { ArrowRight } from 'lucide-react';
 import { bumpFromPractice, sortForPractice } from '@/lib/mastery';
 import { flashcardDef } from '@/lib/studyUtils';
 import WriteOwnDef, {
@@ -9,11 +9,15 @@ import WriteOwnDef, {
   writtenReviewPlan,
 } from '@/components/study/WriteOwnDef';
 import { ShortcutKey, useFlashcardShortcuts, useIsComputer } from '@/components/study/flashcardKeys';
+import FlashCardStage from '@/components/study/FlashCardStage';
+import { cardProgressCaption } from '@/components/study/CardProgress';
 
 export default function PracticeFlashcards({ terms, onUpdateTerm, onDone, heading = 'Flashcards' }) {
   const computer = useIsComputer();
   const byId = React.useMemo(() => Object.fromEntries(terms.map((t) => [t.id, t])), [terms]);
   const [items, setItems] = React.useState(() => sortForPractice(terms).map((t) => t.id));
+  const deckTotalRef = React.useRef(items.length);
+  const [retired, setRetired] = React.useState(0);
   const [pos, setPos] = React.useState(0);
   const [revealed, setRevealed] = React.useState(false);
   const [misses, setMisses] = React.useState({});
@@ -85,6 +89,7 @@ export default function PracticeFlashcards({ terms, onUpdateTerm, onDone, headin
       });
       return next;
     });
+    setRetired((n) => n + ids.length);
     setItems((prev) => prev.filter((x) => !drop.has(x)));
     setPos((p) => {
       const nextLen = items.filter((id) => !drop.has(id)).length;
@@ -237,64 +242,22 @@ export default function PracticeFlashcards({ terms, onUpdateTerm, onDone, headin
   }
 
   return (
-    <div className="flex-1 flex flex-col px-5 pt-4">
-      <p className="text-xs text-muted-foreground mb-3">
-        {reviewing ? 'Practice your wording' : heading} · {pos + 1}/{items.length}
-      </p>
-      <div className="flex-1 flex flex-col items-center">
-        <button
-          type="button"
-          onClick={() => setRevealed(true)}
-          className="w-full max-w-md rounded-3xl border border-border bg-card p-8 shadow-sm text-center min-h-[260px] flex flex-col items-center justify-center"
-        >
-          <p className="text-[11px] uppercase tracking-wide text-muted-foreground mb-3">
-            {revealed ? 'Definition' : 'Term'}
-          </p>
-          <p className="text-3xl font-bold tracking-tight">{current.term}</p>
-          {revealed ? (
-            <p className="mt-5 text-lg text-muted-foreground leading-relaxed">{flashcardDef(current)}</p>
-          ) : (
-            <p className="mt-5 text-xs text-muted-foreground">
-              {computer ? 'Press space to flip it.' : 'Tap the card to flip it.'}
-            </p>
-          )}
-        </button>
-
-        <div className="w-full max-w-md mt-4">
-          {!revealed ? (
-            <Button
-              onClick={() => setRevealed(true)}
-              aria-keyshortcuts="Space"
-              className="w-full h-12 rounded-2xl font-semibold"
-            >
-              <Eye className="w-4 h-4 mr-2" /> Flip card
-              {computer && <ShortcutKey>Space</ShortcutKey>}
-            </Button>
-          ) : (
-            <div className="grid grid-cols-2 gap-3">
-              <Button
-                onClick={onMiss}
-                variant="destructive"
-                aria-keyshortcuts="ArrowLeft"
-                className="h-12 rounded-2xl font-semibold"
-              >
-                <X className="w-4 h-4 mr-2" /> Needs work
-                {computer && <ShortcutKey>←</ShortcutKey>}
-              </Button>
-              <Button
-                onClick={() => retireIds([current.id])}
-                variant="success"
-                aria-keyshortcuts="ArrowRight"
-                className="h-12 rounded-2xl font-semibold"
-              >
-                <Check className="w-4 h-4 mr-2" /> Got it
-                {computer && <ShortcutKey>→</ShortcutKey>}
-              </Button>
-            </div>
-          )}
-        </div>
-        {defModeButton}
-      </div>
-    </div>
+    <FlashCardStage
+      done={retired}
+      total={deckTotalRef.current}
+      caption={cardProgressCaption(deckTotalRef.current, retired)}
+      label={reviewing ? 'Practice your wording' : heading}
+      prompt={current.term}
+      revealed={revealed}
+      answer={flashcardDef(current)}
+      onReveal={() => setRevealed(true)}
+      onMiss={onMiss}
+      onKnow={() => retireIds([current.id])}
+      footer={`${retired} retired · ${items.length} in rotation`}
+      below={defModeButton}
+      revealExtra={computer ? <ShortcutKey>Space</ShortcutKey> : null}
+      missExtra={computer ? <ShortcutKey>←</ShortcutKey> : null}
+      knowExtra={computer ? <ShortcutKey>→</ShortcutKey> : null}
+    />
   );
 }

@@ -2,6 +2,7 @@ import React from 'react';
 import { ArrowLeft, ArrowRight } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
+import { invokeLlm } from '@/api/invokeLlm';
 import { cn } from '@/lib/utils';
 
 export const STUCK_AFTER_ROTATIONS = 3;
@@ -104,6 +105,44 @@ export function writtenDefsFrom(entries) {
   return { ids, defs };
 }
 
+function spoken(definition) {
+  const def = String(definition || '').trim().replace(/\s+/g, ' ');
+  if (!def) return '';
+  return /[.!?]$/.test(def) ? def : `${def}.`;
+}
+
+function localHelp(kind, term, definition) {
+  const name = String(term || '').trim() || 'This term';
+  const def = spoken(definition);
+  if (kind === 'example') {
+    if (!def) return `Picture a real moment where ${name} shows up, and describe that scene.`;
+    const body = def.charAt(0).toLowerCase() + def.slice(1).replace(/[.!?]$/, '');
+    return `For example, ${name} is what is going on when ${body}.`;
+  }
+  if (!def) return `${name} is the idea on this card. Say what it does in your own words.`;
+  return `${name} means ${def.charAt(0).toLowerCase()}${def.slice(1)}`;
+}
+
+function helpText(res) {
+  if (res && typeof res === 'object') {
+    const nested = res.text || res.explanation || res.example || res.result;
+    if (typeof nested === 'string' && nested.trim()) return nested.trim();
+  }
+  const raw = typeof res === 'string' ? res.trim() : '';
+  if (!raw) return '';
+  const start = raw.indexOf('{');
+  const end = raw.lastIndexOf('}');
+  if (start >= 0 && end > start) {
+    try {
+      const obj = JSON.parse(raw.slice(start, end + 1));
+      if (obj && typeof obj.text === 'string' && obj.text.trim()) return obj.text.trim();
+    } catch {
+      // The reply is plain text, not JSON.
+    }
+  }
+  return raw.replace(/^["'\s]+|["'\s]+$/g, '').trim();
+}
+
 export function writtenReviewPlan(entries, fallbackCards, currentQueue = []) {
   const { ids, defs } = writtenDefsFrom(entries);
   const written = [...new Set(ids.length ? ids : (fallbackCards || []).map((c) => c.id).filter(Boolean))];
@@ -127,6 +166,8 @@ export default function WriteOwnDef({
   const [peeking, setPeeking] = React.useState(false);
   const [picked, setPicked] = React.useState(() => new Set((initialCards || []).map((c) => c.id)));
   const [drafts, setDrafts] = React.useState({});
+  const [helps, setHelps] = React.useState({});
+  const [helping, setHelping] = React.useState(null);
   const writtenRef = React.useRef([]);
   const [fitRef, frame] = useFitAboveKeyboard(step, typing);
   const fitStyle = frame.height ? { height: frame.height } : undefined;
@@ -176,6 +217,43 @@ export default function WriteOwnDef({
     if (idx <= 0) return;
     resetCardView();
     setIdx((i) => i - 1);
+  };
+
+  const askHelp = async (kind) => {
+    if (!current?.id || helping) return;
+    const id = current.id;
+    const term = current.term;
+    const definition = current.definition;
+    setHelping(kind);
+    const prompt = kind === 'example'
+      ? `Give one concrete everyday example of the term "${term}" in one or two sentences. ` +
+        `A student is about to write their own definition and needs the idea in use, not a definition to copy. ` +
+        (definition ? `Use this meaning only as a guide, and do not restate it: "${definition}". ` : '') +
+        `No heading. Return JSON { "text": "..." }.`
+      : `Explain the term "${term}" in two short sentences of plain language. ` +
+        `A student is about to write their own definition. Help them understand it without handing them a sentence to copy. ` +
+        (definition ? `Use this meaning only as a guide, and do not restate it: "${definition}". ` : '') +
+        `No heading. Return JSON { "text": "..." }.`;
+    let text = '';
+    try {
+      const res = await invokeLlm({
+        prompt,
+        feature: 'explain',
+        response_json_schema: {
+          type: 'object',
+          properties: { text: { type: 'string' } },
+          required: ['text'],
+        },
+      });
+      text = helpText(res);
+    } catch {
+      text = '';
+    }
+    setHelps((prev) => ({
+      ...prev,
+      [id]: { ...(prev[id] || {}), [kind]: text || localHelp(kind, term, definition) },
+    }));
+    setHelping(null);
   };
 
   const beginPeek = (e) => {
@@ -344,6 +422,46 @@ export default function WriteOwnDef({
             </div>
           )}
         </div>
+        {current?.id && (helps[current.id]?.explain || helps[current.id]?.example) && (
+          <div className={cn('mt-2 shrink-0 space-y-2 overflow-y-auto', frame.keyboard ? 'max-h-16' : 'max-h-32')}>
+            {helps[current.id]?.explain && (
+              <div className="rounded-2xl border border-border bg-muted/40 px-3 py-2.5">
+                <p className="text-[11px] uppercase tracking-wide text-muted-foreground mb-1">Explanation</p>
+                <p className="text-sm leading-relaxed">{helps[current.id].explain}</p>
+              </div>
+            )}
+            {helps[current.id]?.example && (
+              <div className="rounded-2xl border border-border bg-muted/40 px-3 py-2.5">
+                <p className="text-[11px] uppercase tracking-wide text-muted-foreground mb-1">Example</p>
+                <p className="text-sm leading-relaxed">{helps[current.id].example}</p>
+              </div>
+            )}
+          </div>
+        )}
+        {current?.id && (!helps[current.id]?.explain || !helps[current.id]?.example) && (
+          <div className="mt-2 shrink-0 flex flex-wrap items-center gap-x-4 gap-y-1">
+            {!helps[current.id]?.explain && (
+              <button
+                type="button"
+                onClick={() => askHelp('explain')}
+                disabled={!!helping}
+                className="text-sm text-muted-foreground hover:text-foreground underline-offset-4 hover:underline disabled:opacity-60"
+              >
+                {helping === 'explain' ? 'Explaining…' : 'Explain the term'}
+              </button>
+            )}
+            {!helps[current.id]?.example && (
+              <button
+                type="button"
+                onClick={() => askHelp('example')}
+                disabled={!!helping}
+                className="text-sm text-muted-foreground hover:text-foreground underline-offset-4 hover:underline disabled:opacity-60"
+              >
+                {helping === 'example' ? 'Thinking…' : 'Give an example'}
+              </button>
+            )}
+          </div>
+        )}
         <div className="mt-3 shrink-0">
           {typing ? (
             <Textarea

@@ -17,7 +17,7 @@ const MODES = [
   {
     id: 'flashcards',
     title: 'Flashcards',
-    sub: 'Flip a term, then mark got it or needs work.',
+    sub: 'Reveal the definition, then mark missed or got it.',
     icon: BookOpen,
   },
   {

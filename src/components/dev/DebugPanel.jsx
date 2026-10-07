@@ -39,6 +39,20 @@ const SESSION_ROWS = [
   { key: 'stopTime', label: 'Stop time' },
 ];
 
+function SittingLogSection() {
+  const [Panel, setPanel] = React.useState(null);
+  React.useEffect(() => {
+    if (import.meta.env.DEV !== true) return undefined;
+    let live = true;
+    import('./SpacedMetricsPanel.jsx').then((mod) => {
+      if (live) setPanel(() => mod.default);
+    });
+    return () => { live = false; };
+  }, []);
+  if (import.meta.env.DEV !== true || !Panel) return null;
+  return <Panel />;
+}
+
 const TERM_COLS = [
   ['term', 'Term'],
   ['tier', 'Tier'],
@@ -87,6 +101,25 @@ export default function DebugPanel() {
   if (!dbg || pathname === '/dev/video') return null;
 
   const { enabled, setEnabled, isOpen, setOpen, snapshot, events, clockOffset, clockAt, setClockAt, bumpClock, resetClock, clearEvents } = dbg;
+
+  const seedSample = async (count) => {
+    if (import.meta.env.DEV !== true) return;
+    const { loadDevSampleSession } = await import('@/lib/devSampleSession');
+    const session = await loadDevSampleSession(count);
+    if (!session) return;
+    setOpen(false);
+    window.location.hash = '#/spaced-cram';
+    window.location.reload();
+  };
+
+  const exitSample = async () => {
+    if (import.meta.env.DEV !== true) return;
+    const { exitDevSampleSession } = await import('@/lib/devSampleSession');
+    const plan = await exitDevSampleSession();
+    if (!plan) return;
+    setOpen(false);
+    navigate(plan.path);
+  };
 
   const toggleSort = (key) => {
     if (sortKey === key) setSortDir((d) => (d === 'asc' ? 'desc' : 'asc'));
@@ -142,6 +175,36 @@ export default function DebugPanel() {
             </div>
 
             <div className="flex-1 overflow-y-auto p-4 space-y-5 text-sm">
+              {import.meta.env.DEV && (
+                <section>
+                  <h3 className="text-xs font-bold uppercase tracking-wide text-slate-500 mb-2">Load sample session</h3>
+                  <div className="flex flex-wrap gap-2">
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={() => seedSample(12)}
+                    >
+                      12 terms
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={() => seedSample(60)}
+                    >
+                      60 terms
+                    </Button>
+                    <Button size="sm" variant="ghost" onClick={exitSample}>
+                      Exit sample
+                    </Button>
+                  </div>
+                  <p className="text-[11px] text-slate-400 mt-2">
+                    Opens Spaced Cram with a short-answer sample and no account. Exit sample returns to the account that was active before.
+                  </p>
+                </section>
+              )}
+
+              {import.meta.env.DEV && <SittingLogSection />}
+
               <section>
                 <h3 className="text-xs font-bold uppercase tracking-wide text-slate-500 mb-2">Video test</h3>
                 <Button

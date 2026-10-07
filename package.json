@@ -10,7 +10,7 @@
     "lint:fix": "eslint . --fix",
     "typecheck": "tsc -p ./jsconfig.json",
     "preview": "vite preview",
-    "test": "node --import ./test/register-alias.mjs --test src/lib/spacedCram.test.js",
+    "test": "node --import ./test/register-alias.mjs --test src/lib/spacedCram.test.js test/site-plans.test.js",
     "worker:dev": "node scripts/assemble-web.mjs || mkdir -p web-dist; npm run start --prefix worker",
     "worker:deploy": "npm run build && node scripts/assemble-web.mjs && npm run deploy --prefix worker",
     "ios:sync": "npm run build && npx cap sync ios",
@@ -19,6 +19,7 @@
   "dependencies": {
     "@capacitor-firebase/authentication": "^8.5.1",
     "@capacitor/cli": "^8.5.1",
+    "@capacitor/browser": "^8.0.5",
     "@capacitor/core": "^8.5.1",
         "@capacitor/ios": "^8.5.1",
         "@capacitor/local-notifications": "^8.3.1",

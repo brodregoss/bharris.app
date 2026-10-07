@@ -64,15 +64,6 @@ function promoTrialDays(env, code) {
   return days;
 }
 
-async function promoAlreadyUsed(env, customerId) {
-  if (!customerId) return false;
-  const list = await stripeRequest(
-    env,
-    `/subscriptions?customer=${encodeURIComponent(customerId)}&status=all&limit=100`,
-  );
-  return (list.data || []).some((subscription) => subscription?.metadata?.promo === 'beta');
-}
-
 function unixToIso(value) {
   const seconds = Number(value);
   if (!Number.isFinite(seconds) || seconds <= 0) return '';
@@ -230,24 +221,38 @@ export async function handleCheckout(request, env, identity) {
     const body = await readJson(request);
     const plan = body.plan === 'partner' ? 'partner' : body.plan === 'solo' ? 'solo' : '';
     if (!plan) return errorJson('Choose a plan.', 400);
-    const price = priceForPlan(env, plan);
     const trialDays = promoTrialDays(env, body.code);
-    if (!env.STRIPE_SECRET_KEY || !price) return errorJson('Subscriptions are not available yet.', 503);
     const row = await upsertUser(env, identity);
     if (row?.billing_plan === 'solo' || row?.billing_plan === 'partner') {
       if (row.billing_plan === plan) return errorJson('You already have this plan.', 409);
-      return errorJson('Cancel the current plan on this page before switching.', 409);
+      return errorJson('Cancel the current plan before switching.', 409);
     }
-    if (trialDays && await promoAlreadyUsed(env, row?.stripe_customer_id)) {
-      return errorJson('That code was already used on this account.', 409);
+    if (trialDays) {
+      const trialEnd = new Date(Date.now() + trialDays * 86400000).toISOString();
+      await grantWebPlan(env, identity.uid, {
+        plan,
+        customerId: row?.stripe_customer_id || '',
+        subscriptionId: '',
+        schedule: {
+          stripeStatus: 'trialing',
+          stripeTrialEnd: trialEnd,
+          stripePeriodEnd: trialEnd,
+          stripeCancelAtPeriodEnd: 0,
+          stripePromo: 'beta',
+        },
+      });
+      const fresh = await getUserRow(env, identity.uid);
+      return json({ granted: true, trialDays, user: await toPublicUser(env, fresh) });
     }
+    const price = priceForPlan(env, plan);
+    if (!env.STRIPE_SECRET_KEY || !price) return errorJson('Subscriptions are not available yet.', 503);
     const origin = siteOrigin(request, env);
     const fields = {
       mode: 'subscription',
       customer: row?.stripe_customer_id || '',
       customer_email: row?.stripe_customer_id ? '' : identity.email || '',
       client_reference_id: identity.uid,
-      success_url: `${origin}/thanks/`,
+      success_url: plan === 'partner' ? `${origin}/thanks/?plan=partner` : `${origin}/thanks/`,
       cancel_url: `${origin}/plans/`,
       'line_items[0][price]': price,
       'line_items[0][quantity]': '1',
@@ -256,14 +261,7 @@ export async function handleCheckout(request, env, identity) {
       'subscription_data[metadata][firebase_uid]': identity.uid,
       'subscription_data[metadata][plan]': plan,
     };
-    if (trialDays) {
-      fields.payment_method_collection = 'if_required';
-      fields['subscription_data[trial_period_days]'] = String(trialDays);
-      fields['subscription_data[trial_settings][end_behavior][missing_payment_method]'] = 'cancel';
-      fields['subscription_data[metadata][promo]'] = 'beta';
-    } else {
-      fields.payment_method_collection = 'always';
-    }
+    fields.payment_method_collection = 'always';
     const session = await stripeRequest(env, '/checkout/sessions', {
       method: 'POST',
       fields,
@@ -275,13 +273,67 @@ export async function handleCheckout(request, env, identity) {
   }
 }
 
+function subscriptionSearchQuery(uid) {
+  if (!/^[A-Za-z0-9_-]+$/.test(String(uid || ''))) return '';
+  return `metadata['firebase_uid']:'${uid}'`;
+}
+
+function newestPaidSubscription(list) {
+  return (list || [])
+    .filter((subscription) => PAID_STATUSES.has(subscription?.status))
+    .sort((a, b) => Number(b.created || 0) - Number(a.created || 0))[0] || null;
+}
+
+async function findPaidSubscription(env, uid) {
+  const query = subscriptionSearchQuery(uid);
+  if (!query || !env.STRIPE_SECRET_KEY) return null;
+  const list = await stripeRequest(env, `/subscriptions/search?query=${encodeURIComponent(query)}&limit=10`);
+  return newestPaidSubscription(list.data);
+}
+
+async function withTimeout(promise, ms = 4000) {
+  let timer;
+  try {
+    return await Promise.race([
+      promise,
+      new Promise((_, reject) => {
+        timer = setTimeout(() => reject(new Error('Billing refresh timed out')), ms);
+      }),
+    ]);
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+async function expireBetaTrial(env, row) {
+  if (!row || row.stripe_promo !== 'beta') return row;
+  if (row.billing_plan !== 'solo' && row.billing_plan !== 'partner') return row;
+  if (row.stripe_subscription_id) return row;
+  const end = new Date(row.stripe_trial_end || '');
+  if (Number.isNaN(end.getTime()) || end.getTime() > Date.now()) return row;
+  await revokeWebPlan(env, row.firebase_uid, { notice: 'beta_ended' });
+  return getUserRow(env, row.firebase_uid);
+}
+
+export async function billingForRequest(env, ctx, row) {
+  if (!row) return row;
+  row = await expireBetaTrial(env, row);
+  const known = !!(row.billing_plan || row.stripe_subscription_id || row.subscription_tier === 'pro');
+  if (!known) return (await refreshBillingSchedule(env, row.firebase_uid)) || row;
+  const job = refreshBillingSchedule(env, row.firebase_uid).catch(() => {});
+  if (ctx && typeof ctx.waitUntil === 'function') ctx.waitUntil(job);
+  return row;
+}
+
 export async function refreshBillingSchedule(env, uid) {
   const row = await getUserRow(env, uid);
   if (!row) return null;
   if (row.billing_plan === 'guest' && row.partner_owner_uid) {
     await refreshBillingSchedule(env, row.partner_owner_uid);
+    const freshGuest = await getUserRow(env, uid);
+    if (!freshGuest || freshGuest.billing_plan !== 'guest') return freshGuest;
     const owner = await getUserRow(env, row.partner_owner_uid);
-    if (owner) {
+    if (owner?.billing_plan === 'partner') {
       await updateUserBilling(env, uid, {
         stripeStatus: owner.stripe_status || '',
         stripeTrialEnd: owner.stripe_trial_end || '',
@@ -292,12 +344,19 @@ export async function refreshBillingSchedule(env, uid) {
     }
     return getUserRow(env, uid);
   }
-  if (!row.stripe_subscription_id || !env.STRIPE_SECRET_KEY) return row;
+  if (!env.STRIPE_SECRET_KEY) return row;
   try {
-    const subscription = await stripeRequest(env, `/subscriptions/${row.stripe_subscription_id}`);
-    await syncSubscription(env, subscription);
+    if (row.stripe_subscription_id) {
+      const subscription = await withTimeout(
+        stripeRequest(env, `/subscriptions/${row.stripe_subscription_id}`),
+      );
+      await syncSubscription(env, subscription);
+    } else if (!row.billing_plan) {
+      const subscription = await withTimeout(findPaidSubscription(env, uid));
+      if (subscription) await syncSubscription(env, subscription);
+    }
   } catch {
-    return row;
+    return getUserRow(env, uid);
   }
   return getUserRow(env, uid);
 }
@@ -305,9 +364,18 @@ export async function refreshBillingSchedule(env, uid) {
 export async function handleCancel(env, identity) {
   try {
     const row = await getUserRow(env, identity.uid);
-    if (!row?.stripe_subscription_id || (row.billing_plan !== 'solo' && row.billing_plan !== 'partner')) {
+    if (row?.billing_plan !== 'solo' && row?.billing_plan !== 'partner') {
       return errorJson('No website plan to cancel.', 404);
     }
+    if (row.stripe_promo === 'beta') {
+      if (row.stripe_subscription_id) {
+        await cancelStripeSubscription(env, row.stripe_subscription_id).catch(() => {});
+      }
+      await revokeWebPlan(env, identity.uid, { subscriptionId: row.stripe_subscription_id || '' });
+      const fresh = await getUserRow(env, identity.uid);
+      return json({ user: await toPublicUser(env, fresh) });
+    }
+    if (!row.stripe_subscription_id) return errorJson('No website plan to cancel.', 404);
     if (Number(row.stripe_cancel_at_period_end) === 1) {
       return json({ user: await toPublicUser(env, row) });
     }
@@ -332,7 +400,7 @@ export async function handlePortal(request, env, identity) {
       method: 'POST',
       fields: {
         customer: row.stripe_customer_id,
-        return_url: `${origin}/plans/`,
+        return_url: `${origin}/account/`,
       },
     });
     if (!session.url) return errorJson('Could not open billing.', 502);

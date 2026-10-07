@@ -1,4 +1,4 @@
-import { priority } from '@/lib/studyUtils';
+import { normalizeExamType, priority } from '@/lib/studyUtils';
 
 export const SITTING_RETIRE_THRESHOLD = 1;
 
@@ -40,6 +40,10 @@ const LONG_WAKE_GAP_MS = 3 * 60 * MIN_MS;
 const LIGHT_CARDS = 8;
 const LAST_LOOK_CARDS = 10;
 const CARD_SECONDS = 22;
+const MC_TERM_SECONDS = 12;
+const MC_DEF_SECONDS = 18;
+const MIN_MC_DECK = 8;
+const MIN_MC_OPTIONS = 3;
 const LARGE_DECK = 50;
 const ABSENCE_MS = 12 * 60 * MIN_MS;
 const OVERDUE_REBUILD_MS = 30 * MIN_MS;
@@ -50,7 +54,9 @@ const CLOCK_KEY = 'lms_spaced_clock';
 export const AHEAD_LINE = "Nothing needed here. You're ahead of plan.";
 export const WAIT_WHY = 'Your memory needs this gap to stick';
 export const START_EARLY_LINE = "Fine to start early. It'll feel easier than it really is.";
+export const TEST_FORMAT_LINE = "Added practice in your test's format.";
 export const SLIP_LINE = 'Some slipping overnight is normal. This pass is what fixes it.';
+export const RECOGNIZED_LINE = 'Recognized, one recall to lock it in';
 export const WEB_REMINDER_NOTE = 'Only works while this tab is open';
 
 // Full shapes. generatePlan trims these for deck size, then drops anything
@@ -634,6 +640,7 @@ export function generatePlan({
   terms = [],
   lastFinishedAt = 0,
   coreOnly = false,
+  testType = 'mixed',
 } = {}) {
   const list = migrateStudyTerms(terms);
   const exam = typeof examTime === 'number' ? examTime : Number(examTime);
@@ -664,6 +671,7 @@ export function generatePlan({
     foldNote: foldNoteFor(sittings),
     examAt: exam,
     termCount,
+    testType: normalizeExamType(testType),
   };
 }
 
@@ -982,6 +990,7 @@ export function buildSpacedSchedule({
   lastFinishedAt,
   sittings,
   coreOnly = false,
+  testType = 'mixed',
 } = {}) {
   const list = migrateStudyTerms(terms).sort(byPriority);
   const split = splitCorePlan(list);
@@ -993,6 +1002,7 @@ export function buildSpacedSchedule({
         summaryLine: summaryLineFor(sittings.length, list.length),
         whyLine: whyLineFor(sittings),
         foldNote: foldNoteFor(sittings),
+        testType: normalizeExamType(testType),
       }
     : generatePlan({
         now: now || Date.now(),
@@ -1002,6 +1012,7 @@ export function buildSpacedSchedule({
         terms: list,
         lastFinishedAt,
         coreOnly: !!coreOnly,
+        testType,
       });
   const coreList = split.large ? list.filter((t) => split.coreIds.includes(t.id)) : list;
   const bonusList = split.large && !coreOnly
@@ -1025,6 +1036,7 @@ export function buildSpacedSchedule({
     summaryLine: plan.summaryLine,
     whyLine: plan.whyLine,
     foldNote: plan.foldNote || '',
+    testType: normalizeExamType(testType),
     large: split.large,
     coreIds: split.coreIds,
     bonusIds: split.bonusIds,
@@ -1371,6 +1383,216 @@ export function learnedChunkTerms(schedule, throughIndex) {
   return out;
 }
 
+export function freeRecallRatio(testType) {
+  const type = normalizeExamType(testType);
+  if (type === 'short_answer') return 0.3;
+  if (type === 'mixed') return 0.2;
+  return 0;
+}
+
+export function freeRecallCount(length, testType) {
+  const cards = Math.max(0, Number(length) || 0);
+  if (!cards) return 0;
+  const type = normalizeExamType(testType);
+  let count = Math.round(cards * freeRecallRatio(type));
+  if (type === 'short_answer' && cards >= 5) count = Math.max(count, 2);
+  return Math.min(cards, count);
+}
+
+export function firstReviewSittingId(sittings) {
+  const list = (Array.isArray(sittings) ? sittings : [])
+    .filter((s) => s && s.type !== SESSION_TYPE.NEW)
+    .sort((a, b) => (Number(a.sitting) || 0) - (Number(b.sitting) || 0));
+  return list[0]?.sitting ?? null;
+}
+
+function emptyModeIds() {
+  return { freeIds: [], mcIds: [], mcTermIds: [], mcDefIds: [] };
+}
+
+function mcEvidenceRank(a, b) {
+  return (Number(a?.srs?.solidStreak) || 0) - (Number(b?.srs?.solidStreak) || 0);
+}
+
+export function mixHostIds(sittings) {
+  const list = Array.isArray(sittings) ? sittings : [];
+  const morning = [...list].reverse().find((s) => s?.role === 'morning');
+  const morningDay = morning && Number.isFinite(morning.at) ? calendarDayIndex(morning.at) : null;
+  const ids = [];
+  const lastBed = [...list].reverse().find((s) => s?.role === 'before_bed');
+  if (lastBed) ids.push(lastBed.sitting);
+  list.forEach((s) => {
+    if (!s || s.role === 'morning' || s.type === SESSION_TYPE.NEW) return;
+    if (s.sitting === lastBed?.sitting) return;
+    const examMorning = morningDay != null && Number.isFinite(s.at) && calendarDayIndex(s.at) === morningDay;
+    if ((s.role === 'wake' || s.role === 'wake_light') && examMorning) ids.push(s.sitting);
+  });
+  return ids;
+}
+
+export function cardModeIds(queue, sitting, testType, sittings, deckCount = 0, deck = null) {
+  const cards = Array.isArray(queue) ? queue : [];
+  if (!cards.length || !sitting) return emptyModeIds();
+  if (sitting.role === 'morning' || sitting.type === SESSION_TYPE.NEW) return emptyModeIds();
+  if (sitting.type === SESSION_TYPE.FREE) {
+    return { freeIds: cards.map((t) => t.id), mcIds: [], mcTermIds: [], mcDefIds: [] };
+  }
+  const type = normalizeExamType(testType);
+  const ids = cards.map((t) => t.id);
+  if (type === 'short_answer') {
+    if (!mixHostIds(sittings).includes(sitting.sitting)) return emptyModeIds();
+    const count = freeRecallCount(cards.length, type);
+    return { freeIds: ids.slice(ids.length - count), mcIds: [], mcTermIds: [], mcDefIds: [] };
+  }
+  if (sitting.sitting === firstReviewSittingId(sittings)) return emptyModeIds();
+  const freeCount = type === 'mixed' ? freeRecallCount(cards.length, type) : 0;
+  const freeIds = ids.slice(ids.length - freeCount);
+  const freeSet = new Set(freeIds);
+  const deckSize = Number(deckCount) || 0;
+  if (deckSize < MIN_MC_DECK) return { freeIds, mcIds: [], mcTermIds: [], mcDefIds: [] };
+  const pool = Array.isArray(deck) && deck.length ? deck : cards;
+  const share = type === 'mcq' ? 0.4 : 0.2;
+  const target = Math.round(cards.length * share);
+  const eligible = cards
+    .filter((t) => t?.srs?.introduced && !freeSet.has(t.id) && !termIsLocked(t) && termPile(t) !== 'solid')
+    .slice()
+    .sort(mcEvidenceRank);
+  const chosen = [];
+  eligible.forEach((t) => {
+    if (chosen.length >= target) return;
+    const preferred = chosen.length % 2 === 0 ? 'term' : 'def';
+    const built = buildMcCard(pool, t, preferred) || buildMcCard(pool, t, preferred === 'term' ? 'def' : 'term');
+    if (!built) return;
+    chosen.push({ id: t.id, direction: built.direction });
+  });
+  return {
+    freeIds,
+    mcIds: chosen.map((c) => c.id),
+    mcTermIds: chosen.filter((c) => c.direction === 'term').map((c) => c.id),
+    mcDefIds: chosen.filter((c) => c.direction === 'def').map((c) => c.id),
+  };
+}
+
+export function freeRecallIds(queue, sitting, testType, sittings, deckCount) {
+  return cardModeIds(queue, sitting, testType, sittings, deckCount).freeIds;
+}
+
+function termText(value) {
+  return String(value || '').trim().toLowerCase();
+}
+
+function termSimilarity(a, b) {
+  const left = termText(a);
+  const right = termText(b);
+  let i = 0;
+  while (i < left.length && i < right.length && left[i] === right[i]) i += 1;
+  return i;
+}
+
+export function pickMcDistractors(deck, correct, n = 3, direction = 'term') {
+  const field = direction === 'def' ? 'definition' : 'term';
+  const correctOption = termText(correct?.[field]);
+  const correctTerm = termText(correct?.term);
+  const correctDef = termText(correct?.definition);
+  if (!correctOption) return [];
+  const deps = new Set(correct?.depends_on || []);
+  const ranked = (Array.isArray(deck) ? deck : []).filter((t) => {
+    if (!t || t.id === correct?.id) return false;
+    const option = termText(t[field]);
+    const term = termText(t.term);
+    const def = termText(t.definition);
+    if (!option || option === correctOption) return false;
+    if (term && term === correctTerm) return false;
+    if (correctDef && def === correctDef) return false;
+    return true;
+  }).sort((a, b) => {
+    const score = (t) => {
+      let s = 0;
+      if (correct?.tier && t.tier === correct.tier) s += 4;
+      if (correct?.category && t.category && t.category === correct.category) s += 4;
+      if ((t.depends_on || []).some((d) => deps.has(d))) s += 3;
+      s += Math.min(3, termSimilarity(correct?.term, t.term));
+      return s;
+    };
+    return score(b) - score(a) || termText(a.term).localeCompare(termText(b.term));
+  });
+  const seen = new Set([correctOption]);
+  const out = [];
+  ranked.forEach((t) => {
+    if (out.length >= n) return;
+    const key = termText(t[field]);
+    if (seen.has(key)) return;
+    seen.add(key);
+    out.push(String(t[field]).trim());
+  });
+  return out;
+}
+
+export function buildMcCard(deck, correct, direction = 'term') {
+  const field = direction === 'def' ? 'definition' : 'term';
+  const answer = String(correct?.[field] || '').trim();
+  if (!answer) return null;
+  const distractors = pickMcDistractors(deck, correct, 3, direction);
+  const options = [answer, ...distractors];
+  if (options.length < MIN_MC_OPTIONS) return null;
+  return { direction: direction === 'def' ? 'def' : 'term', answer, options };
+}
+
+export function interleaveMc(ids, mcIds) {
+  const wanted = new Set(mcIds || []);
+  const flash = [];
+  const choice = [];
+  (Array.isArray(ids) ? ids : []).forEach((id) => {
+    if (wanted.has(id)) choice.push(id);
+    else flash.push(id);
+  });
+  if (!choice.length) return [...(Array.isArray(ids) ? ids : [])];
+  if (!flash.length) return choice;
+  const total = flash.length + choice.length;
+  const stride = total / choice.length;
+  const out = new Array(total);
+  const used = new Set();
+  choice.forEach((id, i) => {
+    let at = Math.min(total - 1, Math.round((i + 0.5) * stride));
+    while (used.has(at) && at > 0) at -= 1;
+    while (used.has(at) && at < total) at += 1;
+    out[at] = id;
+    used.add(at);
+  });
+  let fi = 0;
+  for (let i = 0; i < total; i += 1) {
+    if (!out[i]) out[i] = flash[fi++];
+  }
+  return out;
+}
+
+export function orderSittingQueue(ids, { freeIds = [], mcIds = [] } = {}) {
+  const free = new Set(freeIds || []);
+  const list = Array.isArray(ids) ? ids : [];
+  const freeOrder = list.filter((id) => free.has(id));
+  const drill = list.filter((id) => !free.has(id));
+  return [...interleaveMc(drill, mcIds), ...freeOrder];
+}
+
+function withModeIds(built, sitting, spaced, schedule, terms) {
+  const queue = built?.queue || [];
+  const deckCount = Number(schedule?.termCount) || (Array.isArray(terms) ? terms.length : 0);
+  if (spaced?.resumeIds?.length && sitting && (!spaced.resumeSitting || sitting.sitting === spaced.resumeSitting)) {
+    const ids = new Set(queue.map((t) => t.id));
+    return {
+      ...built,
+      freeIds: (spaced.freeIds || []).filter((id) => ids.has(id)),
+      mcIds: (spaced.mcIds || []).filter((id) => ids.has(id)),
+      mcTermIds: (spaced.mcTermIds || []).filter((id) => ids.has(id)),
+      mcDefIds: (spaced.mcDefIds || []).filter((id) => ids.has(id)),
+    };
+  }
+  return {
+    ...built,
+    ...cardModeIds(queue, sitting, schedule?.testType, schedule?.sittings, deckCount, terms),
+  };
+}
+
 function queueOptions(terms, spaced, schedule) {
   const split = Array.isArray(schedule?.coreIds)
     ? { large: !!schedule.large, coreIds: schedule.coreIds, bonusIds: schedule.bonusIds || [] }
@@ -1385,7 +1607,7 @@ function queueOptions(terms, spaced, schedule) {
   };
 }
 
-export function describeSittingQueue(terms, spaced, schedule) {
+function buildSittingQueue(terms, spaced, schedule) {
   if (spaced?.lastLook) {
     return { queue: lastLookQueue(terms), leftoverIds: [], skipCount: 0, skipLine: '' };
   }
@@ -1425,6 +1647,13 @@ export function describeSittingQueue(terms, spaced, schedule) {
   return describeReviewQueue(terms, sitting, schedule?.hours, queueOptions(terms, spaced, schedule));
 }
 
+export function describeSittingQueue(terms, spaced, schedule) {
+  const built = buildSittingQueue(terms, spaced, schedule);
+  if (spaced?.lastLook || spaced?.bonusRun) return { ...built, freeIds: [], mcIds: [] };
+  const sitting = sittingByIndex(schedule, spaced?.sittingIndex || 1);
+  return withModeIds(built, sitting, spaced, schedule, terms);
+}
+
 export function planSittingQueue(terms, spaced, schedule) {
   return describeSittingQueue(terms, spaced, schedule).queue;
 }
@@ -1440,12 +1669,14 @@ export function sittingEndedShaky({ missCount = 0, lastGrade } = {}) {
   return (Number(missCount) || 0) >= 2 || lastGrade === 'miss';
 }
 
-export function recordAttempt(bucket, id, result) {
-  const prev = (bucket && bucket[id]) || { missCount: 0, lastGrade: null };
+export function recordAttempt(bucket, id, result, mode = 'flash') {
+  const prev = (bucket && bucket[id]) || { missCount: 0, lastGrade: null, mode: 'flash' };
   const miss = result !== 'got_it';
+  const nextMode = mode === 'free' || mode === 'mc' ? mode : 'flash';
   const next = {
     missCount: (Number(prev.missCount) || 0) + (miss ? 1 : 0),
-    lastGrade: miss ? 'miss' : 'hit',
+    lastGrade: miss ? 'miss' : (nextMode === 'mc' ? 'partial' : 'hit'),
+    mode: nextMode,
   };
   if (bucket) bucket[id] = next;
   return next;
@@ -1453,14 +1684,19 @@ export function recordAttempt(bucket, id, result) {
 
 function attemptFrom(value) {
   if (value && typeof value === 'object') {
+    const mode = value.mode === 'free' || value.mode === 'mc' ? value.mode : 'flash';
+    let lastGrade = 'miss';
+    if (value.lastGrade === 'hit') lastGrade = 'hit';
+    else if (value.lastGrade === 'partial') lastGrade = 'partial';
     return {
       missCount: Number(value.missCount) || 0,
-      lastGrade: value.lastGrade === 'hit' ? 'hit' : 'miss',
+      lastGrade,
+      mode,
     };
   }
   return value === 'got_it'
-    ? { missCount: 0, lastGrade: 'hit' }
-    : { missCount: 1, lastGrade: 'miss' };
+    ? { missCount: 0, lastGrade: 'hit', mode: 'flash' }
+    : { missCount: 1, lastGrade: 'miss', mode: 'flash' };
 }
 
 export function mergeAttemptGrades(terms, results) {
@@ -1468,11 +1704,11 @@ export function mergeAttemptGrades(terms, results) {
   return (Array.isArray(terms) ? terms : []).map((t) => {
     const attempt = map[t.id];
     if (attempt == null) return t;
-    const { missCount, lastGrade } = attemptFrom(attempt);
+    const { missCount, lastGrade, mode } = attemptFrom(attempt);
     return {
       ...t,
       seen: true,
-      srs: { ...emptySrs(), ...t.srs, missCount, lastGrade },
+      srs: { ...emptySrs(), ...t.srs, missCount, lastGrade, lastMode: mode },
     };
   });
 }
@@ -1482,7 +1718,7 @@ export function applyLastLookResults(terms, results) {
   return (Array.isArray(terms) ? terms : []).map((t) => {
     const attempt = map[t.id];
     if (attempt == null) return t;
-    const { lastGrade } = attemptFrom(attempt);
+    const { lastGrade, mode } = attemptFrom(attempt);
     return {
       ...t,
       seen: true,
@@ -1491,6 +1727,7 @@ export function applyLastLookResults(terms, results) {
         ...emptySrs(),
         ...t.srs,
         lastGrade,
+        lastMode: mode,
       },
     };
   });
@@ -1500,7 +1737,8 @@ export function unclearedIds(queue, results) {
   return (Array.isArray(queue) ? queue : []).filter((id) => {
     const attempt = results?.[id];
     if (!attempt) return true;
-    return attempt.lastGrade !== 'hit';
+    const grade = attemptFrom(attempt);
+    return grade.lastGrade !== 'hit' && grade.lastGrade !== 'partial';
   });
 }
 
@@ -1508,22 +1746,40 @@ export function pickupLine(left) {
   return `Picking up where you left off (${Math.max(0, Number(left) || 0)} left).`;
 }
 
-export function shakyDelta(before, after) {
-  return `Shaky: ${Number(before) || 0} -> ${Number(after) || 0}`;
+export function shakyDelta(before, after, recognized = 0) {
+  const n = Math.max(0, Number(recognized) || 0);
+  if (!n) return `Shaky: ${Number(before) || 0} -> ${Number(after) || 0}`;
+  return `${Number(after) || 0} still shaky, ${n} of them recognized (one recall locks them in)`;
+}
+
+export function hasTestFormatCards(modeIds, testType) {
+  const type = normalizeExamType(testType);
+  if (type === 'short_answer') return (modeIds?.freeIds || []).length > 0;
+  if (type === 'mcq' || type === 'mixed') return (modeIds?.mcIds || []).length > 0;
+  return false;
 }
 
 export function countLearned(terms) {
   return (Array.isArray(terms) ? terms : []).filter((t) => t?.srs?.introduced).length;
 }
 
-export function recapCopy({ sittingNumber = 1, learned = 0, shakyBefore = 0, shakyAfter = 0 } = {}) {
+export function recapCopy({ sittingNumber = 1, learned = 0, shakyBefore = 0, shakyAfter = 0, recognized = 0 } = {}) {
   if (Number(sittingNumber) <= 1) {
     return { text: `${Number(learned) || 0} learned, ${Number(shakyAfter) || 0} shaky`, slip: false };
   }
   if (Number(shakyAfter) > Number(shakyBefore)) {
     return { text: SLIP_LINE, slip: true };
   }
-  return { text: shakyDelta(shakyBefore, shakyAfter), slip: false };
+  return { text: shakyDelta(shakyBefore, shakyAfter, recognized), slip: false };
+}
+
+export function recognizedFromResults(results) {
+  const ids = [];
+  Object.entries(results && typeof results === 'object' ? results : {}).forEach(([id, attempt]) => {
+    const grade = attemptFrom(attempt);
+    if (grade.lastGrade === 'partial' && grade.mode === 'mc') ids.push(id);
+  });
+  return ids;
 }
 
 export function reminderMode({ native = false, canNotify = false } = {}) {
@@ -1544,6 +1800,16 @@ export function hitAttempts(results) {
   Object.entries(results).forEach(([id, attempt]) => {
     const grade = attemptFrom(attempt);
     if (grade.lastGrade === 'hit') out[id] = grade;
+  });
+  return out;
+}
+
+export function settledAttempts(results) {
+  const out = {};
+  if (!results || typeof results !== 'object') return out;
+  Object.entries(results).forEach(([id, attempt]) => {
+    const grade = attemptFrom(attempt);
+    if (grade.lastGrade === 'hit' || grade.lastGrade === 'partial') out[id] = grade;
   });
   return out;
 }
@@ -1604,11 +1870,23 @@ export function countdownLabel(due, now = Date.now()) {
   return `${mins}:${pad(secs)}`;
 }
 
-export function sittingEstimate(cardCount) {
+export function cardEstimateSeconds(mode) {
+  if (mode === 'mc_term') return MC_TERM_SECONDS;
+  if (mode === 'mc_def') return MC_DEF_SECONDS;
+  return CARD_SECONDS;
+}
+
+export function sittingEstimate(cardCount, { mcCards = 0, mcTermCards = 0, mcDefCards = 0 } = {}) {
   const cards = Math.max(0, Number(cardCount) || 0);
-  if (!cards) return { cards: 0, minutes: 0, line: '' };
-  const minutes = Math.max(1, Math.min(MAX_SITTING_MINUTES, Math.round((cards * CARD_SECONDS) / 60)));
-  return { cards, minutes, line: `~${minutes} min, ${cards} cards` };
+  if (!cards) return { cards: 0, minutes: 0, seconds: 0, line: '' };
+  let def = Math.max(0, Number(mcDefCards) || 0);
+  let term = Math.max(0, Number(mcTermCards) || 0);
+  if (!def && !term) term = Math.max(0, Number(mcCards) || 0);
+  def = Math.min(cards, def);
+  term = Math.min(Math.max(0, cards - def), term);
+  const seconds = (cards - term - def) * CARD_SECONDS + term * MC_TERM_SECONDS + def * MC_DEF_SECONDS;
+  const minutes = Math.max(1, Math.min(MAX_SITTING_MINUTES, Math.round(seconds / 60)));
+  return { cards, minutes, seconds, line: `~${minutes} min, ${cards} cards` };
 }
 
 export function applySittingResults(terms, results, context = {}) {
@@ -1617,8 +1895,27 @@ export function applySittingResults(terms, results, context = {}) {
   return (Array.isArray(terms) ? terms : []).map((t) => {
     const attempt = map[t.id];
     if (attempt == null) return t;
-    const { missCount, lastGrade } = attemptFrom(attempt);
-    const shaky = sittingEndedShaky({ missCount, lastGrade });
+    const grade = attemptFrom(attempt);
+    const { missCount, lastGrade, mode } = grade;
+    const shaky = sittingEndedShaky({ missCount, lastGrade: lastGrade === 'partial' ? 'hit' : lastGrade });
+    if (lastGrade === 'partial' && !shaky) {
+      return {
+        ...t,
+        seen: true,
+        pile: termPile(t) === 'solid' ? 'solid' : 'shaky',
+        srs: {
+          ...emptySrs(),
+          ...t.srs,
+          introduced: true,
+          lastGrade: 'partial',
+          lastMode: 'mc',
+          mcCredit: 0.5,
+          missCount: 0,
+          solidStreak: Number(t.srs?.solidStreak) || 0,
+          solidFinishes: finishList(t.srs?.solidFinishes),
+        },
+      };
+    }
     const prevStreak = Number(t.srs?.solidStreak) || 0;
     const prevFinishes = shaky ? [] : finishList(t.srs?.solidFinishes);
     const afterSleep = !shaky && prevFinishes.length
@@ -1634,6 +1931,8 @@ export function applySittingResults(terms, results, context = {}) {
         ...t.srs,
         introduced: true,
         lastGrade,
+        lastMode: mode,
+        mcCredit: 0,
         missCount: 0,
         solidStreak: shaky ? 0 : prevStreak + 1,
         solidFinishes,

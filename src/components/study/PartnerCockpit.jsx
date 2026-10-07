@@ -1,6 +1,6 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
-import { Flag, Home, RotateCcw } from 'lucide-react';
+import { Check, Flag, Home, RotateCcw, X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
   Dialog,
@@ -11,6 +11,7 @@ import {
 } from '@/components/ui/dialog';
 import { cn } from '@/lib/utils';
 import { flashcardDef } from '@/lib/studyUtils';
+import CardProgress, { cardProgressCaption } from '@/components/study/CardProgress';
 
 function useLandscape() {
   const [landscape, setLandscape] = React.useState(
@@ -170,6 +171,14 @@ export default function PartnerCockpit({
         </p>
       </div>
 
+      <div className="shrink-0 px-4 pt-3">
+        <CardProgress
+          done={coveredCount}
+          total={totalCount}
+          caption={cardProgressCaption(totalCount, coveredCount)}
+        />
+      </div>
+
       <div className="flex-1 flex flex-col min-h-0 overflow-hidden relative">
         {showRotate && (
           <div className="absolute inset-0 z-30 bg-background/95 flex flex-col items-center justify-center px-8 text-center">
@@ -194,34 +203,41 @@ export default function PartnerCockpit({
           <div className={cn('flex-1 flex flex-col min-h-0 overflow-hidden px-5', landscape ? 'py-2' : 'py-4')}>
             {current ? (
               <>
-                <div className="flex-1 min-h-0 overflow-y-auto overscroll-y-contain">
-                  <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground mb-1.5">
-                    Term
-                  </p>
-                  <div className="flex items-start gap-2">
-                    <p className="text-2xl sm:text-3xl font-bold tracking-tight leading-tight flex-1 min-w-0">{current.term}</p>
-                    {missed.has(current.id) && (
-                      <Flag className="w-6 h-6 shrink-0 mt-1 text-amber-500 fill-amber-500" aria-label="Coming back to this term" />
-                    )}
+                <div className="flex-1 min-h-0 overflow-y-auto overscroll-y-contain flex flex-col justify-center">
+                  <div className={cn(
+                    'w-full rounded-3xl border border-border bg-card shadow-sm p-8 flex flex-col',
+                    landscape ? 'min-h-0' : 'min-h-[280px] justify-center'
+                  )}
+                  >
+                    <p className="text-[11px] uppercase tracking-wide text-muted-foreground mb-2">Term</p>
+                    <div className="flex items-start gap-2">
+                      <p className="text-3xl font-bold tracking-tight leading-tight flex-1 min-w-0">{current.term}</p>
+                      {missed.has(current.id) && (
+                        <Flag className="w-6 h-6 shrink-0 mt-1 text-amber-500 fill-amber-500" aria-label="Coming back to this term" />
+                      )}
+                    </div>
+                    <p className="text-[11px] uppercase tracking-wide text-muted-foreground mt-5 mb-2">Definition</p>
+                    <p className="text-lg text-muted-foreground leading-relaxed">
+                      {flashcardDef(current)}
+                    </p>
                   </div>
-                  <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground mt-5 mb-1.5">
-                    Definition
-                  </p>
-                  <p className="text-lg sm:text-xl font-medium leading-snug text-muted-foreground">
-                    {flashcardDef(current)}
-                  </p>
                 </div>
                 <div className={cn('shrink-0 grid grid-cols-2 gap-3 pb-safe', landscape ? 'pt-2' : 'pt-4')}>
                   <Button
                     type="button"
-                    variant="outline"
-                    className="h-14 rounded-2xl text-base font-semibold"
+                    variant="destructive"
+                    className="h-12 rounded-2xl font-semibold"
                     onClick={onMissed}
                   >
-                    Missed
+                    <X className="w-4 h-4 mr-2" /> Missed
                   </Button>
-                  <Button type="button" className="h-14 rounded-2xl text-base font-semibold" onClick={onGotIt}>
-                    Got it
+                  <Button
+                    type="button"
+                    variant="success"
+                    className="h-12 rounded-2xl font-semibold"
+                    onClick={onGotIt}
+                  >
+                    <Check className="w-4 h-4 mr-2" /> Got it
                   </Button>
                 </div>
               </>

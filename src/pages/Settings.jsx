@@ -24,11 +24,12 @@ import { Progress } from '@/components/ui/progress';
 import { useAuth } from '@/lib/AuthContext';
 import ChangePasswordSheet from '@/components/account/ChangePasswordSheet';
 import EditNameSheet from '@/components/account/EditNameSheet';
-import { cancelWebsitePlan, getUsage, removePartner, resetPartnerCode } from '@/lib/accountStore';
+import { getUsage, removePartner, resetPartnerCode } from '@/lib/accountStore';
 import { formatPersonName } from '@/lib/personName';
 import { greetingLine, greetingNameStyle, setGreetingNameStyle } from '@/lib/greeting';
 import { usePaywall } from '@/lib/PaywallContext';
-import { planLabel } from '@/lib/plans';
+import { planLabel, planValue } from '@/lib/plans';
+import { trialRemainingLabel } from '../../scripts/account-plan.js';
 import {
   Sheet,
   SheetContent,
@@ -109,24 +110,6 @@ function maskPartnerCode(code) {
   return `${value.slice(0, 2)}${'*'.repeat(value.length - 2)}`;
 }
 
-function formatPlanDate(iso) {
-  const date = new Date(iso || '');
-  if (Number.isNaN(date.getTime())) return '';
-  return date.toLocaleDateString(undefined, { month: 'long', day: 'numeric', year: 'numeric' });
-}
-
-function trialRemainingLabel(iso) {
-  const end = new Date(iso || '');
-  if (Number.isNaN(end.getTime())) return '';
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
-  const endDay = new Date(end.getFullYear(), end.getMonth(), end.getDate());
-  const days = Math.round((endDay.getTime() - today.getTime()) / 86400000);
-  if (days <= 0) return 'Your free trial ends today.';
-  if (days === 1) return '1 day left in your free trial.';
-  return `${days} days left in your free trial.`;
-}
-
 function usedPct(person) {
   if (!person || person.unlimited || !person.aiQuotaLimit) return 0;
   return Math.min(100, ((person.aiQuotaUsed || 0) / person.aiQuotaLimit) * 100);
@@ -166,7 +149,7 @@ function UsageBlock({ heading, person, onUpgrade }) {
       )}
       {person?.subscriptionTier !== 'pro' && onUpgrade && (
         <Button className="w-full h-11 rounded-2xl" onClick={onUpgrade}>
-          Upgrade to Pro
+          See plans
         </Button>
       )}
     </div>
@@ -190,10 +173,6 @@ export default function Settings() {
   const [partnerBusy, setPartnerBusy] = React.useState(false);
   const [partnerNote, setPartnerNote] = React.useState('');
   const [codeShown, setCodeShown] = React.useState(false);
-  const [manageOpen, setManageOpen] = React.useState(false);
-  const [cancelOpen, setCancelOpen] = React.useState(false);
-  const [canceling, setCanceling] = React.useState(false);
-  const [cancelError, setCancelError] = React.useState('');
   const [devCode, setDevCode] = React.useState('');
   const [devUnlocked, setDevUnlocked] = React.useState(() => devToolsUnlocked());
   const [devCodeError, setDevCodeError] = React.useState(false);
@@ -218,11 +197,9 @@ export default function Settings() {
   const dark = ready && (resolvedTheme || theme) === 'dark';
   const open = DOCS[doc];
   const me = usage?.me || usage?.user || user;
+  const billingPlan = me?.billingPlan || '';
   const onTrial = me?.subscriptionStatus === 'trialing' && !!me?.trialEndsAt;
   const trialLabel = onTrial ? trialRemainingLabel(me.trialEndsAt) : '';
-  const accessUntil = formatPlanDate(me?.subscriptionStatus === 'trialing' ? me?.trialEndsAt : me?.periodEndsAt);
-  const websitePlan = me?.billingPlan === 'solo' || me?.billingPlan === 'partner';
-  const canCancel = websitePlan && !!me?.subscriptionStatus && !me?.cancelAtPeriodEnd;
   const displayName = me?.displayName || firebaseUser?.displayName || '';
   const greetingPreview = greetingLine(displayName, new Date(), nameStyle);
 
@@ -291,11 +268,8 @@ export default function Settings() {
               <Row
                 icon={Sparkles}
                 label="Manage plan"
-                value={planLabel(me)}
-                onClick={() => {
-                  setCancelError('');
-                  setManageOpen(true);
-                }}
+                value={planValue(me)}
+                onClick={() => navigate('/manage')}
               />
               {trialLabel && (
                 <p className="pl-12 pr-5 pb-3.5 -mt-1.5 text-sm leading-5 text-muted-foreground">
@@ -312,7 +286,7 @@ export default function Settings() {
             {me?.billingPlan === 'guest' && (
               <div className="px-5 pb-5">
                 <p className="text-xs text-muted-foreground">
-                  You're on a friend's partner study plan. If they cancel, this plan ends.
+                  You're on a friend's partner study plan. If they cancel, you both lose access.
                 </p>
               </div>
             )}
@@ -378,7 +352,7 @@ export default function Settings() {
                 )}
               </div>
               <p className="text-xs text-muted-foreground mt-3">
-                Resetting makes the old code stop working. Canceling in Manage plan ends access for both of you when the period ends.
+                Resetting makes the old code stop working. Canceling the plan ends access for both of you when the period ends.
               </p>
               {partnerNote && <p className="text-sm mt-2">{partnerNote}</p>}
             </section>
@@ -570,90 +544,6 @@ export default function Settings() {
         onOpenChange={setChangePasswordOpen}
         firebaseUser={firebaseUser}
       />
-
-      <Sheet open={manageOpen} onOpenChange={setManageOpen}>
-        <SheetContent side="bottom" className="rounded-t-3xl">
-          <SheetHeader className="text-left pr-10">
-            <SheetTitle>Manage plan</SheetTitle>
-            <SheetDescription>{planLabel(me)}</SheetDescription>
-          </SheetHeader>
-          <div className="space-y-3 pt-4 pb-6">
-            {trialLabel && (
-              <p className="text-sm text-muted-foreground">{trialLabel}</p>
-            )}
-            {websitePlan && me?.cancelAtPeriodEnd && accessUntil && (
-              <p className="text-sm text-muted-foreground">Access until {accessUntil}. You won't be billed again.</p>
-            )}
-            {websitePlan && !me?.cancelAtPeriodEnd && me?.billingPromo === 'beta' && accessUntil && (
-              <p className="text-sm text-muted-foreground">Free trial ends {accessUntil}. You won't be charged.</p>
-            )}
-            {websitePlan && !me?.cancelAtPeriodEnd && me?.billingPromo !== 'beta' && accessUntil && (
-              <p className="text-sm text-muted-foreground">Next billing date {accessUntil}.</p>
-            )}
-            {me?.billingPlan === 'guest' && (
-              <p className="text-sm text-muted-foreground">
-                Your friend manages this plan.{accessUntil ? ` It runs until ${accessUntil}.` : ''}
-              </p>
-            )}
-            {!websitePlan && me?.billingPlan !== 'guest' && me?.subscriptionTier === 'pro' && (
-              <p className="text-sm text-muted-foreground">Study Pro is billed through Apple.</p>
-            )}
-            {!websitePlan && me?.billingPlan !== 'guest' && me?.subscriptionTier !== 'pro' && (
-              <p className="text-sm text-muted-foreground">You're on Free.</p>
-            )}
-            {cancelError && <p className="text-sm text-destructive">{cancelError}</p>}
-            {canCancel && (
-              <Button
-                variant="outline"
-                className="w-full h-11 rounded-2xl"
-                onClick={() => {
-                  setCancelError('');
-                  setCancelOpen(true);
-                }}
-              >
-                Cancel plan
-              </Button>
-            )}
-          </div>
-        </SheetContent>
-      </Sheet>
-
-      <AlertDialog open={cancelOpen} onOpenChange={(open) => { if (!canceling) setCancelOpen(open); }}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Cancel {planLabel(me)}?</AlertDialogTitle>
-            <AlertDialogDescription>
-              {accessUntil
-                ? `You'll keep access until ${accessUntil}, and you won't be billed again.`
-                : "You won't be billed again."}
-              {me?.billingPlan === 'partner' ? ' Your friend loses access then too.' : ''}
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel disabled={canceling}>Keep plan</AlertDialogCancel>
-            <Button
-              variant="destructive"
-              disabled={canceling}
-              onClick={async () => {
-                setCanceling(true);
-                setCancelError('');
-                try {
-                  const data = await cancelWebsitePlan();
-                  if (data?.user) setUsage((current) => ({ ...(current || {}), me: data.user, user: data.user }));
-                  setCancelOpen(false);
-                } catch (err) {
-                  setCancelError(err instanceof Error ? err.message : 'Could not cancel the plan.');
-                  setCancelOpen(false);
-                } finally {
-                  setCanceling(false);
-                }
-              }}
-            >
-              {canceling ? 'Canceling…' : 'Cancel plan'}
-            </Button>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
 
       <Sheet open={!!doc} onOpenChange={(on) => { if (!on) setDoc(null); }}>
         <SheetContent side="bottom" className="rounded-t-3xl max-h-[85dvh] overflow-y-auto">

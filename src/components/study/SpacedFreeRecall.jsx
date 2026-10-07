@@ -19,6 +19,7 @@ export default function SpacedFreeRecall({
   blockLabel = 'Free recall',
   onLogAttempt,
   onUpdateTerm,
+  onCardTimed,
   onDone,
 }) {
   const [queue] = React.useState(() =>
@@ -28,6 +29,11 @@ export default function SpacedFreeRecall({
   const [draft, setDraft] = React.useState('');
   const [revealed, setRevealed] = React.useState(false);
   const doneRef = React.useRef(false);
+  const shownAtRef = React.useRef(Date.now());
+
+  React.useLayoutEffect(() => {
+    shownAtRef.current = Date.now();
+  }, [pos]);
 
   const current = queue[pos];
   const earlierAttempt = current ? savedAttemptForMiss(current) : '';
@@ -44,6 +50,7 @@ export default function SpacedFreeRecall({
 
   const advance = (result) => {
     if (!current) return;
+    onCardTimed?.({ mode: 'free', ms: Math.max(0, Date.now() - shownAtRef.current) });
     onLogAttempt?.(current.id, result);
     const typed = String(draft || '').trim();
     if (typed) onUpdateTerm?.(current.id, { freeAttempt: typed });

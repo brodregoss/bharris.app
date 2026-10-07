@@ -35,11 +35,15 @@ export const PRIVACY_SECTIONS = [
   },
   {
     title: 'Payments',
-    body: 'Study is $8 per month. Partner study is $12 per month and covers one friend who redeems your code. The website bills those plans through Stripe. The price is shown before you pay, and the plan renews until you cancel it from the plans page. The beta code starts one free week and is not charged. When that week ends, access ends. A separate free trial, if one is offered, asks for a card and the plan price starts when the trial ends. If you cancel partner study, paid access ends for you and your friend when the paid period ends. Resetting a partner code makes the old code stop working. On iPhone, an App Store subscription is billed by Apple and cancelled in your Apple ID subscriptions. We receive whether your plan is active, not your payment card.',
+    body: 'Study is $8 per month. Partner study is $12 per month and covers one friend who redeems your code. The app and the website share the same account, so a plan bought on either one is the plan on both. Stripe bills the plan until you cancel it in the app or on the plans page. The price is shown before you pay. The beta code starts one free week and is not charged. When that week ends, access ends. A separate free trial, if one is offered, asks for a card and the plan price starts when the trial ends. If you cancel partner study, paid access ends for you and your friend when the paid period ends. Resetting a partner code makes the old code stop working. An older App Store subscription, if you still have one, is billed by Apple and cancelled in your Apple ID subscriptions. We receive whether your plan is active, not your payment card.',
+  },
+  {
+    title: 'Cookies',
+    body: 'The website shows a notice where you can accept or decline cookies. If you accept, it keeps one cookie, bharris_plan, so it can remember your plan while you move between pages. That cookie stores your account id, the plan name (Free, Study, or Partner study), and, only for partner study, the partner code and whether a friend has redeemed it. It does not store your name, email, notes, photos, or payment card. It is not used for advertising. It lasts until you sign out or close the browser. Signing out deletes it. A second cookie, bharris_cookie, stores only your choice, accepted or declined, so the notice stays closed on later visits. If you decline, the site does not remember your plan between pages and checks it when a page needs it.',
   },
   {
     title: 'What we do not do',
-    body: 'We do not sell your notes, account, or study history. We do not use your notes to advertise to you.',
+    body: 'We do not sell your notes, account, or study history. We do not use your notes to advertise to you. We do not use advertising or analytics cookies.',
   },
   {
     title: 'Deleting your data',
@@ -66,7 +70,11 @@ export const TERMS_SECTIONS = [
   },
   {
     title: 'Plans',
-    body: 'A free plan is available with a smaller monthly AI quota. On the website, Study is $8 per month and Partner study is $12 per month. Partner study includes one friend: you get a code, they redeem it on the plans page, and if you reset that code the old one stops working. The beta code starts one free week and is not charged. When that week ends, access ends. A separate free trial, if one is offered, asks for a card and the plan price starts when the trial ends. Canceling partner study ends paid access for both of you when the paid period ends. Website plans are billed by Stripe until you cancel them on the plans page. An iPhone App Store subscription, if you use one, is billed by Apple and cancelled in your Apple ID subscriptions.',
+    body: 'A free plan is available with a smaller monthly AI quota. Study is $8 per month and Partner study is $12 per month, in the app and on the website. A plan bought on either one is the plan on both. Partner study includes one friend: you get a code, they redeem it, and if you reset that code the old one stops working. The beta code starts one free week and is not charged. When that week ends, access ends. A separate free trial, if one is offered, asks for a card and the plan price starts when the trial ends. Canceling partner study ends paid access for both of you when the paid period ends. These plans are billed by Stripe until you cancel them in the app or on the plans page. An older App Store subscription, if you still have one, is billed by Apple and cancelled in your Apple ID subscriptions.',
+  },
+  {
+    title: 'Cookies',
+    body: 'The website shows a notice where you can accept or decline cookies. Accepting lets the site remember your plan between pages. If you decline, the site does not remember your plan between pages. The privacy policy describes both cookies. The site does not use advertising or analytics cookies.',
   },
   {
     title: 'No academic guarantee',

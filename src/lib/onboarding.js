@@ -1,3 +1,4 @@
+import { safeAuthReturn } from '@/lib/authReturn';
 import { loadSession } from '@/lib/sessionStore';
 import { userStorageKey } from '@/lib/userStorage';
 
@@ -23,11 +24,7 @@ export function afterAuthPath() {
 
 const AUTH_RETURN_KEY = 'bharris-auth-return';
 
-function safeAuthReturn(value) {
-  if (value === '/plans' || value === '/plans/') return '/plans/';
-  if (value === '/thanks' || value === '/thanks/') return '/thanks/';
-  return '';
-}
+export { safeAuthReturn };
 
 export function rememberAuthReturn() {
   if (typeof window === 'undefined') return;

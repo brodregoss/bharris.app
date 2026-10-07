@@ -2,6 +2,8 @@ import React from 'react';
 import { Button } from '@/components/ui/button';
 import { Eye, Check, X, ArrowRight } from 'lucide-react';
 import { fmtTime, normalizeExamType, flashcardDef } from '@/lib/studyUtils';
+import { buildMcCard } from '@/lib/spacedCram';
+import CardProgress, { cardProgressCaption } from '@/components/study/CardProgress';
 import { useDebug } from '@/lib/DebugContext';
 import WriteOwnDef, {
   STUCK_AFTER_ROTATIONS,
@@ -56,12 +58,21 @@ export default function RecallBlock({
   blockLabel,
   examType = 'mixed',
   mixReverse = false,
+  cardMode = 'flash',
+  mcIds = [],
+  mcDirections = {},
+  distractorTerms,
   onUpdateTerm,
   onLogAttempt,
+  onCardTimed,
   onDone,
   onOpenCheat,
+  showProgress = true,
 }) {
   const { logEvent } = useDebug() || {};
+  const mcSet = React.useMemo(() => new Set(mcIds || []), [mcIds]);
+  const planCache = React.useRef({ key: '', plan: null });
+  const shownAtRef = React.useRef(Date.now());
   const timed = Number(blockBudgetMs) > 0;
   const byId = React.useMemo(() => Object.fromEntries(terms.map((t) => [t.id, t])), [terms]);
   const idsKey = terms.map((t) => t.id).filter((id) => id != null && id !== '').join('|');
@@ -160,8 +171,29 @@ export default function RecallBlock({
   const currentId = st.queue[st.pos];
   const current = currentId != null ? byId[currentId] : null;
 
-  const reverse = mixReverse && st.pos % 2 === 1;
-  const style = reverse ? 'free_recall' : cardStyle(examType, st.pos);
+  const planKey = `${currentId}|${st.pos}|${st.round}|${cardSeq}`;
+  if (planCache.current.key !== planKey) {
+    let plan = null;
+    const wantsMc = current && (cardMode === 'mc' || mcSet.has(current.id));
+    if (wantsMc) {
+      const pool = distractorTerms?.length ? distractorTerms : terms;
+      const preferred = mcDirections?.[current.id] === 'def' ? 'def' : 'term';
+      const built = buildMcCard(pool, current, preferred)
+        || buildMcCard(pool, current, preferred === 'term' ? 'def' : 'term');
+      if (built) {
+        plan = { ...built, options: shuffle(built.options) };
+      }
+    }
+    planCache.current = { key: planKey, plan };
+  }
+  const liveMc = planCache.current.plan;
+
+  const reverse = !liveMc && cardMode !== 'mc' && mixReverse && st.pos % 2 === 1;
+  const style = liveMc ? 'mc' : (reverse ? 'free_recall' : cardStyle(examType, st.pos));
+
+  React.useLayoutEffect(() => {
+    shownAtRef.current = Date.now();
+  }, [currentId, st.pos, st.round, cardSeq]);
 
   // Reset per-card interaction state when the card (or attempt) changes.
   // Options are shuffled once here and held until the card is answered.
@@ -169,13 +201,14 @@ export default function RecallBlock({
     advancingRef.current = false;
     setRevealed(false);
     setRecogSelected(null);
-    if (current && style === 'recognition') {
+    if (liveMc) {
+      setRecogOptions(liveMc.options);
+    } else if (current && style === 'recognition') {
       const distractors = pickRecallTermDistractors(terms, current, 3);
       setRecogOptions(shuffle([current.term, ...distractors]));
     } else {
       setRecogOptions(null);
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [currentId, st.pos, st.round, cardSeq]);
 
   React.useLayoutEffect(() => {
@@ -192,12 +225,20 @@ export default function RecallBlock({
     }
   }, [currentId, st.queue, stuck, defMode, singlePass, current, byId]);
 
+  const reportCardTime = () => {
+    if (!onCardTimed) return;
+    const live = planCache.current.plan;
+    const mode = live?.direction === 'def' ? 'mc_def' : live ? 'mc_term' : 'flash';
+    onCardTimed({ mode, ms: Math.max(0, Date.now() - shownAtRef.current) });
+  };
+
   const handleGot = () => {
     if (!current || advancingRef.current) return;
     advancingRef.current = true;
     const newStreak = (current.correctStreak || 0) + 1;
     onUpdateTerm(current.id, { correctStreak: newStreak });
-    onLogAttempt(current.id, 'got_it');
+    reportCardTime();
+    onLogAttempt(current.id, 'got_it', planCache.current.plan ? 'mc' : 'flash');
     missCountRef.current[current.id] = 0;
     deferredRef.current.delete(current.id);
     setRevealed(false);
@@ -261,7 +302,8 @@ export default function RecallBlock({
     if (advancingRef.current && !lastInRotation) return;
     const missedId = current.id;
     onUpdateTerm(missedId, { correctStreak: 0 });
-    onLogAttempt(missedId, 'missed');
+    reportCardTime();
+    onLogAttempt(missedId, 'missed', planCache.current.plan ? 'mc' : 'flash');
     logEvent?.(`Term "${current.term}" missed${singlePass ? '' : ', requeued'}`);
     const misses = (missCountRef.current[missedId] || 0) + 1;
     missCountRef.current[missedId] = misses;
@@ -312,14 +354,18 @@ export default function RecallBlock({
     setCardSeq((n) => n + 1);
   };
 
-  const promptLabel = style === 'recognition'
-    ? 'Pick the term'
-    : reverse
-      ? 'Definition'
-      : style === 'explain'
-        ? 'Explain in your own words'
-        : 'Term';
-  const recognition = style === 'recognition';
+  const multipleChoice = style === 'mc';
+  const defOptions = liveMc?.direction === 'def';
+  const promptLabel = multipleChoice
+    ? (defOptions ? 'Pick the definition' : 'Pick the term')
+    : style === 'recognition'
+      ? 'Pick the term'
+      : reverse
+        ? 'Definition'
+        : style === 'explain'
+          ? 'Explain in your own words'
+          : 'Term';
+  const recognition = style === 'recognition' || multipleChoice;
   const defCards = cardsAtStuckThreshold(st.queue, byId, missCountRef.current, writtenRef.current);
   const writeCards = stuck?.length ? stuck : defMode ? defCards : null;
   const fit = useFillBelow(recognition && !!current && !writeCards?.length);
@@ -354,7 +400,20 @@ export default function RecallBlock({
     );
   }
 
+  const progressTotal = singlePass ? st.queue.length : terms.length;
+  const progressDone = singlePass ? Math.min(st.pos, progressTotal) : Math.min(gotCount, progressTotal);
+
   return (
+    <div className="flex-1 flex flex-col min-h-0">
+      {showProgress && progressTotal > 0 && (
+        <div className="px-4 pt-3 shrink-0">
+          <CardProgress
+            done={progressDone}
+            total={progressTotal}
+            caption={cardProgressCaption(progressTotal, progressDone)}
+          />
+        </div>
+      )}
     <div
       ref={recognition ? fit.ref : undefined}
       style={recognition ? fit.style : undefined}
@@ -377,10 +436,10 @@ export default function RecallBlock({
           <p className="text-[11px] uppercase tracking-wide text-muted-foreground mb-2 shrink-0">{promptLabel}</p>
           {recognition ? (
             <p
-              data-mcq-prompt="definition"
+              data-mcq-prompt={defOptions ? 'term' : 'definition'}
               className="text-base font-semibold leading-snug overflow-y-auto min-h-0 overscroll-contain"
             >
-              {current.definition}
+              {defOptions ? current.term : current.definition}
             </p>
           ) : (
             <p className={reverse ? 'text-lg font-semibold tracking-tight leading-relaxed' : 'text-3xl font-bold tracking-tight'}>
@@ -391,12 +450,21 @@ export default function RecallBlock({
           {recognition ? (
             <div className="mt-3 w-full space-y-2 shrink-0">
               {(recogOptions || []).map((opt, i) => {
+                const answer = liveMc?.answer || current.term;
                 const selected = recogSelected === opt;
-                const isCorrect = opt === current.term;
+                const isCorrect = opt === answer;
                 return (
                   <button
-                    key={i}
-                    onClick={() => !recogSelected && setRecogSelected(opt)}
+                    key={`${opt}-${i}`}
+                    onClick={() => {
+                      if (recogSelected || advancingRef.current) return;
+                      setRecogSelected(opt);
+                      if (!multipleChoice) return;
+                      window.setTimeout(() => {
+                        if (opt === answer) handleGot();
+                        else handleMissed();
+                      }, 450);
+                    }}
                     className={`w-full text-left rounded-xl border px-3.5 py-2.5 text-base leading-snug transition ${
                       recogSelected
                         ? isCorrect
@@ -428,7 +496,7 @@ export default function RecallBlock({
         </div>
 
         <div className={`w-full shrink-0 ${recognition ? 'pt-3' : 'max-w-md mt-4'}`}>
-          {recognition ? (
+          {multipleChoice ? null : recognition ? (
             recogSelected ? (
               <Button
                 onClick={() => (recogSelected === current.term ? handleGot() : handleMissed())}
@@ -492,6 +560,7 @@ export default function RecallBlock({
           </button>
         )}
       </div>
+    </div>
     </div>
   );
 }

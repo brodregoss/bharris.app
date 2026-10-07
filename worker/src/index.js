@@ -20,7 +20,7 @@ import {
   deleteUserNotes,
 } from './notes.js';
 import { handleRevenueCatWebhook, handleSubscriptionRefresh, handleProUnlock } from './billing.js';
-import { handleCheckout, handlePortal, handleStripeWebhook, handleCancel, refreshBillingSchedule, cancelStripeSubscription } from './stripeBilling.js';
+import { handleCheckout, handlePortal, handleStripeWebhook, handleCancel, billingForRequest, cancelStripeSubscription } from './stripeBilling.js';
 import {
   handlePartnerRedeem,
   handlePartnerRemove,
@@ -49,19 +49,20 @@ async function warmDo(env, uid) {
   await markDoReady(env, uid, ping.storeId || id.toString());
 }
 
-async function handleUsersMe(request, env, identity) {
+async function handleUsersMe(request, env, identity, ctx) {
   const body = request.method === 'GET' ? {} : await readJson(request);
   const updateName = body.updateName === true;
   const submitted = String(body.displayName || body.name || '').trim().replace(/\s+/g, ' ');
   if (updateName && (!submitted || submitted.length > 80)) {
     return errorJson(submitted ? 'That name is too long.' : 'Enter your name.', 400);
   }
-  const row = await upsertUser(env, {
+  let row = await upsertUser(env, {
     uid: identity.uid,
     email: body.email || identity.email,
     name: updateName ? submitted : (submitted || identity.name),
     updateName,
   });
+  if (!updateName) row = await billingForRequest(env, ctx, row);
   return json({ user: await toPublicUser(env, row) });
 }
 
@@ -81,9 +82,10 @@ async function handleDeleteMe(env, identity) {
   return json({ ok: true });
 }
 
-async function handleUsage(env, identity) {
-  const row = await refreshBillingSchedule(env, identity.uid);
+async function handleUsage(env, identity, ctx) {
+  let row = await getUserRow(env, identity.uid);
   if (!row) return errorJson('Account not found', 404);
+  row = await billingForRequest(env, ctx, row);
   const user = await toPublicUser(env, row);
   return json({ me: user, user });
 }
@@ -190,10 +192,10 @@ export default {
       if (parts[1] === 'users' && parts[2] === 'me' && !parts[3] && request.method === 'DELETE') {
         response = await handleDeleteMe(env, identity);
       } else if (parts[1] === 'users' && parts[2] === 'me' && !parts[3] && (request.method === 'GET' || request.method === 'POST')) {
-        response = await handleUsersMe(request, env, identity);
+        response = await handleUsersMe(request, env, identity, ctx);
         if (request.method === 'POST') ctx.waitUntil(warmDo(env, identity.uid).catch(() => {}));
       } else if (parts[1] === 'users' && parts[2] === 'me' && parts[3] === 'usage' && request.method === 'GET') {
-        response = await handleUsage(env, identity);
+        response = await handleUsage(env, identity, ctx);
       } else if (
         parts[1] === 'users'
         && parts[2] === 'me'

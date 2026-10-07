@@ -20,7 +20,7 @@ import {
   describeSittingQueue,
   ensureSpaced,
   generatePlan,
-  hitAttempts,
+  settledAttempts,
   lastSittingIndex,
   loadSavedClock,
   markTermsIntroduced,
@@ -32,9 +32,12 @@ import {
   migrateStudyTerms,
   offerReminder,
   openSpacedSession,
+  orderSittingQueue,
   pickupLine,
   planEndGlance,
+  RECOGNIZED_LINE,
   recapCopy,
+  recognizedFromResults,
   recordAttempt,
   resolveExamTime,
   saveSavedClock,
@@ -53,12 +56,14 @@ import {
 import SpacedPlan from '@/components/study/SpacedPlan';
 import SpacedFreeRecall from '@/components/study/SpacedFreeRecall';
 import RecallBlock from '@/components/study/RecallBlock';
+import CardProgress, { cardProgressCaption } from '@/components/study/CardProgress';
 import SleepTimePicker from '@/components/study/SleepTimePicker';
 import { loadSession, saveSession, saveFinishedSession, clearSession } from '@/lib/sessionStore';
 import { getActiveUid } from '@/lib/userStorage';
 import { withInferredMastery } from '@/lib/mastery';
 import { useDebug } from '@/lib/DebugContext';
 import { currentReminderMode, scheduleStudyReminder, WEB_REMINDER_NOTE } from '@/lib/studyReminder';
+import { logEstimateGap, recordSpacedMetric } from '@/lib/spacedMetrics';
 
 function hydrate(location) {
   const ownerUid = getActiveUid();
@@ -129,6 +134,9 @@ export default function SpacedCram() {
   });
   const [terms, setTerms] = React.useState(booted.terms);
   const [spaced, setSpaced] = React.useState(booted.spaced);
+  const [reviewingPlan, setReviewingPlan] = React.useState(
+    () => booted.spaced?.phase === 'drill' || booted.spaced?.phase === 'chunk_break'
+  );
   const [sleepDraft, setSleepDraft] = React.useState(() => init?.spaced?.stopTime || loadSavedClock().sleep || '22:30');
   const [wakeDraft, setWakeDraft] = React.useState(() => init?.spaced?.wakeTime || loadSavedClock().wake || '07:00');
   const [examDraft, setExamDraft] = React.useState(() => init?.spaced?.examClock || '');
@@ -233,8 +241,9 @@ export default function SpacedCram() {
       examTime: spaced.examTime,
       sittings: Array.isArray(spaced.sittings) ? spaced.sittings : undefined,
       coreOnly: !!spaced.coreOnly,
+      testType: setup?.examType || 'mixed',
     }),
-    [setup?.examTiming, setup?.hours, terms, spaced.stopTime, spaced.wakeTime, spaced.examTime, spaced.sittings, spaced.coreOnly]
+    [setup?.examTiming, setup?.examType, setup?.hours, terms, spaced.stopTime, spaced.wakeTime, spaced.examTime, spaced.sittings, spaced.coreOnly]
   );
   const needTimes = !spaced.stopTime || !spaced.wakeTime || !spaced.examTime;
   const skipKeyRef = React.useRef('');
@@ -289,6 +298,25 @@ export default function SpacedCram() {
   };
 
   const completeSitting = (currentTerms, fromSpaced = spaced) => {
+    if (fromSpaced.sittingStartedAt) {
+      const actualMs = Math.max(0, Date.now() - fromSpaced.sittingStartedAt);
+      recordSpacedMetric({
+        type: 'sitting_completed',
+        sitting: fromSpaced.sittingIndex || 1,
+        estimatedSeconds: fromSpaced.estimateSeconds || 0,
+        actualMs,
+      });
+      if (import.meta.env.DEV === true) {
+        const line = logEstimateGap(fromSpaced.estimateSeconds, actualMs, {
+          dev: true,
+          log: (msg) => {
+            console.info(msg);
+            dbg?.logEvent?.(msg);
+          },
+        });
+        void line;
+      }
+    }
     const finished = sittingByIndex(schedule, fromSpaced.sittingIndex || 1);
     const gradedAt = now;
     const finishedId = finished?.sitting || fromSpaced.sittingIndex;
@@ -368,14 +396,58 @@ export default function SpacedCram() {
       completeSitting(terms, { ...nextSpaced, pendingCarry: built.leftoverIds, aheadNote: false });
       return;
     }
+    const queueIds = nextQueue.map((t) => t.id);
+    const freeIds = (rest.lastLook || rest.bonusRun)
+      ? []
+      : (resuming
+        ? (spaced.freeIds || []).filter((id) => queueIds.includes(id))
+        : (built.freeIds || []));
+    const mcIds = (rest.lastLook || rest.bonusRun)
+      ? []
+      : (resuming
+        ? (spaced.mcIds || []).filter((id) => queueIds.includes(id))
+        : (built.mcIds || []));
+    const mcTermIds = (rest.lastLook || rest.bonusRun)
+      ? []
+      : (resuming
+        ? (spaced.mcTermIds || []).filter((id) => mcIds.includes(id))
+        : (built.mcTermIds || []));
+    const mcDefIds = (rest.lastLook || rest.bonusRun)
+      ? []
+      : (resuming
+        ? (spaced.mcDefIds || []).filter((id) => mcIds.includes(id))
+        : (built.mcDefIds || []));
+    const ordered = (rest.lastLook || rest.bonusRun)
+      ? queueIds
+      : orderSittingQueue(queueIds, { freeIds, mcIds });
+    const freeSet = new Set(freeIds);
+    const hasDrill = ordered.some((id) => !freeSet.has(id));
+    const estimate = sittingEstimate(ordered.length, {
+      mcTermCards: mcTermIds.length,
+      mcDefCards: mcDefIds.length,
+    });
+    recordSpacedMetric({
+      type: 'sitting_started',
+      sitting: nextSpaced.sittingIndex || 1,
+      estimatedSeconds: estimate.seconds,
+      lastLook: !!rest.lastLook,
+    });
     persistSitting({
       ...nextSpaced,
       phase: 'drill',
-      queue: nextQueue.map((t) => t.id),
+      queue: ordered,
+      freeIds,
+      mcIds,
+      mcTermIds,
+      mcDefIds,
+      mixStep: hasDrill ? 'flash' : 'free',
       pendingCarry: built.leftoverIds,
       aheadNote: false,
-      drillTotal: nextQueue.length,
-      pickingUp: resuming ? pickupLine(nextQueue.length) : '',
+      drillTotal: ordered.length,
+      estimateSeconds: estimate.seconds,
+      sittingStartedAt: Date.now(),
+      recognizedIds: [],
+      pickingUp: resuming ? pickupLine(ordered.length) : '',
       resumeIds: rest.lastLook ? nextSpaced.resumeIds : [],
       clearedIds: [],
     });
@@ -385,9 +457,9 @@ export default function SpacedCram() {
     setTerms((prev) => prev.map((t) => (t.id === id ? { ...t, ...patch } : t)));
   };
 
-  const logAttempt = (id, result) => {
-    const attempt = recordAttempt(sittingResultsRef.current, id, result);
-    if (result === 'got_it') {
+  const logAttempt = (id, result, mode = 'flash') => {
+    const attempt = recordAttempt(sittingResultsRef.current, id, result, mode);
+    if (attempt.lastGrade === 'hit' || attempt.lastGrade === 'partial') {
       setSpaced((prev) => ({
         ...prev,
         clearedIds: [...new Set([...(prev.clearedIds || []), id])],
@@ -404,7 +476,13 @@ export default function SpacedCram() {
                 result: result === 'got_it' ? 'got' : result === 'partly' ? 'partly' : 'missed',
                 at,
               }],
-              srs: { ...emptySrs(), ...t.srs, missCount: attempt.missCount, lastGrade: attempt.lastGrade },
+              srs: {
+                ...emptySrs(),
+                ...t.srs,
+                missCount: attempt.missCount,
+                lastGrade: attempt.lastGrade,
+                lastMode: attempt.mode,
+              },
             }
           : t
       )
@@ -412,6 +490,11 @@ export default function SpacedCram() {
   };
 
   const onDrillDone = () => {
+    const freeIds = spaced.freeIds || [];
+    if (spaced.mixStep !== 'free' && freeIds.length) {
+      persistSitting({ ...spaced, mixStep: 'free' });
+      return;
+    }
     const gradedAt = nowRef.current;
     const gradeContext = { at: gradedAt, wakeTime: spaced.wakeTime, sleepTime: spaced.stopTime };
     if (spaced.lastLook) {
@@ -451,7 +534,7 @@ export default function SpacedCram() {
           mergeAttemptGrades(terms, sittingResultsRef.current),
           spaced.queue
         );
-        const keptHits = { ...(spaced.pendingGrades || {}), ...hitAttempts(sittingResultsRef.current) };
+        const keptHits = { ...(spaced.pendingGrades || {}), ...settledAttempts(sittingResultsRef.current) };
         sittingResultsRef.current = {};
         persistSitting(
           {
@@ -468,12 +551,13 @@ export default function SpacedCram() {
       }
     }
     const results = { ...(spaced.pendingGrades || {}), ...(sittingResultsRef.current || {}) };
+    const recognizedIds = recognizedFromResults(results);
     let nextTerms = applySittingResults(terms, results, gradeContext);
     if (currentSitting?.type === SESSION_TYPE.NEW || currentSitting?.fullRev || currentSitting?.prioritized) {
       nextTerms = markTermsIntroduced(nextTerms, spaced.queue);
     }
     sittingResultsRef.current = {};
-    completeSitting(nextTerms, { ...spaced, pendingGrades: {}, aheadNote: false });
+    completeSitting(nextTerms, { ...spaced, pendingGrades: {}, aheadNote: false, recognizedIds });
   };
 
   const remindLater = async () => {
@@ -494,6 +578,11 @@ export default function SpacedCram() {
       phase: spaced.phase === 'complete' ? 'complete' : 'plan',
     };
     if (spaced.phase === 'drill') {
+      recordSpacedMetric({
+        type: 'sitting_abandoned',
+        sitting: spaced.sittingIndex || 1,
+        actualMs: Math.max(0, Date.now() - (spaced.sittingStartedAt || Date.now())),
+      });
       nextTerms = mergeAttemptGrades(terms, sittingResultsRef.current);
       if (!spaced.lastLook && sitting?.type === SESSION_TYPE.NEW) {
         nextTerms = markTermsIntroduced(nextTerms, spaced.queue);
@@ -508,7 +597,11 @@ export default function SpacedCram() {
           resumeLine: pickupLine(left.length),
           pickingUp: '',
           clearedIds: [],
-          pendingGrades: { ...(spaced.pendingGrades || {}), ...hitAttempts(sittingResultsRef.current) },
+          pendingGrades: { ...(spaced.pendingGrades || {}), ...settledAttempts(sittingResultsRef.current) },
+          freeIds: (spaced.freeIds || []).filter((id) => left.includes(id)),
+          mcIds: (spaced.mcIds || []).filter((id) => left.includes(id)),
+          mcTermIds: (spaced.mcTermIds || []).filter((id) => left.includes(id)),
+          mcDefIds: (spaced.mcDefIds || []).filter((id) => left.includes(id)),
         };
       }
       setTerms(nextTerms);
@@ -551,6 +644,7 @@ export default function SpacedCram() {
     const examTime = resolveExamTime({ now, examTiming: setup?.examTiming, examClock: examDraft });
     saveSavedClock(sleepDraft, wakeDraft);
     const keepFinished = (spaced.sittings || []).some((s) => s.done);
+    setReviewingPlan(false);
     persistSitting(changePlanTimes({
       ...spaced,
       lastFinishedAt: keepFinished ? spaced.lastFinishedAt : 0,
@@ -587,7 +681,7 @@ export default function SpacedCram() {
     });
   };
 
-  if ((needTimes || spaced.editingTimes) && spaced.phase !== 'drill' && spaced.phase !== 'chunk_break') {
+  if (spaced.editingTimes || (needTimes && spaced.phase !== 'drill' && spaced.phase !== 'chunk_break')) {
     return (
       <div className="min-h-[100dvh] bg-background text-foreground flex flex-col">
         <header className="px-3 pt-safe pb-2">
@@ -635,7 +729,7 @@ export default function SpacedCram() {
     );
   }
 
-  if (spaced.phase === 'chunk_break') {
+  if (spaced.phase === 'chunk_break' && !reviewingPlan) {
     const chunkCount = schedule.chunks.length;
     const n = (spaced.chunkIndex || 0) + 1;
     const copy =
@@ -695,7 +789,7 @@ export default function SpacedCram() {
     );
   }
 
-  if (spaced.phase === 'plan' || spaced.phase === 'done' || spaced.phase === 'complete' || allDone) {
+  if (reviewingPlan || spaced.phase === 'plan' || spaced.phase === 'done' || spaced.phase === 'complete' || allDone) {
     const justFinished = spaced.phase === 'done';
     const finishedAll = allDone;
     const statusLine = spaced.welcomeLine
@@ -713,7 +807,12 @@ export default function SpacedCram() {
                 : null;
     const finishedNumber = Math.max(0, sittingN - 1);
     const shakyNow = countShaky(terms);
-    const shakyNames = shakyTermNames(terms);
+    const recognizedSet = new Set(spaced.recognizedIds || []);
+    const recognizedNames = terms
+      .filter((t) => recognizedSet.has(t.id))
+      .map((t) => t.term)
+      .filter(Boolean);
+    const shakyNames = shakyTermNames(terms).filter((name) => !recognizedNames.includes(name));
     const glance = planEndGlance(terms);
     const showRecap = justFinished && Number.isFinite(spaced.shakyBefore);
     const recap = recapCopy({
@@ -721,6 +820,7 @@ export default function SpacedCram() {
       learned: countLearned(terms),
       shakyBefore: spaced.shakyBefore,
       shakyAfter: shakyNow,
+      recognized: recognizedNames.length,
     });
     const solidNames = terms
       .filter((t) => t?.srs?.introduced && t.pile === 'solid')
@@ -729,13 +829,29 @@ export default function SpacedCram() {
     const resumeNote = spaced.resumeIds?.length
       ? (spaced.resumeLine || pickupLine(spaced.resumeIds.length))
       : '';
-    const upcoming = finishedAll
-      ? []
-      : describeSittingQueue(terms, { ...spaced, lastLook: false, bonusRun: false }, schedule).queue;
-    const preview = sittingEstimate(upcoming.length);
+    const upcomingBuilt = finishedAll
+      ? { queue: [], mcTermIds: [], mcDefIds: [] }
+      : describeSittingQueue(terms, { ...spaced, lastLook: false, bonusRun: false }, schedule);
+    const preview = sittingEstimate(upcomingBuilt.queue.length, {
+      mcTermCards: (upcomingBuilt.mcTermIds || []).length,
+      mcDefCards: (upcomingBuilt.mcDefIds || []).length,
+    });
+    const leftHalfway = reviewingPlan || (
+      (spaced.resumeIds || []).length > 0
+      && (!spaced.resumeSitting || spaced.resumeSitting === sittingN)
+    );
+    const beginSitting = () => {
+      setReviewingPlan(false);
+      if (spaced.phase === 'drill') return;
+      if (spaced.phase === 'chunk_break') {
+        startSitting({ keepResults: true });
+        return;
+      }
+      startSitting();
+    };
     return (
       <div className="min-h-[100dvh] bg-background text-foreground flex flex-col">
-        <header className="px-3 pt-safe pb-2">
+        <header className="px-3 pt-safe pb-2 flex items-center justify-between gap-2">
           <button
             type="button"
             onClick={() => navigate('/')}
@@ -744,6 +860,14 @@ export default function SpacedCram() {
           >
             <ArrowLeft className="w-5 h-5" />
           </button>
+          <Button
+            type="button"
+            variant="outline"
+            onClick={() => persistSitting({ ...spaced, editingTimes: true })}
+            className="h-10 rounded-full px-4 text-sm font-semibold"
+          >
+            Change times
+          </Button>
         </header>
         <main className="flex-1 px-6 pb-4 overflow-y-auto">
           <div className="max-w-md mx-auto w-full">
@@ -761,6 +885,14 @@ export default function SpacedCram() {
                     {shakyNames.map((name) => <li key={name}>{name}</li>)}
                   </ul>
                 )}
+                {recognizedNames.length > 0 && (
+                  <div className="text-sm text-emerald-800 dark:text-emerald-300">
+                    <p>{RECOGNIZED_LINE}</p>
+                    <ul className="leading-relaxed">
+                      {recognizedNames.map((name) => <li key={name}>{name}</li>)}
+                    </ul>
+                  </div>
+                )}
                 <p className="text-sm text-muted-foreground">{solidNames.length ? solidNames.join(', ') : `Solid: ${glance.solid}`}</p>
               </div>
             )}
@@ -774,7 +906,7 @@ export default function SpacedCram() {
                 )}
               </div>
             )}
-            {!finishedAll && !ready && (
+            {!finishedAll && !ready && !leftHalfway && (
               <div className="mb-4 text-center">
                 <p className="text-sm">{WAIT_WHY}</p>
                 <p className="text-2xl font-bold tabular-nums mt-1">{countdownLabel(spaced.nextDueAt, now)}</p>
@@ -793,18 +925,25 @@ export default function SpacedCram() {
         </main>
         <footer className="px-6 pt-2 pb-safe">
           <div className="max-w-md mx-auto w-full flex flex-col gap-3">
-            {!finishedAll && ready && (
-              <Button className="h-14 rounded-2xl text-base font-semibold" onClick={() => startSitting()}>
-                {justFinished ? 'Start next sitting' : 'Start this sitting'}
+            {!finishedAll && (ready || leftHalfway) && (
+              <Button className="h-14 rounded-2xl text-base font-semibold" onClick={beginSitting}>
+                {leftHalfway ? 'Continue' : 'Start'}
               </Button>
             )}
             {Number(spaced.examTime) > now && (
               <Button
                 variant="outline"
-                className="h-12 rounded-2xl text-base font-semibold"
-                onClick={() => startSitting({ lastLook: true })}
+                className="h-auto whitespace-normal rounded-2xl px-4 py-3 text-base font-semibold flex-col gap-1"
+                onClick={() => {
+                  setReviewingPlan(false);
+                  recordSpacedMetric({ type: 'last_look', sitting: spaced.sittingIndex || 1 });
+                  startSitting({ lastLook: true });
+                }}
               >
-                Last look
+                <span>Last look</span>
+                <span className="text-xs font-normal text-muted-foreground leading-snug">
+                  A short quiz on the terms you still miss. This doesn’t change your plan.
+                </span>
               </Button>
             )}
             {schedule?.large && schedule.bonusCount > 0 && (
@@ -816,14 +955,7 @@ export default function SpacedCram() {
                 {spaced.coreOnly ? 'Include bonus' : 'Core only'}
               </button>
             )}
-            <button
-              type="button"
-              onClick={() => persistSitting({ ...spaced, editingTimes: true })}
-              className="text-sm text-muted-foreground hover:text-foreground underline-offset-4 hover:underline self-center"
-            >
-              Change times
-            </button>
-            {!finishedAll && !ready && (
+            {!finishedAll && !ready && !leftHalfway && (
               <>
                 <Button disabled className="h-14 rounded-2xl text-base font-semibold bg-muted text-muted-foreground">
                   {waitCopy || 'Come back later'}
@@ -844,7 +976,10 @@ export default function SpacedCram() {
                 )}
                 <button
                   type="button"
-                  onClick={() => startSitting()}
+                  onClick={() => {
+                    recordSpacedMetric({ type: 'start_anyway', sitting: spaced.sittingIndex || 1 });
+                    startSitting();
+                  }}
                   className="text-sm text-muted-foreground hover:text-foreground self-center text-center"
                 >
                   <span className="underline underline-offset-4">Start anyway</span>
@@ -852,9 +987,6 @@ export default function SpacedCram() {
                 </button>
               </>
             )}
-            <Button variant="outline" className="h-14 rounded-2xl text-base font-semibold" onClick={endToHome}>
-              Come back later
-            </Button>
             {finishedAll && (
               <Button className="h-14 rounded-2xl text-base font-semibold" onClick={finishAll}>
                 Finish this set
@@ -870,7 +1002,14 @@ export default function SpacedCram() {
   const drillingLast = !!spaced.lastLook;
   const mixReverse = !drillingLast && (drillingBonus || sitting?.type === SESSION_TYPE.REV || sitting?.type === SESSION_TYPE.REV_PLUS);
   const fastPass = drillingLast || (!drillingBonus && !!sitting?.fast);
-  const isFree = !drillingLast && !drillingBonus && sitting?.type === SESSION_TYPE.FREE;
+  const freeSet = new Set(drillingLast || drillingBonus ? [] : (spaced.freeIds || []));
+  const mcIds = drillingLast || drillingBonus ? [] : (spaced.mcIds || []);
+  const mcDirections = {};
+  (spaced.mcTermIds || []).forEach((id) => { mcDirections[id] = 'term'; });
+  (spaced.mcDefIds || []).forEach((id) => { mcDirections[id] = 'def'; });
+  const drillTerms = sittingTerms.filter((t) => !freeSet.has(t.id));
+  const freeTerms = sittingTerms.filter((t) => freeSet.has(t.id));
+  const showFree = !drillingLast && !drillingBonus && (spaced.mixStep === 'free' || (!drillTerms.length && freeTerms.length > 0));
 
   return (
     <div className="min-h-[100dvh] bg-background text-foreground flex flex-col">
@@ -890,39 +1029,44 @@ export default function SpacedCram() {
         {spaced.pickingUp && (
           <p className="text-sm font-medium text-center mb-2">{spaced.pickingUp}</p>
         )}
-        <div className="h-1.5 rounded-full bg-muted overflow-hidden" aria-hidden="true">
-          <div
-            className="h-full bg-primary rounded-full"
-            style={{ width: `${Math.min(100, Math.round((((spaced.clearedIds || []).length) / Math.max(1, spaced.drillTotal || queue.length)) * 100))}%` }}
-          />
-        </div>
-        <p className="text-[11px] text-muted-foreground mt-1 text-center">
-          {sittingEstimate(spaced.drillTotal || queue.length).line}
-          {(spaced.clearedIds || []).length > 0 ? ` · ${(spaced.clearedIds || []).length} done` : ''}
-        </p>
+        <CardProgress
+          done={(spaced.clearedIds || []).length}
+          total={spaced.drillTotal || queue.length}
+          caption={cardProgressCaption(spaced.drillTotal || queue.length, (spaced.clearedIds || []).length, {
+            mcTermCards: (spaced.mcTermIds || []).length,
+            mcDefCards: (spaced.mcDefIds || []).length,
+          })}
+        />
       </div>
       <div className="flex-1 flex flex-col min-h-0">
-        {sittingTerms.length ? (
-          isFree ? (
+        {(showFree ? freeTerms : drillTerms).length ? (
+          showFree ? (
             <SpacedFreeRecall
-              key={queue.join('|')}
-              terms={sittingTerms}
+              key={`free-${queue.join('|')}`}
+              terms={freeTerms}
               blockLabel={drillLabel(sitting, spaced, schedule)}
               onUpdateTerm={updateTerm}
-              onLogAttempt={logAttempt}
+              onLogAttempt={(id, result) => logAttempt(id, result, 'free')}
+              onCardTimed={({ mode, ms }) => recordSpacedMetric({ type: 'card', mode, ms })}
               onDone={onDrillDone}
             />
           ) : (
             <RecallBlock
-              key={queue.join('|')}
-              terms={sittingTerms}
+              key={`drill-${queue.join('|')}`}
+              terms={drillTerms}
               retireThreshold={SITTING_RETIRE_THRESHOLD}
               singlePass={fastPass}
               mixReverse={mixReverse}
+              cardMode="flash"
+              mcIds={mcIds}
+              mcDirections={mcDirections}
+              distractorTerms={terms}
               blockLabel={drillLabel(sitting, spaced, schedule)}
-              examType={setup?.examType || 'mixed'}
+              examType="short_answer"
+              showProgress={false}
               onUpdateTerm={updateTerm}
               onLogAttempt={logAttempt}
+              onCardTimed={({ mode, ms }) => recordSpacedMetric({ type: 'card', mode, ms })}
               onDone={onDrillDone}
             />
           )

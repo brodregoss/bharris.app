@@ -1,6 +1,8 @@
 import React from 'react';
 import { Navigate, Outlet, useLocation } from 'react-router-dom';
 import { useAuth } from '@/lib/AuthContext';
+import { accountRedirect } from '@/lib/accountGate';
+import { devSampleOpen } from '@/lib/devSampleGate';
 
 export default function RequireAccount() {
   const { isAuthenticated, isLoadingAuth } = useAuth();
@@ -14,8 +16,13 @@ export default function RequireAccount() {
     );
   }
 
-  if (!isAuthenticated) {
-    return <Navigate to="/account" replace state={{ from: location.pathname }} />;
+  const dest = accountRedirect({
+    authenticated: isAuthenticated,
+    dev: import.meta.env.DEV === true,
+    sampleOpen: import.meta.env.DEV === true && devSampleOpen(),
+  });
+  if (dest) {
+    return <Navigate to={dest} replace state={{ from: location.pathname }} />;
   }
 
   return <Outlet />;

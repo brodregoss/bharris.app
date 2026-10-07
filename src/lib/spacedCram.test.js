@@ -24,6 +24,14 @@ import {
   offerReminder,
   openSpacedSession,
   pickupLine,
+  buildMcCard,
+  cardModeIds,
+  hasTestFormatCards,
+  freeRecallIds,
+  mixHostIds,
+  orderSittingQueue,
+  pickMcDistractors,
+  recognizedFromResults,
   planEndGlance,
   planProgress,
   recapCopy,
@@ -42,6 +50,10 @@ import {
   unclearedIds,
   welcomeBackLine,
 } from './spacedCram.js';
+import { accountRedirect } from './accountGate.js';
+import { buildDevSampleSession, sampleExitPlan } from './devSampleSession.js';
+import { estimateGapLine, loadSpacedMetrics, logEstimateGap, recordSpacedMetric } from './spacedMetrics.js';
+import { modeTimeLine, sittingEventLine, spacedLogView } from './spacedLogView.js';
 
 function at(y, m, d, h, min) {
   return new Date(y, m, d, h, min, 0, 0).getTime();
@@ -56,6 +68,14 @@ function terms(n, patch) {
     confidence: 'shaky',
     srs: { introduced: false, missCount: 0, solidStreak: 0 },
     ...patch,
+  }));
+}
+
+function shakyIntroduced(n) {
+  return terms(n).map((t) => ({
+    ...t,
+    pile: 'shaky',
+    srs: { introduced: true, missCount: 0, solidStreak: 0, lastGrade: 'miss' },
   }));
 }
 
@@ -1130,6 +1150,14 @@ test('progress copy is a plain shaky delta with a wait countdown', () => {
   assert.equal(recapCopy({ sittingNumber: 1, learned: 12, shakyAfter: 4 }).text.includes('->'), false);
   assert.equal(recapCopy({ sittingNumber: 2, shakyBefore: 11, shakyAfter: 5 }).text, 'Shaky: 11 -> 5');
   assert.equal(
+    shakyDelta(12, 6, 5),
+    '6 still shaky, 5 of them recognized (one recall locks them in)'
+  );
+  assert.equal(
+    recapCopy({ sittingNumber: 2, shakyBefore: 12, shakyAfter: 6, recognized: 5 }).text,
+    '6 still shaky, 5 of them recognized (one recall locks them in)'
+  );
+  assert.equal(
     recapCopy({ sittingNumber: 2, shakyBefore: 5, shakyAfter: 8 }).text,
     'Some slipping overnight is normal. This pass is what fixes it.'
   );
@@ -1192,6 +1220,200 @@ test('a dropped half-finished queue records the cleared grades', () => {
   assert.equal(settled.terms.find((t) => t.id === 't1').srs.solidStreak, 1);
 });
 
+test('test type changes the card mix and not the schedule', () => {
+  const now = at(2026, 9, 4, 14, 0);
+  const exam = at(2026, 9, 6, 9, 0);
+  const input = {
+    now,
+    sleepTime: '23:00',
+    wakeTime: '07:00',
+    examTime: exam,
+    terms: terms(40),
+  };
+  const shape = (plan) => plan.sittings.map((s) => ({
+    sitting: s.sitting,
+    role: s.role,
+    type: s.type,
+    at: s.at,
+  }));
+  const shortPlan = generatePlan({ ...input, testType: 'short_answer' });
+  const choicePlan = generatePlan({ ...input, testType: 'multiple_choice' });
+  const bothPlan = generatePlan({ ...input, testType: 'mixed' });
+  assert.deepEqual(shape(shortPlan), shape(choicePlan));
+  assert.deepEqual(shape(shortPlan), shape(bothPlan));
+
+  const cards = introduced(20, 0);
+  const sittings = [
+    { sitting: 1, role: 'gap', type: 'rev', at: at(2026, 9, 4, 16, 25) },
+    { sitting: 2, role: 'before_bed', type: 'rev', at: at(2026, 9, 4, 22, 40) },
+    { sitting: 3, role: 'wake', type: 'rev_plus', at: at(2026, 9, 5, 7, 0) },
+    { sitting: 4, role: 'before_bed', type: 'rev', at: at(2026, 9, 5, 22, 40) },
+    { sitting: 5, role: 'wake_light', type: 'rev', at: at(2026, 9, 6, 7, 0) },
+    { sitting: 6, role: 'morning', type: 'rev_plus', at: at(2026, 9, 6, 7, 30) },
+  ];
+  assert.deepEqual(mixHostIds(sittings), [4, 5]);
+  assert.equal(freeRecallIds(cards, { sitting: 8, role: 'start', type: 'new', at: now }, 'short_answer', sittings).length, 0);
+  assert.equal(freeRecallIds(cards, sittings[1], 'short_answer', sittings).length, 0);
+  assert.equal(freeRecallIds(cards, sittings[3], 'short_answer', sittings).length, 6);
+  assert.equal(freeRecallIds(cards, sittings[3], 'multiple_choice', sittings, 40).length, 0);
+  assert.equal(cardModeIds(shakyIntroduced(20), sittings[3], 'multiple_choice', sittings, 40).mcIds.length, 8);
+  assert.equal(freeRecallIds(cards, sittings[3], 'mixed', sittings, 40).length, 4);
+  assert.equal(cardModeIds(shakyIntroduced(20), sittings[3], 'mixed', sittings, 40).mcIds.length, 4);
+  assert.equal(cardModeIds(cards, sittings[3], 'multiple_choice', sittings, 40).mcIds.length, 0);
+  assert.equal(freeRecallIds(cards, sittings[4], 'short_answer', sittings).length, 6);
+  assert.equal(freeRecallIds(cards, sittings[5], 'short_answer', sittings).length, 0);
+  assert.equal(freeRecallIds(cards, sittings[5], 'multiple_choice', sittings).length, 0);
+  const midday = { sitting: 7, role: 'midday', type: 'free', at: at(2026, 9, 5, 13, 0) };
+  assert.equal(freeRecallIds(cards, midday, 'multiple_choice', [...sittings, midday]).length, cards.length);
+  assert.equal(sittingEndedShaky({ missCount: 1, lastGrade: 'miss' }), true);
+});
+
+test('a sample session is short answer with 12 or 60 terms', () => {
+  const now = at(2026, 9, 5, 14, 0);
+  const small = buildDevSampleSession(12, now);
+  const large = buildDevSampleSession(60, now);
+  assert.equal(small.terms.length, 12);
+  assert.equal(large.terms.length, 60);
+  assert.equal(small.setup.examType, 'short_answer');
+  assert.equal(large.setup.examType, 'short_answer');
+  assert.equal(small.setup.examTiming, 'tomorrow');
+  assert.equal(small.setup.studyMode, 'spaced_cram');
+  assert.ok(small.terms.every((t) => t.term && t.definition));
+  assert.equal(small.spaced.stopTime, '22:30');
+  assert.equal(small.spaced.wakeTime, '07:00');
+  assert.ok(small.spaced.examTime > now);
+  assert.equal(buildDevSampleSession(1, now).terms.length, 12);
+});
+
+test('small mix sittings keep a free-recall floor', () => {
+  const host = [
+    { sitting: 1, role: 'gap', type: 'rev', at: 1 },
+    { sitting: 2, role: 'before_bed', type: 'rev', at: 2 },
+    { sitting: 3, role: 'morning', type: 'rev_plus', at: 3 },
+  ];
+  const bed = host[1];
+  const morning = host[2];
+  const count = (n, type, sitting = bed) => freeRecallIds(introduced(n, 0), sitting, type, host).length;
+  assert.equal(count(1, 'short_answer'), 0);
+  assert.equal(count(4, 'short_answer'), 1);
+  assert.equal(count(5, 'short_answer'), 2);
+  assert.equal(count(6, 'short_answer'), 2);
+  assert.equal(count(20, 'short_answer', morning), 0);
+  assert.equal(count(20, 'multiple_choice', morning), 0);
+});
+
+test('RequireAccount sends signed-out people to the account screen when dev mode is off', () => {
+  assert.equal(accountRedirect({ authenticated: false, dev: false, sampleOpen: true }), '/account');
+  assert.equal(accountRedirect({ authenticated: false, dev: false, sampleOpen: false }), '/account');
+  assert.equal(accountRedirect({ authenticated: false, dev: true, sampleOpen: true }), null);
+  assert.equal(accountRedirect({ authenticated: true, dev: false }), null);
+});
+
+test('exit sample restores the previous account', () => {
+  assert.deepEqual(sampleExitPlan('user-1'), { uid: 'user-1', path: '/' });
+  assert.deepEqual(sampleExitPlan(''), { uid: '', path: '/account' });
+  assert.deepEqual(sampleExitPlan('dev-sample'), { uid: '', path: '/account' });
+});
+
+test('multiple choice is a middle-and-late mix and stays off a small deck', () => {
+  const sittings = [
+    { sitting: 1, role: 'start', type: 'new', at: 1 },
+    { sitting: 2, role: 'gap', type: 'rev', at: 2 },
+    { sitting: 3, role: 'gap', type: 'rev_plus', at: 3 },
+    { sitting: 4, role: 'morning', type: 'rev_plus', at: 4 },
+  ];
+  const cards = introduced(20, 0);
+  const fresh = terms(20);
+  assert.equal(cardModeIds(cards, sittings[0], 'multiple_choice', sittings, 20).mcIds.length, 0);
+  assert.equal(cardModeIds(cards, sittings[1], 'multiple_choice', sittings, 20).mcIds.length, 0);
+  assert.equal(cardModeIds(cards, sittings[3], 'multiple_choice', sittings, 20).mcIds.length, 0);
+  assert.equal(cardModeIds(cards, sittings[2], 'multiple_choice', sittings, 7).mcIds.length, 0);
+  assert.equal(cardModeIds(fresh, sittings[2], 'multiple_choice', sittings, 20).mcIds.length, 0);
+  const shaky = shakyIntroduced(20);
+  const mc = cardModeIds(shaky, sittings[2], 'multiple_choice', sittings, 20);
+  assert.equal(mc.freeIds.length, 0);
+  assert.equal(mc.mcIds.length, 8);
+  assert.ok(mc.mcTermIds.length > 0);
+  assert.ok(mc.mcDefIds.length > 0);
+  assert.equal(mc.mcTermIds.length + mc.mcDefIds.length, mc.mcIds.length);
+  assert.equal(cardModeIds(cards, sittings[2], 'multiple_choice', sittings, 20).mcIds.length, 0);
+  const both = cardModeIds(shaky, sittings[2], 'mixed', sittings, 20);
+  assert.equal(both.freeIds.length, 4);
+  assert.equal(both.mcIds.length, 4);
+  const overlap = both.freeIds.filter((id) => both.mcIds.includes(id));
+  assert.equal(overlap.length, 0);
+  const flashOnly = sittingEstimate(20);
+  const withMc = sittingEstimate(20, { mcCards: 8 });
+  const termCards = sittingEstimate(20, { mcTermCards: 10 });
+  const defCards = sittingEstimate(20, { mcDefCards: 10 });
+  assert.equal(flashOnly.cards, 20);
+  assert.equal(withMc.cards, 20);
+  assert.ok(withMc.minutes < flashOnly.minutes);
+  assert.equal(termCards.seconds, 10 * 22 + 10 * 12);
+  assert.equal(defCards.seconds, 10 * 22 + 10 * 18);
+  assert.equal(termCards.cards, defCards.cards);
+  assert.ok(termCards.seconds < defCards.seconds);
+  assert.ok(defCards.seconds < flashOnly.seconds);
+});
+
+test('multiple choice distractors are unique and never repeat a correct answer', () => {
+  const correct = { id: 'c', term: 'Mitosis', definition: 'Cell division', tier: 'core', category: 'bio' };
+  const deck = [
+    correct,
+    { id: 'dup', term: 'Mitosis', definition: 'Same name', tier: 'core', category: 'bio' },
+    { id: 'also', term: 'Meiosis', definition: 'Cell division', tier: 'core', category: 'bio' },
+    { id: 'near', term: 'Mitochondria', definition: 'Makes energy', tier: 'core', category: 'bio' },
+    { id: 'far', term: 'Sonata', definition: 'A piece of music', tier: 'passive', category: 'music' },
+    { id: 'other', term: 'Axon', definition: 'A nerve fiber', tier: 'core', category: 'bio' },
+    { id: 'last', term: 'Tide', definition: 'Rising water', tier: 'passive', category: 'geo' },
+  ];
+  const picks = pickMcDistractors(deck, correct, 3);
+  assert.equal(new Set(picks).size, picks.length);
+  assert.equal(picks.includes('Mitosis'), false);
+  assert.equal(picks.includes('Meiosis'), false);
+  assert.equal(picks[0], 'Mitochondria');
+  assert.equal(picks.length, 3);
+  const defs = pickMcDistractors(deck, correct, 3, 'def');
+  assert.equal(defs.includes('Cell division'), false);
+  assert.equal(defs[0], 'Makes energy');
+  assert.equal(buildMcCard(deck, correct, 'term')?.options.length, 4);
+  assert.equal(buildMcCard(deck, correct, 'def')?.options.length, 4);
+  assert.equal(buildMcCard([correct, deck[3]], correct, 'term'), null);
+});
+
+test('a correct multiple choice answer is half credit until a retrieval success', () => {
+  const bucket = {};
+  recordAttempt(bucket, 'a', 'got_it', 'mc');
+  assert.equal(bucket.a.lastGrade, 'partial');
+  assert.equal(bucket.a.mode, 'mc');
+  const [held] = applySittingResults([
+    { id: 'a', pile: 'shaky', term: 'A', srs: { introduced: true, solidStreak: 0, lastGrade: 'miss' } },
+  ], bucket);
+  assert.equal(held.pile, 'shaky');
+  assert.equal(held.srs.solidStreak, 0);
+  assert.equal(held.srs.mcCredit, 0.5);
+  assert.equal(held.srs.lastMode, 'mc');
+  assert.equal(held.srs.lastGrade, 'partial');
+  const later = {};
+  recordAttempt(later, 'a', 'got_it', 'free');
+  const [solid] = applySittingResults([held], later);
+  assert.equal(solid.pile, 'solid');
+  assert.equal(solid.srs.lastMode, 'free');
+  assert.equal(solid.srs.solidStreak, 1);
+  const missed = {};
+  recordAttempt(missed, 'b', 'missed', 'mc');
+  const [shaky] = applySittingResults([
+    {
+      id: 'b',
+      pile: 'solid',
+      srs: { introduced: true, solidStreak: 2, lastGrade: 'hit', solidFinishes: [{ at: 1, afterSleep: false }, { at: 2, afterSleep: true }] },
+    },
+  ], missed);
+  assert.equal(shaky.pile, 'shaky');
+  assert.equal(shaky.srs.solidStreak, 0);
+  assert.equal(shaky.srs.lastMode, 'mc');
+});
+
 test('partly counts as shaky and a saved attempt shows only after a miss', () => {
   const bucket = {};
   recordAttempt(bucket, 'a', 'partly');
@@ -1205,4 +1427,191 @@ test('partly counts as shaky and a saved attempt shows only after a miss', () =>
   assert.equal(term.srs.solidStreak, 0);
   assert.equal(savedAttemptForMiss({ srs: { lastGrade: 'hit' }, freeAttempt: 'old' }), '');
   assert.equal(savedAttemptForMiss({ srs: { lastGrade: 'miss' }, freeAttempt: ' mitochondria ' }), 'mitochondria');
+});
+
+test('multiple choice is saved for shaky and low-streak terms', () => {
+  const sittings = [
+    { sitting: 1, role: 'start', type: 'new', at: 1 },
+    { sitting: 2, role: 'gap', type: 'rev', at: 2 },
+    { sitting: 3, role: 'gap', type: 'rev_plus', at: 3 },
+  ];
+  const shaky = (id, streak) => ({
+    id,
+    term: `Term ${id}`,
+    definition: `Def ${id}`,
+    pile: 'shaky',
+    srs: { introduced: true, solidStreak: streak, lastGrade: 'miss' },
+  });
+  const solid = (id) => ({
+    id,
+    term: `Term ${id}`,
+    definition: `Def ${id}`,
+    pile: 'solid',
+    srs: { introduced: true, solidStreak: 1, lastGrade: 'hit' },
+  });
+  const locked = {
+    id: 'locked',
+    term: 'Locked term',
+    definition: 'Locked def',
+    pile: 'solid',
+    srs: {
+      introduced: true,
+      solidStreak: 2,
+      lastGrade: 'hit',
+      solidFinishes: [{ at: 0 }, { at: 100 * 60 * 1000 }],
+    },
+  };
+  const cards = [
+    locked,
+    solid('s0'),
+    solid('s1'),
+    shaky('low', 1),
+    ...Array.from({ length: 16 }, (_, i) => shaky(`k${i}`, 0)),
+  ];
+  const mc = cardModeIds(cards, sittings[2], 'multiple_choice', sittings, 20);
+  assert.equal(mc.mcIds.length, 8);
+  assert.ok(mc.mcIds.every((id) => id.startsWith('k')));
+  assert.equal(mc.mcIds.includes('low'), false);
+  assert.equal(mc.mcIds.includes('locked'), false);
+  assert.equal(mc.mcIds.includes('s0'), false);
+  const short = [
+    shaky('only0', 0),
+    shaky('only1', 0),
+    shaky('only2', 0),
+    shaky('mid', 1),
+    solid('keep'),
+    locked,
+    ...Array.from({ length: 14 }, (_, i) => solid(`fill${i}`)),
+  ];
+  const few = cardModeIds(short, sittings[2], 'multiple_choice', sittings, 20);
+  assert.deepEqual(few.mcIds, ['only0', 'only1', 'only2', 'mid']);
+  assert.equal(few.mcTermIds.length, 2);
+  assert.equal(few.mcDefIds.length, 2);
+});
+
+test('a thin option list stays a flashcard and multiple choice is interleaved', () => {
+  const sittings = [
+    { sitting: 1, role: 'start', type: 'new', at: 1 },
+    { sitting: 2, role: 'gap', type: 'rev', at: 2 },
+    { sitting: 3, role: 'gap', type: 'rev_plus', at: 3 },
+  ];
+  const pair = (id, term, definition) => ({
+    id,
+    term,
+    definition,
+    pile: 'shaky',
+    srs: { introduced: true, solidStreak: 0, lastGrade: 'miss' },
+  });
+  const thin = [
+    pair('a', 'Alpha', 'A def'),
+    pair('b', 'Beta', 'B def'),
+    ...Array.from({ length: 6 }, (_, i) => pair(`d${i}`, 'Alpha', 'A def')),
+  ];
+  assert.deepEqual(cardModeIds(thin, sittings[2], 'multiple_choice', sittings, 8).mcIds, []);
+  const ordered = orderSittingQueue(
+    ['a', 'b', 'c', 'd', 'e', 'f', 'g', 'h'],
+    { freeIds: ['g', 'h'], mcIds: ['b', 'e'] }
+  );
+  assert.deepEqual(ordered.slice(-2), ['g', 'h']);
+  const drill = ordered.slice(0, -2);
+  const mcAt = ['b', 'e'].map((id) => drill.indexOf(id));
+  assert.ok(mcAt.every((at) => at >= 0));
+  assert.ok(mcAt[0] < drill.length - mcAt.length);
+  const bucket = {};
+  recordAttempt(bucket, 'a', 'got_it', 'mc');
+  recordAttempt(bucket, 'b', 'got_it', 'flash');
+  assert.deepEqual(recognizedFromResults(bucket), ['a']);
+});
+
+test('sitting metrics are stored on this device', () => {
+  const data = new Map();
+  const storage = {
+    getItem: (key) => (data.has(key) ? data.get(key) : null),
+    setItem: (key, value) => data.set(key, String(value)),
+  };
+  recordSpacedMetric({ type: 'sitting_started', sitting: 2 }, storage);
+  recordSpacedMetric({ type: 'card', mode: 'flash', ms: 20000 }, storage);
+  recordSpacedMetric({ type: 'card', mode: 'mc_term', ms: 11000 }, storage);
+  recordSpacedMetric({ type: 'card', mode: 'mc_def', ms: 17000 }, storage);
+  recordSpacedMetric({ type: 'card', mode: 'free', ms: 25000 }, storage);
+  recordSpacedMetric({ type: 'start_anyway', sitting: 2 }, storage);
+  recordSpacedMetric({ type: 'last_look' }, storage);
+  recordSpacedMetric({ type: 'sitting_abandoned', sitting: 2, actualMs: 4000 }, storage);
+  recordSpacedMetric({ type: 'sitting_completed', sitting: 3, estimatedSeconds: 120, actualMs: 90000 }, storage);
+  const saved = loadSpacedMetrics(storage);
+  assert.deepEqual(saved.events.map((event) => event.type), [
+    'sitting_started',
+    'card',
+    'card',
+    'card',
+    'card',
+    'start_anyway',
+    'last_look',
+    'sitting_abandoned',
+    'sitting_completed',
+  ]);
+  assert.deepEqual(saved.cardMs.mc_term, [11000]);
+  assert.deepEqual(saved.cardMs.mc_def, [17000]);
+  assert.deepEqual(saved.cardMs.flash, [20000]);
+  assert.deepEqual(saved.cardMs.free, [25000]);
+  assert.equal(estimateGapLine(120, 90000), 'Time gap: estimated 120s, actual 90s (-30s)');
+  const lines = [];
+  assert.equal(logEstimateGap(120, 90000, { dev: false, log: (line) => lines.push(line) }), '');
+  assert.equal(lines.length, 0);
+  assert.equal(
+    logEstimateGap(120, 90000, { dev: true, log: (line) => lines.push(line) }),
+    'Time gap: estimated 120s, actual 90s (-30s)'
+  );
+  assert.equal(lines.length, 1);
+  const view = spacedLogView(saved);
+  assert.deepEqual(view.sittings.map((event) => event.type), [
+    'sitting_started',
+    'start_anyway',
+    'last_look',
+    'sitting_abandoned',
+    'sitting_completed',
+  ]);
+  assert.equal(sittingEventLine(saved.events.at(-1)), 'Sitting 3 completed: estimated 120s, actual 90s');
+  assert.equal(sittingEventLine(saved.events.find((event) => event.type === 'start_anyway')), 'Start anyway, sitting 2');
+  assert.equal(sittingEventLine(saved.events.find((event) => event.type === 'last_look')), 'Last look');
+  const term = view.modes.find((mode) => mode.mode === 'mc_term');
+  const def = view.modes.find((mode) => mode.mode === 'mc_def');
+  assert.equal(modeTimeLine(term), 'mc_term: estimated 12s, actual 11s (1 card)');
+  assert.equal(modeTimeLine(def), 'mc_def: estimated 18s, actual 17s (1 card)');
+  assert.equal(modeTimeLine(view.modes.find((mode) => mode.mode === 'flash')), 'flash: estimated 22s, actual 20s (1 card)');
+});
+
+test('the sitting log keeps the most recent 200 events', () => {
+  const data = new Map();
+  const storage = {
+    getItem: (key) => (data.has(key) ? data.get(key) : null),
+    setItem: (key, value) => data.set(key, String(value)),
+  };
+  for (let i = 0; i < 205; i += 1) {
+    recordSpacedMetric({ type: 'sitting_started', sitting: i, at: i }, storage);
+  }
+  const saved = loadSpacedMetrics(storage);
+  assert.equal(saved.events.length, 200);
+  assert.equal(saved.events[0].sitting, 5);
+  assert.equal(saved.events.at(-1).sitting, 204);
+});
+
+test('the format line follows the cards in the current sitting', () => {
+  const sittings = [
+    { sitting: 1, role: 'start', type: 'new', at: 1 },
+    { sitting: 2, role: 'gap', type: 'rev', at: 2 },
+    { sitting: 3, role: 'before_bed', type: 'rev', at: 3 },
+    { sitting: 4, role: 'morning', type: 'rev_plus', at: 4 },
+  ];
+  const shaky = shakyIntroduced(20);
+  const solid = introduced(20, 1);
+  const bed = sittings[2];
+  const morning = sittings[3];
+  assert.equal(hasTestFormatCards(cardModeIds(shaky, bed, 'multiple_choice', sittings, 20), 'multiple_choice'), true);
+  assert.equal(hasTestFormatCards(cardModeIds(solid, bed, 'multiple_choice', sittings, 20), 'multiple_choice'), false);
+  assert.equal(hasTestFormatCards(cardModeIds(solid, bed, 'mixed', sittings, 20), 'mixed'), false);
+  assert.equal(hasTestFormatCards(cardModeIds(shaky, bed, 'mixed', sittings, 20), 'mixed'), true);
+  assert.equal(hasTestFormatCards(cardModeIds(shaky, bed, 'short_answer', sittings, 20), 'short_answer'), true);
+  assert.equal(hasTestFormatCards(cardModeIds(solid, morning, 'short_answer', sittings, 20), 'short_answer'), false);
+  assert.equal(hasTestFormatCards(cardModeIds(shaky, sittings[0], 'multiple_choice', sittings, 20), 'multiple_choice'), false);
 });

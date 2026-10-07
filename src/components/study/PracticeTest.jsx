@@ -548,6 +548,10 @@ export default function PracticeTest({ terms, examType, budgetMs, priorMissed, o
                     </div>
                   )}
                   <div className="rounded-xl bg-muted p-3 text-lg leading-relaxed">
+                    <p className="text-[11px] uppercase tracking-wide text-muted-foreground">Your answer</p>
+                    <p className="mt-1 whitespace-pre-wrap">{clampChars(shortAnswer, MAX_SHORT_ANSWER_CHARS).trim()}</p>
+                  </div>
+                  <div className="rounded-xl bg-muted p-3 text-lg leading-relaxed">
                     <p className="text-[11px] uppercase tracking-wide text-muted-foreground">Correct answer</p>
                     <p className="mt-1">{q.definition}</p>
                   </div>

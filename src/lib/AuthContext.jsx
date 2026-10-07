@@ -26,6 +26,7 @@ import { cancelPendingCloudSave, hydrateRemoteSession } from '@/lib/sessionStore
 import { configurePurchases, logOutPurchases } from '@/lib/premiumAccess';
 import { closeAdminGate } from '@/lib/adminGate';
 import { clearAccountLocalData, getActiveUid } from '@/lib/userStorage';
+import { devSampleOpen } from '@/lib/devSampleGate';
 import { formatPersonName } from '@/lib/personName';
 
 const AuthContext = createContext();
@@ -66,7 +67,7 @@ export const AuthProvider = ({ children }) => {
           setFirebaseUser(next || null);
           if (!next) {
             cancelPendingCloudSave();
-            clearAccountCache();
+            if (!(import.meta.env.DEV && devSampleOpen())) clearAccountCache();
             setUser(null);
             setIsLoadingAuth(false);
             return;
@@ -102,6 +103,16 @@ export const AuthProvider = ({ children }) => {
       unsubscribe();
     };
   }, []);
+
+  useEffect(() => {
+    if (!firebaseUser) return undefined;
+    const onVisible = () => {
+      if (document.visibilityState !== 'visible') return;
+      refreshUser().catch(() => {});
+    };
+    document.addEventListener('visibilitychange', onVisible);
+    return () => document.removeEventListener('visibilitychange', onVisible);
+  }, [firebaseUser]);
 
   const value = useMemo(() => {
     const refresh = async () => {

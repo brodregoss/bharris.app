@@ -1,6 +1,6 @@
 import React from 'react';
 import { Capacitor } from '@capacitor/core';
-import { Check, Loader2, Lock } from 'lucide-react';
+import { Check, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -11,28 +11,57 @@ import {
   SheetHeader,
   SheetTitle,
 } from '@/components/ui/sheet';
-import { PLANS } from '@/lib/plans';
+import {
+  AlertDialog,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
+import { APP_CONFIG } from '@/lib/appConfig';
+import { PLANS, planLabel } from '@/lib/plans';
+import { checkoutDestination } from '../../../scripts/plan-marks.js';
+import { canCancelWebsitePlan, cancelPlanConfirm, cancelPlanNote } from '../../../scripts/account-plan.js';
 import { useAuth } from '@/lib/AuthContext';
-import { restorePurchases, revenueCatConfigured } from '@/lib/premiumAccess';
-import { refreshUser, unlockStudyPro } from '@/lib/accountStore';
+import {
+  cancelWebsitePlan,
+  getUsage,
+  openBillingPortal,
+  redeemPartnerCode,
+  startCheckout,
+} from '@/lib/accountStore';
+import { openBillingUrl } from '@/lib/billingUrl';
 import { cn } from '@/lib/utils';
 
-function PlanCard({ plan, current, highlight, onSelect }) {
-  const className = cn(
-    'rounded-2xl border p-4 text-left w-full',
-    highlight ? 'border-foreground bg-card' : 'border-border bg-muted/40',
-    onSelect && 'hover:bg-accent/40 transition',
-  );
-  const body = (
-    <>
+function formatPlanDate(iso) {
+  const date = new Date(iso || '');
+  if (Number.isNaN(date.getTime())) return '';
+  return date.toLocaleDateString(undefined, { month: 'long', day: 'numeric', year: 'numeric' });
+}
+
+function PlanCard({ plan, current, highlight, action, busy }) {
+  return (
+    <div className={cn(
+      'rounded-2xl border p-4 text-left w-full',
+      highlight ? 'border-foreground bg-card' : 'border-border bg-muted/40',
+    )}
+    >
       <div className="flex items-baseline justify-between gap-3">
         <p className="text-sm font-bold tracking-tight">{plan.name}</p>
-        {current && (
+        {current && !plan.monthlyPrice && (
           <span className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
             Current
           </span>
         )}
       </div>
+      {plan.monthlyPrice && (
+        <p className="text-lg font-bold tracking-tight mt-1">
+          {plan.monthlyPrice}
+          <span className="text-sm font-medium text-muted-foreground"> / month</span>
+        </p>
+      )}
       <p className="text-xs text-muted-foreground mt-1">{plan.blurb}</p>
       <ul className="mt-3 space-y-1.5">
         {plan.features.map((feature) => (
@@ -42,158 +71,259 @@ function PlanCard({ plan, current, highlight, onSelect }) {
           </li>
         ))}
       </ul>
-    </>
-  );
-  if (!onSelect) return <div className={className}>{body}</div>;
-  return (
-    <button type="button" onClick={onSelect} className={className}>
-      {body}
-    </button>
+      {action ? (
+        <Button
+          type="button"
+          className="w-full h-11 rounded-2xl mt-4 font-semibold"
+          disabled={busy}
+          onClick={action.onClick}
+        >
+          {busy ? <Loader2 className="w-4 h-4 animate-spin" /> : action.label}
+        </Button>
+      ) : current && plan.monthlyPrice ? (
+        <div className="w-full h-11 rounded-2xl mt-4 font-semibold bg-primary text-primary-foreground flex items-center justify-center">
+          Current
+        </div>
+      ) : null}
+    </div>
   );
 }
 
 export default function PaywallSheet({ open, onOpenChange }) {
   const { user } = useAuth();
-  const [loading, setLoading] = React.useState(false);
+  const [busy, setBusy] = React.useState('');
   const [error, setError] = React.useState('');
-  const [passwordOpen, setPasswordOpen] = React.useState(false);
-  const [password, setPassword] = React.useState('');
-  const [passwordError, setPasswordError] = React.useState('');
-  const isPro = user?.subscriptionTier === 'pro';
-  const native = Capacitor.isNativePlatform() && revenueCatConfigured();
+  const [code, setCode] = React.useState('');
+  const [redeemCode, setRedeemCode] = React.useState('');
+  const [cancelOpen, setCancelOpen] = React.useState(false);
+
+  const billingPlan = user?.billingPlan || '';
+  const websitePlan = billingPlan === 'solo' || billingPlan === 'partner';
+  const canCancel = canCancelWebsitePlan(user);
+  const canceledNote = cancelPlanNote(user);
+  const accessUntil = formatPlanDate(user?.subscriptionStatus === 'trialing' ? user?.trialEndsAt : user?.periodEndsAt);
+  const currentFree = !billingPlan && user?.subscriptionTier !== 'pro';
+  const currentStudy = billingPlan === 'solo';
+  const currentPartner = billingPlan === 'partner' || billingPlan === 'guest';
 
   React.useEffect(() => {
-    if (open) return;
-    setPasswordOpen(false);
-    setPassword('');
-    setPasswordError('');
-    setError('');
+    if (!open) {
+      setError('');
+      setBusy('');
+      setCancelOpen(false);
+      return undefined;
+    }
+    let cancelled = false;
+    getUsage().catch(() => {
+      if (!cancelled) setError('');
+    });
+    return () => { cancelled = true; };
   }, [open]);
 
-  const askPassword = () => {
-    setPassword('');
-    setPasswordError('');
-    setPasswordOpen(true);
-  };
-
-  const submitPassword = async (event) => {
-    event.preventDefault();
-    const attempt = password.trim();
-    if (!attempt) {
-      setPasswordError('Enter the password.');
-      return;
-    }
-    setLoading(true);
-    setPasswordError('');
-    try {
-      await unlockStudyPro(attempt);
-      setPasswordOpen(false);
-      setPassword('');
-      onOpenChange(false);
-    } catch (err) {
-      setPasswordError(err.message || 'That password is wrong.');
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const restore = async () => {
-    setLoading(true);
+  const run = async (name, action) => {
+    setBusy(name);
     setError('');
     try {
-      await restorePurchases();
-      await refreshUser();
-      onOpenChange(false);
+      await action();
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Could not restore purchases.');
+      setError(err instanceof Error ? err.message : 'Something went wrong.');
     } finally {
-      setLoading(false);
+      setBusy('');
     }
   };
 
+  const subscribe = (plan) => run(plan, async () => {
+    const data = await startCheckout(plan, code);
+    if (data.granted) {
+      const path = checkoutDestination(plan, data);
+      if (Capacitor.isNativePlatform()) {
+        const origin = APP_CONFIG.workerUrl;
+        if (origin) await openBillingUrl(`${origin}${path}`);
+        onOpenChange(false);
+        return;
+      }
+      window.location.assign(path);
+      return;
+    }
+    if (!data.url) throw new Error('Could not start checkout.');
+    await openBillingUrl(data.url);
+    if (!Capacitor.isNativePlatform()) onOpenChange(false);
+  });
+
+  const subscribeAction = (planId, isCurrent) => {
+    if (isCurrent && billingPlan !== 'guest') return null;
+    return { label: 'Subscribe', onClick: () => subscribe(planId) };
+  };
+
+  const manageBilling = () => run('portal', async () => {
+    const data = await openBillingPortal();
+    await openBillingUrl(data.url);
+  });
+
+  const redeem = (event) => {
+    event.preventDefault();
+    const attempt = redeemCode.trim();
+    if (!attempt) {
+      setError('Enter a code.');
+      return;
+    }
+    run('redeem', async () => {
+      await redeemPartnerCode(attempt);
+      setRedeemCode('');
+      onOpenChange(false);
+    });
+  };
+
+  const studyAction = subscribeAction('solo', currentStudy);
+  const partnerAction = subscribeAction('partner', currentPartner);
+
   return (
-    <Sheet open={open} onOpenChange={onOpenChange}>
-      <SheetContent side="bottom" className="rounded-t-3xl max-h-[85dvh] overflow-y-auto">
-        {!passwordOpen && (
+    <>
+      <Sheet open={open} onOpenChange={onOpenChange}>
+        <SheetContent side="bottom" className="rounded-t-3xl max-h-[85dvh] overflow-y-auto">
           <SheetHeader className="text-left pr-10">
             <SheetTitle>Plans</SheetTitle>
             <SheetDescription>
-              Free gets you started. Study Pro is for the nights you need more AI.
+              Study is $8 a month. Partner study is $12 a month and covers one friend. A plan bought on the website is the same plan here.
             </SheetDescription>
           </SheetHeader>
-        )}
-        {passwordOpen ? (
-          <form onSubmit={submitPassword} className="pt-2 pb-6">
-            <div className="flex items-center justify-center w-11 h-11 rounded-2xl bg-primary text-primary-foreground mb-4">
-              <Lock className="w-5 h-5" />
-            </div>
-            <h2 className="text-lg font-bold tracking-tight">Study Pro</h2>
-            <p className="text-sm text-muted-foreground mt-1">Enter the password to unlock Study Pro.</p>
-            <div className="space-y-2 mt-4">
-              <Label htmlFor="pro-password">Password</Label>
-              <Input
-                id="pro-password"
-                type="password"
-                autoComplete="off"
-                autoFocus
-                value={password}
-                onChange={(event) => setPassword(event.target.value)}
-                className="h-12 rounded-2xl"
-              />
-            </div>
-            {passwordError && (
-              <p className="text-sm text-destructive mt-3">{passwordError}</p>
+          <div className="space-y-3 pt-4 pb-6">
+            {error && <p className="text-sm text-destructive">{error}</p>}
+            {user?.billingNotice === 'beta_ended' && !billingPlan && (
+              <p className="text-sm text-muted-foreground">Your free week ended.</p>
             )}
-            <Button type="submit" className="w-full h-12 rounded-2xl mt-4 font-semibold" disabled={loading}>
-              {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Unlock'}
-            </Button>
-            <button
-              type="button"
-              className="w-full text-sm text-muted-foreground mt-3 py-2"
-              onClick={() => setPasswordOpen(false)}
-              disabled={loading}
-            >
-              Cancel
-            </button>
-          </form>
-        ) : (
-        <div className="space-y-3 pt-4 pb-6">
-          {error && (
-            <p className="text-sm text-destructive">{error}</p>
-          )}
-          <PlanCard plan={PLANS.free} current={!isPro} />
-          <PlanCard
-            plan={PLANS.pro}
-            current={isPro}
-            highlight
-            onSelect={isPro ? undefined : askPassword}
-          />
-          {isPro ? (
-            <p className="text-sm text-muted-foreground text-center pt-1">
-              You are on Study Pro. Thanks for supporting the cram.
-            </p>
-          ) : (
+            {canceledNote && (
+              <p className="text-sm text-muted-foreground">{canceledNote}</p>
+            )}
+            {websitePlan && !user?.cancelAtPeriodEnd && user?.billingPromo === 'beta' && accessUntil && (
+              <p className="text-sm text-muted-foreground">Free trial ends {accessUntil}. You won't be charged.</p>
+            )}
+            {websitePlan && !user?.cancelAtPeriodEnd && user?.billingPromo !== 'beta' && accessUntil && (
+              <p className="text-sm text-muted-foreground">Next billing date {accessUntil}.</p>
+            )}
+            {billingPlan === 'guest' && (
+              <p className="text-sm text-muted-foreground">
+                You're on a friend's partner study plan. If they cancel, you both lose access.
+                {accessUntil ? ` It runs until ${accessUntil}.` : ''}
+              </p>
+            )}
+            {!websitePlan && billingPlan !== 'guest' && user?.subscriptionTier === 'pro' && (
+              <p className="text-sm text-muted-foreground">
+                This Study access is billed through the App Store. Cancel it in your Apple ID subscriptions.
+              </p>
+            )}
+
+            <PlanCard plan={PLANS.free} current={currentFree} />
+            <PlanCard
+              plan={PLANS.study}
+              current={currentStudy}
+              highlight
+              busy={busy === 'solo'}
+              action={studyAction}
+            />
+            <PlanCard
+              plan={PLANS.partner}
+              current={currentPartner}
+              busy={busy === 'partner'}
+              action={partnerAction}
+            />
+
+            {(studyAction || partnerAction) && (
+              <div className="space-y-2">
+                <Label htmlFor="plan-code">Code</Label>
+                <Input
+                  id="plan-code"
+                  value={code}
+                  autoComplete="off"
+                  spellCheck={false}
+                  placeholder="Optional"
+                  onChange={(event) => setCode(event.target.value)}
+                  className="h-11 rounded-2xl"
+                />
+              </div>
+            )}
+
+            {canCancel && (
+              <Button
+                type="button"
+                variant="outline"
+                className="w-full h-11 rounded-2xl"
+                disabled={!!busy}
+                onClick={() => {
+                  setError('');
+                  setCancelOpen(true);
+                }}
+              >
+                Cancel plan
+              </Button>
+            )}
+            {user?.hasBilling && (
+              <Button
+                type="button"
+                variant="outline"
+                className="w-full h-11 rounded-2xl"
+                disabled={!!busy}
+                onClick={manageBilling}
+              >
+                {busy === 'portal' ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Manage billing'}
+              </Button>
+            )}
+
+            {!billingPlan && (
+              <form onSubmit={redeem} className="rounded-2xl border border-border p-4 space-y-3">
+                <p className="text-sm font-bold tracking-tight">Redeem partner code</p>
+                <p className="text-xs text-muted-foreground">
+                  Get a code from someone on partner study. It works for one friend.
+                </p>
+                <Input
+                  value={redeemCode}
+                  autoComplete="off"
+                  spellCheck={false}
+                  placeholder="Partner code"
+                  aria-label="Partner code"
+                  onChange={(event) => setRedeemCode(event.target.value)}
+                  className="h-11 rounded-2xl"
+                />
+                <Button type="submit" className="w-full h-11 rounded-2xl font-semibold" disabled={!!busy}>
+                  {busy === 'redeem' ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Redeem'}
+                </Button>
+              </form>
+            )}
+
+            {websitePlan && (
+              <p className="text-xs text-muted-foreground">
+                {planLabel(user)} is billed through Stripe. Canceling keeps access until the period ends.
+                {billingPlan === 'partner' ? ' Your friend loses access then too.' : ''}
+              </p>
+            )}
+          </div>
+        </SheetContent>
+      </Sheet>
+
+      <AlertDialog open={cancelOpen} onOpenChange={(next) => { if (busy !== 'cancel') setCancelOpen(next); }}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Cancel {planLabel(user)}?</AlertDialogTitle>
+            <AlertDialogDescription>
+              {cancelPlanConfirm(user)}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          {error && cancelOpen && <p className="text-sm text-destructive">{error}</p>}
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={busy === 'cancel'}>Keep plan</AlertDialogCancel>
             <Button
-              className="w-full h-14 rounded-2xl text-base font-semibold"
-              disabled={loading}
-              onClick={askPassword}
+              variant="destructive"
+              disabled={busy === 'cancel'}
+              onClick={() => run('cancel', async () => {
+                await cancelWebsitePlan();
+                setCancelOpen(false);
+              })}
             >
-              Study Pro
+              {busy === 'cancel' ? 'Canceling…' : 'Cancel plan'}
             </Button>
-          )}
-          {native && (
-            <button
-              type="button"
-              className="w-full text-sm text-muted-foreground underline underline-offset-4 py-2"
-              disabled={loading}
-              onClick={restore}
-            >
-              {loading && !passwordOpen ? <Loader2 className="w-4 h-4 animate-spin mx-auto" /> : 'Restore purchases'}
-            </button>
-          )}
-        </div>
-        )}
-      </SheetContent>
-    </Sheet>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+    </>
   );
 }

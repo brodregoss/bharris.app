@@ -1,5 +1,5 @@
 import React from 'react';
-import { ArrowLeft, ArrowRight, Check, Eye, X } from 'lucide-react';
+import { ArrowLeft, ArrowRight } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import { flashcardDef } from '@/lib/studyUtils';
@@ -9,6 +9,8 @@ import WriteOwnDef, {
   writtenReviewPlan,
 } from '@/components/study/WriteOwnDef';
 import { ShortcutKey, useFlashcardShortcuts, useIsComputer } from '@/components/study/flashcardKeys';
+import FlashCardStage from '@/components/study/FlashCardStage';
+import { cardProgressCaption } from '@/components/study/CardProgress';
 
 const COLUMNS = [
   { id: 'blank', label: 'Blank', sub: "Don't know" },
@@ -126,6 +128,8 @@ function Picker({ terms, selected, setSelected, onStart, onBack, startLabel }) {
 function FlashRound({ queue, byId, allTerms, onUpdateTerm, onDone, onBack }) {
   const computer = useIsComputer();
   const [items, setItems] = React.useState(queue);
+  const deckTotalRef = React.useRef(queue.length);
+  const [retired, setRetired] = React.useState(0);
   const [pos, setPos] = React.useState(0);
   const [revealed, setRevealed] = React.useState(false);
   const [misses, setMisses] = React.useState({});
@@ -184,6 +188,7 @@ function FlashRound({ queue, byId, allTerms, onUpdateTerm, onDone, onBack }) {
       });
       return next;
     });
+    setRetired((n) => n + ids.length);
     setItems((prev) => prev.filter((x) => !drop.has(x)));
     setPos((p) => {
       const nextLen = items.filter((id) => !drop.has(id)).length;
@@ -321,70 +326,32 @@ function FlashRound({ queue, byId, allTerms, onUpdateTerm, onDone, onBack }) {
   }
 
   return (
-    <div className="flex-1 flex flex-col px-5 pt-4">
-      <div className="max-w-md mx-auto w-full flex-1 flex flex-col">
-        <div className="flex items-center justify-between mb-3">
-          <button
-            type="button"
-            onClick={onBack}
-            className="text-sm text-muted-foreground hover:text-foreground underline-offset-4 hover:underline"
-          >
-            Back
-          </button>
-          <p className="text-xs text-muted-foreground">{reviewing ? 'Practice your wording · ' : ''}{pos + 1}/{items.length}</p>
-        </div>
+    <FlashCardStage
+      done={retired}
+      total={deckTotalRef.current}
+      caption={cardProgressCaption(deckTotalRef.current, retired)}
+      label={(
         <button
           type="button"
-          onClick={() => setRevealed(true)}
-          className="w-full rounded-3xl border border-border bg-card p-8 shadow-sm text-center min-h-[240px] flex flex-col items-center justify-center"
+          onClick={onBack}
+          className="text-sm text-muted-foreground hover:text-foreground underline-offset-4 hover:underline"
         >
-          <p className="text-[11px] uppercase tracking-wide text-muted-foreground mb-3">
-            {revealed ? 'Definition' : 'Term'}
-          </p>
-          <p className="text-3xl font-bold tracking-tight">{current.term}</p>
-          {revealed ? (
-            <p className="mt-5 text-lg text-muted-foreground leading-relaxed">{flashcardDef(current)}</p>
-          ) : (
-            <p className="mt-5 text-xs text-muted-foreground">
-              {computer ? 'Press space to flip it.' : 'Tap the card to flip it.'}
-            </p>
-          )}
+          Back
         </button>
-        <div className="mt-4">
-          {!revealed ? (
-            <Button
-              onClick={() => setRevealed(true)}
-              aria-keyshortcuts="Space"
-              className="w-full h-12 rounded-2xl font-semibold"
-            >
-              <Eye className="w-4 h-4 mr-2" /> Flip card
-              {computer && <ShortcutKey>Space</ShortcutKey>}
-            </Button>
-          ) : (
-            <div className="grid grid-cols-2 gap-3">
-              <Button
-                variant="outline"
-                onClick={onMiss}
-                aria-keyshortcuts="ArrowLeft"
-                className="h-12 rounded-2xl font-semibold"
-              >
-                <X className="w-4 h-4 mr-2" /> Needs work
-                {computer && <ShortcutKey>←</ShortcutKey>}
-              </Button>
-              <Button
-                onClick={() => retireIds([current.id])}
-                aria-keyshortcuts="ArrowRight"
-                className="h-12 rounded-2xl font-semibold"
-              >
-                <Check className="w-4 h-4 mr-2" /> Got it
-                {computer && <ShortcutKey>→</ShortcutKey>}
-              </Button>
-            </div>
-          )}
-        </div>
-        {defModeButton}
-      </div>
-    </div>
+      )}
+      meta={reviewing ? 'Practice your wording' : 'Flash cards'}
+      prompt={current.term}
+      revealed={revealed}
+      answer={flashcardDef(current)}
+      onReveal={() => setRevealed(true)}
+      onMiss={onMiss}
+      onKnow={() => retireIds([current.id])}
+      footer={`${retired} retired · ${items.length} in rotation`}
+      below={defModeButton}
+      revealExtra={computer ? <ShortcutKey>Space</ShortcutKey> : null}
+      missExtra={computer ? <ShortcutKey>←</ShortcutKey> : null}
+      knowExtra={computer ? <ShortcutKey>→</ShortcutKey> : null}
+    />
   );
 }
 

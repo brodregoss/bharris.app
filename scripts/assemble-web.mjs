@@ -23,15 +23,14 @@ const css = `
     top: 0;
     left: 0;
     right: 0;
-    z-index: 2;
+    z-index: 50;
     height: 3.25rem;
     display: flex;
     align-items: center;
     justify-content: center;
     padding: 0 1.25rem;
-    background: rgba(255, 255, 255, 0.92);
+    background: #fff;
     border-bottom: 1px solid #eee;
-    backdrop-filter: blur(10px);
   }
   .bar a {
     color: #0a0a0a;
@@ -46,20 +45,64 @@ const css = `
     left: 1.25rem;
     font-weight: 700;
   }
-  .bar-links { display: flex; align-items: center; gap: 1.5rem; }
-  a.bar-open {
+  .bar-links {
+    position: absolute;
+    left: 0;
+    right: 0;
+    top: 0;
+    height: 100%;
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    column-gap: 1.5rem;
+    align-items: center;
+    pointer-events: none;
+  }
+  .bar-cluster {
+    display: flex;
+    align-items: center;
+    gap: 1.5rem;
+    white-space: nowrap;
+    pointer-events: auto;
+  }
+  .bar-cluster-left { justify-self: end; }
+  .bar-cluster-right { justify-self: start; }
+  .bar-end {
     position: absolute;
     right: 1.25rem;
+    display: flex;
+    align-items: center;
+    gap: 0.55rem;
+  }
+  a.bar-signin,
+  button.bar-signin,
+  a.bar-open {
     display: inline-flex;
     align-items: center;
     justify-content: center;
     height: 2.15rem;
     padding: 0 0.9rem;
     border-radius: 999px;
-    background: #0a0a0a;
-    color: #fff;
     font-size: 0.9rem;
     font-weight: 600;
+  }
+  a.bar-signin,
+  button.bar-signin {
+    border: 1px solid #d4d4d4;
+    background: #fff;
+    color: #0a0a0a;
+  }
+  button.bar-signin {
+    appearance: none;
+    cursor: pointer;
+    font-family: inherit;
+  }
+  a.bar-signin:hover,
+  button.bar-signin:hover { background: #f5f5f5; color: #0a0a0a; }
+  a.bar-signin[hidden],
+  button.bar-signin[hidden] { display: none !important; }
+  a.bar-open {
+    background: #0a0a0a;
+    color: #fff;
   }
   a.bar-open:hover { background: #262626; color: #fff; }
   .hero {
@@ -800,7 +843,7 @@ const css = `
     width: auto;
     margin: 0;
     display: grid;
-    grid-template-columns: repeat(3, max-content);
+    grid-template-columns: repeat(4, max-content);
     gap: 1.75rem 2.75rem;
   }
   .footer-col h3 {
@@ -810,7 +853,8 @@ const css = `
     letter-spacing: -0.02em;
     color: #fafafa;
   }
-  .footer-col a {
+  .footer-col a,
+  .footer-col span {
     display: block;
     margin-top: 0.55rem;
     color: #a3a3a3;
@@ -851,6 +895,21 @@ const css = `
     letter-spacing: -0.03em;
     line-height: 1.2;
   }
+  .plan-current {
+    margin: 1.15rem 0 0;
+    min-height: 2.75rem;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0.65rem 1.1rem;
+    border-radius: 999px;
+    background: #0a0a0a;
+    color: #fff;
+    font-size: 0.95rem;
+    font-weight: 650;
+  }
+  .plan-current[hidden],
+  button.plan-btn[hidden] { display: none !important; }
   .plan-card .price { margin-top: 0.55rem; font-size: clamp(1.8rem, 4vw, 2.35rem); }
   .plan-card .price span {
     margin-left: 0.15rem;
@@ -906,12 +965,21 @@ const css = `
     text-decoration: none;
   }
   button.plan-btn:hover, a.plan-btn:hover, a.thanks-open:hover { background: #262626; color: #fff; }
-  button.plan-btn.secondary {
+  button.plan-btn:disabled { opacity: 0.6; cursor: wait; }
+  button.plan-btn.secondary,
+  a.plan-btn.secondary {
     background: #fff;
     color: #0a0a0a;
     border: 1px solid #d4d4d4;
   }
-  button.plan-btn.secondary:hover { background: #f5f5f5; color: #0a0a0a; }
+  button.plan-btn.secondary:hover,
+  a.plan-btn.secondary:hover { background: #f5f5f5; color: #0a0a0a; }
+  button.plan-btn.danger {
+    background: #fff;
+    color: #b91c1c;
+    border: 1px solid #fecaca;
+  }
+  button.plan-btn.danger:hover { background: #fef2f2; color: #991b1b; }
   .plan-actions { display: flex; flex-wrap: wrap; gap: 0.5rem; }
   .plan-actions button.plan-btn { margin-top: 0.75rem; }
   .plan-code {
@@ -982,6 +1050,134 @@ const css = `
     color: #525252;
     text-align: center;
   }
+  dialog.account {
+    margin: auto;
+    border: 0;
+    border-radius: 1.5rem;
+    padding: 1.35rem 1.35rem 1.2rem;
+    width: min(26rem, calc(100vw - 2rem));
+    background: #fff;
+    color: #0a0a0a;
+    text-align: left;
+    box-shadow: 0 1.5rem 4rem rgba(0, 0, 0, 0.22);
+  }
+  dialog.account::backdrop { background: rgba(10, 10, 10, 0.46); }
+  dialog.account h2 {
+    margin: 0;
+    font-size: 1.45rem;
+    letter-spacing: -0.04em;
+  }
+  .account-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1rem;
+  }
+  .account-close {
+    appearance: none;
+    border: 0;
+    background: none;
+    width: 2rem;
+    height: 2rem;
+    border-radius: 999px;
+    font-size: 1.4rem;
+    line-height: 1;
+    cursor: pointer;
+    color: #525252;
+  }
+  .account-close:hover { background: #f5f5f5; color: #0a0a0a; }
+  .account-rows { margin: 1rem 0 0; }
+  .account-rows div { padding: 0.7rem 0; border-top: 1px solid #eee; }
+  .account-rows dt {
+    margin: 0;
+    font-size: 0.72rem;
+    font-weight: 650;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    color: #737373;
+  }
+  .account-rows dd {
+    margin: 0.2rem 0 0;
+    font-size: 1rem;
+    font-weight: 600;
+    letter-spacing: -0.02em;
+    word-break: break-word;
+  }
+  .account-partner { margin-top: 0.2rem; padding-top: 0.85rem; border-top: 1px solid #eee; }
+  .account-partner[hidden] { display: none !important; }
+  .account-partner p { margin: 0; font-size: 0.72rem; font-weight: 650; letter-spacing: 0.04em; text-transform: uppercase; color: #737373; }
+  .account-code {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    margin-top: 0.35rem;
+  }
+  .account-code span {
+    font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+    font-size: 0.95rem;
+    font-weight: 600;
+    word-break: break-all;
+  }
+  button.account-copy,
+  button.account-reset {
+    appearance: none;
+    cursor: pointer;
+    font: inherit;
+  }
+  button.account-copy {
+    border: 0;
+    background: none;
+    color: #0a0a0a;
+    font-size: 0.85rem;
+    font-weight: 650;
+    text-decoration: underline;
+    text-underline-offset: 2px;
+  }
+  button.account-copy[hidden] { display: none !important; }
+  button.account-reset {
+    width: 100%;
+    margin-top: 1rem;
+    min-height: 2.75rem;
+    border: 1px solid #d4d4d4;
+    border-radius: 999px;
+    background: #fff;
+    font-size: 0.95rem;
+    font-weight: 650;
+  }
+  button.account-reset:hover { background: #f5f5f5; }
+  button.account-reset:disabled { opacity: 0.6; cursor: wait; }
+  .account-status { margin: 0.75rem 0 0; min-height: 1.2rem; font-size: 0.9rem; color: #404040; }
+  .account-page { width: min(32rem, 100%); padding-bottom: 4rem; }
+  .account-page .plan-card { margin-top: 1rem; }
+  .account-plan-name {
+    margin: 0.45rem 0 0;
+    font-size: 1.35rem;
+    font-weight: 700;
+    letter-spacing: -0.03em;
+  }
+  .account-lines p { margin: 0.55rem 0 0; color: #404040; font-size: 0.98rem; line-height: 1.45; }
+  .account-actions { display: flex; flex-direction: column; gap: 0.55rem; margin-top: 1.1rem; }
+  .account-actions .plan-btn { width: 100%; margin-top: 0; }
+  .account-password label {
+    display: block;
+    margin-top: 0.85rem;
+    font-size: 0.82rem;
+    font-weight: 650;
+  }
+  .account-password input {
+    width: 100%;
+    height: 2.85rem;
+    margin-top: 0.35rem;
+    border: 1px solid #e5e5e5;
+    border-radius: 0.9rem;
+    padding: 0 0.9rem;
+    font: inherit;
+    font-size: 1rem;
+  }
+  .account-password .plan-btn { width: 100%; }
+  dialog.password { text-align: left; }
+  dialog.password h3 { text-align: left; }
+  dialog.password .account-status { text-align: left; }
   @media (prefers-reduced-motion: reduce) {
     dialog.sign-in,
     dialog.sign-in::backdrop { transition: none; }
@@ -1053,17 +1249,158 @@ const css = `
     color: #404040;
   }
   a.thanks-open { margin-top: 2.4rem; position: static; }
-  .email {
-    margin: 1rem 0 0;
-    font-size: 1.15rem;
-    font-weight: 600;
-    letter-spacing: -0.02em;
+  .thanks-partner {
+    width: min(28rem, 100%);
+    margin-top: 2.2rem;
+  }
+  .thanks-partner h2 {
+    margin: 0;
+    font-size: 1.2rem;
+    font-weight: 650;
+    letter-spacing: -0.03em;
+    line-height: 1.25;
     color: #0a0a0a;
   }
-  .philosophy {
-    padding-bottom: 5.5rem;
+  .thanks-code-row {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.35rem;
+    margin-top: 0.7rem;
   }
-  .philosophy p + p { margin-top: 1.15rem; }
+  .thanks p.thanks-code-value {
+    margin: 0;
+    max-width: none;
+    font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+    font-size: 0.98rem;
+    font-weight: 600;
+    letter-spacing: 0.01em;
+    line-height: 1.45;
+    color: #0a0a0a;
+    word-break: break-all;
+  }
+  button.thanks-copy {
+    appearance: none;
+    border: 0;
+    background: none;
+    color: #0a0a0a;
+    width: 2.4rem;
+    height: 2.4rem;
+    padding: 0;
+    border-radius: 999px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    flex: none;
+    cursor: pointer;
+  }
+  button.thanks-copy:hover { background: #f5f5f5; }
+  button.thanks-copy svg { width: 1.15rem; height: 1.15rem; }
+  .thanks p.thanks-manage {
+    margin: 0.7rem 0 0;
+    font-size: 0.82rem;
+    font-weight: 500;
+    letter-spacing: 0;
+    line-height: 1.45;
+    color: #737373;
+  }
+  .thanks p.thanks-manage a {
+    color: #0a0a0a;
+    font-weight: 650;
+  }
+  .contact-page {
+    min-height: 100dvh;
+    display: grid;
+    align-content: safe center;
+    width: min(68rem, 100%);
+    margin: 0 auto;
+    padding: 6.5rem 1.5rem 4.75rem;
+  }
+  .contact-head { text-align: center; }
+  .contact-head h1 {
+    margin: 0;
+    font-size: clamp(2.4rem, 5vw, 3.5rem);
+    font-weight: 700;
+    letter-spacing: -0.05em;
+    line-height: 1.02;
+  }
+  .contact-email {
+    margin: 0.9rem 0 0;
+    font-size: clamp(1.2rem, 2.4vw, 1.55rem);
+    font-weight: 650;
+    letter-spacing: -0.03em;
+    color: #0a0a0a;
+  }
+  .contact-head .lede {
+    margin: 0.7rem auto 0;
+    max-width: 26rem;
+    font-size: 1.05rem;
+    line-height: 1.45;
+    color: #525252;
+  }
+  .faq { margin-top: 2.75rem; }
+  .faq h2 {
+    margin: 0 0 1rem;
+    text-align: center;
+    font-size: 0.82rem;
+    font-weight: 700;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: #737373;
+  }
+  .faq-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 0.85rem;
+    align-items: stretch;
+  }
+  .faq-item {
+    margin: 0;
+    padding: 1.2rem 1.25rem 1.3rem;
+    border: 1px solid #e5e5e5;
+    border-radius: 1.15rem;
+    background: #fff;
+  }
+  .faq-item h3 {
+    margin: 0;
+    font-size: 1.05rem;
+    font-weight: 650;
+    letter-spacing: -0.02em;
+    line-height: 1.3;
+  }
+  .faq-item p {
+    margin: 0.5rem 0 0;
+    font-size: 0.98rem;
+    line-height: 1.5;
+    color: #404040;
+  }
+  .philosophy-page {
+    min-height: 100dvh;
+    display: grid;
+    align-content: safe center;
+    width: min(68rem, 100%);
+    margin: 0 auto;
+    padding: 6.5rem 1.5rem 4.75rem;
+  }
+  .philosophy-page h1 {
+    margin: 0;
+    text-align: center;
+    font-size: clamp(2.4rem, 5vw, 3.5rem);
+    font-weight: 700;
+    letter-spacing: -0.05em;
+    line-height: 1.02;
+  }
+  .philosophy-copy {
+    width: min(40rem, 100%);
+    margin: 1.75rem auto 0;
+  }
+  .philosophy-copy p {
+    margin: 0;
+    font-size: 1.0625rem;
+    line-height: 1.55;
+    color: #404040;
+  }
+  .philosophy-copy p + p { margin-top: 1.15rem; }
   html.motion .reveal {
     opacity: 0;
     transform: translateY(10px);
@@ -1102,10 +1439,7 @@ const css = `
     .true-stage .bleed-right { left: 0.75rem; }
     .true-stage .bleed-left { right: 0.75rem; }
   }
-  @media (max-width: 800px) {
-    .plan-grid { grid-template-columns: 1fr; }
-  }
-  @media (max-width: 760px) {
+  @media (max-width: 900px) {
     .bar {
       height: auto;
       justify-content: space-between;
@@ -1113,13 +1447,38 @@ const css = `
       row-gap: 0.35rem;
       padding: 0.55rem 0.85rem 0.7rem;
     }
-    .brand, a.bar-open { position: static; }
+    .brand, .bar-end { position: static; }
     .bar-links {
+      position: static;
+      left: auto;
+      right: auto;
+      top: auto;
+      height: auto;
+      display: flex;
+      grid-template-columns: none;
+      column-gap: 0;
       order: 3;
       flex: 1 0 100%;
+      align-items: center;
       justify-content: center;
       gap: 0.85rem;
+      pointer-events: auto;
     }
+    .bar-cluster {
+      display: contents;
+    }
+    .block, .paper-rest { scroll-margin-top: 5.6rem; }
+    .paper-black {
+      height: calc(100dvh - 5.6rem);
+      min-height: calc(100dvh - 5.6rem);
+      scroll-margin-top: 5.6rem;
+    }
+  }
+  @media (max-width: 800px) {
+    .plan-grid { grid-template-columns: 1fr; }
+    .faq-grid { grid-template-columns: 1fr; }
+  }
+  @media (max-width: 760px) {
     .block { scroll-margin-top: 5.6rem; }
     .paper-black {
       height: calc(100dvh - 5.6rem);
@@ -1164,12 +1523,12 @@ const css = `
   }
   @media (max-width: 520px) {
     .bar a { font-size: 0.85rem; }
-    a.bar-open { font-size: 0.82rem; padding: 0 0.75rem; }
+    a.bar-signin, button.bar-signin, a.bar-open { font-size: 0.82rem; padding: 0 0.75rem; }
   }
   .brain-wrap {
     width: min(68rem, 100%);
     padding-top: 2.2rem;
-    padding-bottom: 4.5rem;
+    padding-bottom: 7.5rem;
   }
   .brain-wrap h2 {
     text-align: center;
@@ -1198,38 +1557,38 @@ const css = `
     line-height: 0;
   }
   .brain-scans svg { display: block; width: 100%; height: auto; }
-  .brain-sticky { margin-top: 3rem; }
-  .brain-sticky h3 {
+  .brain-sticky { margin-top: 5.5rem; }
+  .brain-pair {
+    display: grid;
+    grid-template-columns: minmax(0, 1.2fr) minmax(16rem, 0.9fr);
+    gap: 1.15rem 2.25rem;
+    align-items: start;
+  }
+  .brain-card-col { min-width: 0; }
+  .brain-sticky-copy h3 {
     margin: 0;
-    text-align: center;
     font-size: clamp(1.35rem, 2.4vw, 1.7rem);
     letter-spacing: -0.04em;
+    line-height: 1.15;
   }
-  .brain-sticky > p {
-    max-width: 40rem;
-    margin-left: auto;
-    margin-right: auto;
+  .brain-sticky-copy p {
+    margin: 0.7rem 0 0;
+    font-size: 1.0625rem;
+    line-height: 1.55;
+    color: #404040;
   }
   .brain-dash {
-    display: grid;
-    grid-template-columns: 12.75rem minmax(0, 1fr);
-    width: min(40rem, 100%);
-    margin: 1.35rem auto 0.4rem;
-    background: #07080c;
+    width: 100%;
+    margin: 0;
+    background: #fafafa;
     border-radius: 1.35rem;
     overflow: hidden;
     box-shadow: 0 24px 50px rgba(10, 10, 10, 0.16);
   }
-  #brain-gauge { padding: 0.85rem 0.45rem 0.7rem; color: #fff; }
-  #brain-gauge svg { display: block; width: 100%; height: auto; }
-  .bg-num, .bg-label { margin: 0; text-align: center; font-weight: 700; }
-  .bg-num { font-family: ui-monospace, monospace; font-size: 1.35rem; line-height: 1; }
-  .bg-label { margin-top: 0.2rem; font-size: 0.78rem; letter-spacing: 0.01em; }
   #brain-sim {
     background: #fafafa;
     color: #0a0a0a;
     min-height: 18.5rem;
-    border-left: 1px solid rgba(255, 255, 255, 0.14);
     display: flex;
     flex-direction: column;
   }
@@ -1323,13 +1682,72 @@ const css = `
   }
   @media (max-width: 800px) {
     .brain-split { grid-template-columns: minmax(0, 1fr) minmax(7.5rem, 42%); gap: 0.9rem; }
-    .brain-dash { grid-template-columns: 7.6rem minmax(0, 1fr); }
+    .brain-pair { grid-template-columns: 1fr; gap: 1.15rem; }
     .bs-term { font-size: 1.15rem; }
     .bs-title { font-size: 1.15rem; }
     #brain-sim { min-height: 16rem; }
   }
   @media (prefers-reduced-motion: reduce) {
     .bs-caret { animation: none; }
+  }
+  .cookie-notice {
+    position: fixed;
+    left: 0.75rem;
+    right: 0.75rem;
+    bottom: 0.75rem;
+    z-index: 40;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1rem;
+    max-width: 52rem;
+    margin: 0 auto;
+    padding: 0.9rem 1rem;
+    background: #fff;
+    color: #0a0a0a;
+    border: 1px solid #e5e5e5;
+    border-radius: 1rem;
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.08);
+  }
+  .cookie-notice[hidden] { display: none !important; }
+  .cookie-notice p {
+    margin: 0;
+    font-size: 0.92rem;
+    line-height: 1.45;
+  }
+  .cookie-notice a { color: #0a0a0a; }
+  .cookie-actions { display: flex; gap: 0.5rem; flex: none; }
+  .cookie-actions button {
+    appearance: none;
+    font-family: inherit;
+    font-size: 0.9rem;
+    font-weight: 600;
+    height: 2.4rem;
+    padding: 0 1rem;
+    border-radius: 999px;
+    cursor: pointer;
+  }
+  .cookie-actions [data-cookie="accept"] {
+    background: #0a0a0a;
+    color: #fff;
+    border: 1px solid #0a0a0a;
+  }
+  .cookie-actions [data-cookie="decline"] {
+    background: #fff;
+    color: #0a0a0a;
+    border: 1px solid #d4d4d4;
+  }
+  body.cookie-open { padding-bottom: 6.5rem; }
+  @media (max-width: 640px) {
+    .cookie-notice {
+      flex-direction: column;
+      align-items: stretch;
+      left: 0.6rem;
+      right: 0.6rem;
+      bottom: 0.6rem;
+    }
+    .cookie-actions button { flex: 1; }
+    body.cookie-open { padding-bottom: 9.5rem; }
   }
 `.trim();
 
@@ -1354,6 +1772,8 @@ function page({ title, description, body, foot = '' }) {
   <script>if (!window.matchMedia('(prefers-reduced-motion: reduce)').matches) document.documentElement.classList.add('motion');</script>
 </head>
 <body>
+${cookieNoticeHtml}
+<script>${cookieNoticeScript}</script>
 ${body}
 ${foot}
 <script>${fadeScript}</script>
@@ -1361,6 +1781,61 @@ ${foot}
 </html>
 `;
 }
+
+const cookieNoticeHtml = `  <aside class="cookie-notice" id="cookie-notice" hidden>
+    <p>This site uses one cookie to remember your plan between pages. <a href="/privacy/">Privacy policy</a></p>
+    <div class="cookie-actions">
+      <button type="button" data-cookie="decline">Decline</button>
+      <button type="button" data-cookie="accept">Accept</button>
+    </div>
+  </aside>`;
+
+const cookieNoticeScript = `
+  (function () {
+    var choiceName = 'bharris_cookie';
+    var planName = 'bharris_plan';
+    var maxAge = 60 * 60 * 24 * 180;
+    function suffix() {
+      return '; Path=/; SameSite=Lax' + (location.protocol === 'https:' ? '; Secure' : '');
+    }
+    function readChoice() {
+      var parts = document.cookie ? document.cookie.split('; ') : [];
+      var row = '';
+      for (var i = 0; i < parts.length; i += 1) {
+        if (parts[i].indexOf(choiceName + '=') === 0) row = parts[i];
+      }
+      if (!row) return '';
+      var value = decodeURIComponent(row.slice(choiceName.length + 1));
+      return value === 'accepted' || value === 'declined' ? value : '';
+    }
+    function writeChoice(value) {
+      document.cookie = choiceName + '=' + value + suffix() + '; Max-Age=' + maxAge;
+    }
+    var banner = document.getElementById('cookie-notice');
+    if (!banner) return;
+    function closeBanner() {
+      banner.hidden = true;
+      document.body.classList.remove('cookie-open');
+    }
+    if (readChoice()) {
+      closeBanner();
+      return;
+    }
+    banner.hidden = false;
+    document.body.classList.add('cookie-open');
+    banner.querySelector('[data-cookie="accept"]').addEventListener('click', function () {
+      writeChoice('accepted');
+      closeBanner();
+      window.dispatchEvent(new Event('bharris-cookies-accepted'));
+    });
+    banner.querySelector('[data-cookie="decline"]').addEventListener('click', function () {
+      writeChoice('declined');
+      document.cookie = planName + '=' + suffix() + '; Max-Age=0';
+      closeBanner();
+      window.dispatchEvent(new Event('bharris-cookies-declined'));
+    });
+  })();
+`.trim();
 
 const fadeScript = `
   if (!document.documentElement.classList.contains('motion')) {
@@ -1407,9 +1882,10 @@ function siteFooter() {
         <div class="footer-col">
           <h3>Product</h3>
           <a href="/#home">Home</a>
-          <a href="/#features">Features</a>
+          <a href="/#modes">Features</a>
+          <a href="/philosophy/">Core philosophy</a>
           <a href="/plans/">Plans</a>
-          <a href="/#contact">Contact</a>
+          <a href="/contact/">Contact &amp; FAQ</a>
         </div>
         <div class="footer-col">
           <h3>Legal</h3>
@@ -1418,25 +1894,52 @@ function siteFooter() {
         </div>
         <div class="footer-col">
           <h3>Contact</h3>
-          <a href="/#contact">[contact email]</a>
+          <a href="/contact/">[contact email]</a>
+        </div>
+        <div class="footer-col">
+          <h3>Socials</h3>
+          <span>[social 1]</span>
+          <span>[social 2]</span>
         </div>
       </div>
     </div>
   </footer>`;
 }
 
-function navBar(prefix) {
+function navBar({ prefix = '', back = '/' } = {}) {
   const here = prefix || '';
+  const signIn = `/app/#/account/signin?return=${encodeURIComponent(back)}`;
   return `  <nav class="bar reveal">
     <a class="brand" href="${here}#home">bharris.app</a>
     <div class="bar-links">
-      <a href="${here}#home">Home</a>
-      <a href="${here}#features">Features</a>
-      <a href="/plans/">Plans</a>
-      <a href="${here}#contact">Contact</a>
+      <div class="bar-cluster bar-cluster-left">
+        <a href="${here}#home">Home</a>
+        <a href="${here}#modes">Features</a>
+      </div>
+      <div class="bar-cluster bar-cluster-right">
+        <a href="/plans/">Plans</a>
+        <a href="/contact/">Contact &amp; FAQ</a>
+      </div>
     </div>
-    <a class="bar-open" href="/app/">Open bharris.app</a>
+    <div class="bar-end">
+      <a class="bar-signin" id="site-sign-in" href="${signIn}" hidden>Sign in</a>
+      <a class="bar-signin" id="site-account" href="/account/" hidden>Account</a>
+      <a class="bar-open" href="/app/">Open bharris.app</a>
+    </div>
   </nav>`;
+}
+
+function siteAuthFoot(firebaseConfig) {
+  const siteAccount = readFileSync(path.join(root, 'scripts', 'site-account.js'), 'utf8');
+  const siteAuth = readFileSync(path.join(root, 'scripts', 'site-auth.js'), 'utf8')
+    .replace(
+      "import { getAuth, onAuthStateChanged } from 'https://www.gstatic.com/firebasejs/12.3.0/firebase-auth.js';",
+      `import { getAuth, onAuthStateChanged } from 'https://www.gstatic.com/firebasejs/12.3.0/firebase-auth.js';\n${siteAccount}`,
+    );
+  return `<script>window.BH_SITE = ${JSON.stringify(firebaseConfig)};</script>
+<script type="module">
+${siteAuth}
+</script>`;
 }
 
 const HOME_ICON = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linejoin="round" aria-hidden="true"><path d="M4 10.5 12 4l8 6.5V20h-6v-6H10v6H4z"></path></svg>`;
@@ -1532,14 +2035,65 @@ function trueCramPhone() {
           </div>`;
 }
 
-function homePage() {
+function wireBrain(view) {
+  const panel = (id, label, drawing) => `<svg viewBox="0 0 200 168" role="img" aria-label="${label}">
+    <defs>
+      <pattern id="${id}-grid" width="12" height="12" patternUnits="userSpaceOnUse">
+        <path d="M 12 0 L 0 0 0 12" fill="none" stroke="#12343a" stroke-width="0.45"></path>
+      </pattern>
+    </defs>
+    <rect width="200" height="168" fill="#061016"></rect>
+    <rect width="200" height="168" fill="url(#${id}-grid)"></rect>
+    ${drawing}
+  </svg>`;
+  const side = `
+    <g fill="none" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M62 98 C48 90 40 72 48 54 C56 36 80 26 106 26 C134 26 160 38 172 56 C184 74 180 96 164 110 C150 122 132 120 122 110" stroke="#1d4f4c" stroke-width="5"></path>
+      <path d="M122 112 C132 126 156 132 172 120 C184 110 180 96 166 94 C154 92 140 100 130 108" stroke="#1d4f4c" stroke-width="4"></path>
+      <path d="M62 98 C48 90 40 72 48 54 C56 36 80 26 106 26 C134 26 160 38 172 56 C184 74 180 96 164 110 C150 122 132 120 122 110 C114 122 96 128 80 122 C66 116 60 106 62 98 Z" stroke="#d8fff6" stroke-width="1.15"></path>
+      <path d="M58 74 C78 50 118 44 156 60" stroke="#8ef0df" stroke-width="0.8"></path>
+      <path d="M56 86 C80 62 124 58 162 76" stroke="#8ef0df" stroke-width="0.8"></path>
+      <path d="M60 98 C86 76 128 74 158 92" stroke="#8ef0df" stroke-width="0.8"></path>
+      <path d="M72 108 C96 92 126 92 146 104" stroke="#8ef0df" stroke-width="0.8"></path>
+      <path d="M84 32 C74 54 78 80 72 108" stroke="#8ef0df" stroke-width="0.8"></path>
+      <path d="M110 28 C104 52 112 80 104 114" stroke="#8ef0df" stroke-width="0.8"></path>
+      <path d="M136 34 C146 56 138 82 132 108" stroke="#8ef0df" stroke-width="0.8"></path>
+      <path d="M156 46 C166 66 158 88 150 106" stroke="#8ef0df" stroke-width="0.8"></path>
+      <path d="M118 112 C112 128 106 140 98 150" stroke="#d8fff6" stroke-width="1.05"></path>
+      <path d="M126 110 C122 124 116 138 108 148" stroke="#8ef0df" stroke-width="0.8"></path>
+      <path d="M130 108 C146 120 168 122 176 110" stroke="#d8fff6" stroke-width="1.05"></path>
+      <path d="M136 104 C150 114 168 112 174 102" stroke="#8ef0df" stroke-width="0.8"></path>
+      <path d="M142 112 C156 118 170 114 172 106" stroke="#8ef0df" stroke-width="0.8"></path>
+    </g>`;
+  const top = `
+    <g fill="none" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M100 34 C74 32 48 46 40 72 C32 98 44 124 68 136 C82 142 94 132 100 116 C106 132 118 142 132 136 C156 124 168 98 160 72 C152 46 126 32 100 34 Z" stroke="#1d4f4c" stroke-width="5"></path>
+      <path d="M100 34 C74 32 48 46 40 72 C32 98 44 124 68 136 C82 142 94 132 100 116 C106 132 118 142 132 136 C156 124 168 98 160 72 C152 46 126 32 100 34 Z" stroke="#d8fff6" stroke-width="1.15"></path>
+      <path d="M100 40 C96 62 104 86 100 112" stroke="#d8fff6" stroke-width="1.05"></path>
+      <ellipse cx="100" cy="86" rx="62" ry="16" stroke="#8ef0df" stroke-width="0.8"></ellipse>
+      <ellipse cx="100" cy="86" rx="50" ry="28" stroke="#8ef0df" stroke-width="0.8"></ellipse>
+      <ellipse cx="100" cy="86" rx="34" ry="40" stroke="#8ef0df" stroke-width="0.8"></ellipse>
+      <path d="M72 46 C56 62 52 96 66 122" stroke="#8ef0df" stroke-width="0.8"></path>
+      <path d="M86 40 C74 60 74 100 84 128" stroke="#8ef0df" stroke-width="0.8"></path>
+      <path d="M128 46 C144 62 148 96 134 122" stroke="#8ef0df" stroke-width="0.8"></path>
+      <path d="M114 40 C126 60 126 100 116 128" stroke="#8ef0df" stroke-width="0.8"></path>
+      <path d="M58 78 C78 70 92 86 100 86 C108 86 122 70 142 78" stroke="#8ef0df" stroke-width="0.8"></path>
+      <path d="M52 100 C76 92 90 108 100 104 C110 108 124 92 148 100" stroke="#8ef0df" stroke-width="0.8"></path>
+    </g>`;
+  return view === 'top'
+    ? panel('bw-top', 'Wireframe brain, top view', top)
+    : panel('bw-side', 'Wireframe brain, side view', side);
+}
+
+function homePage(firebaseConfig) {
   const brainScript = readFileSync(path.join(root, 'scripts', 'brain-learn.js'), 'utf8');
   const mockupScript = readFileSync(path.join(root, 'scripts', 'mockup-scrub.js'), 'utf8');
   return page({
     title: 'bharris.app',
     description: 'Time is money, so we will make sure not to waste yours.',
-    foot: `<script>${brainScript}</script><script>${mockupScript}</script>`,
-    body: `${navBar('')}
+    foot: `<script>${brainScript}</script><script>${mockupScript}</script>
+${siteAuthFoot(firebaseConfig)}`,
+    body: `${navBar({ back: '/' })}
   <section id="home" class="hero">
     <h1 class="reveal">bharris.app</h1>
     <p class="tag reveal" style="--d:90ms">Time is money, so we will make sure not to waste yours.</p>
@@ -1622,45 +2176,111 @@ function homePage() {
         <p><strong>A cleaner environment leaves more room for learning.</strong> Cognitive Load Theory suggests that our working memory has limited capacity. When an interface is cluttered with unnecessary buttons, information, and distractions, part of that capacity is spent figuring out the interface instead of learning. By removing unnecessary complexity, bharris.app reduces <strong>extraneous cognitive load</strong>, helping you focus your attention on what actually matters: the material.</p>
       </div>
       <div class="brain-scans reveal" style="--d:120ms">
-        <div class="scan" id="brain-fire"></div>
-        <div class="scan" id="brain-slice"></div>
+        <div class="scan">${wireBrain('side')}</div>
+        <div class="scan">${wireBrain('top')}</div>
       </div>
     </div>
     <div class="brain-sticky reveal" style="--d:80ms">
-      <h3>Where flashcards get sticky</h3>
-      <p>A card you already know is a quick flip. The gauge stays on low effort, because that answer came easily.</p>
-      <div class="brain-dash">
-        <div id="brain-gauge"></div>
-        <div id="brain-sim"></div>
+      <div class="brain-pair">
+        <div class="brain-card-col">
+          <div class="brain-dash">
+            <div id="brain-sim"></div>
+          </div>
+        </div>
+        <div class="brain-sticky-copy">
+          <h3>When the last couple of flashcards don’t click</h3>
+          <p>Make your own definition so the term is more memorable. If you still don’t get it, you can have it explained or used in an example.</p>
+        </div>
       </div>
-      <p>Then the set is down to two cards. They come past twice, and both times they are still missed. That repeat is the sticky spot in a normal flashcard deck: the card keeps returning, and another look at the answer leaves it stuck.</p>
-      <p>bharris.app breaks that loop. After those misses, the same prompt from a real session comes up, and the screen switches to writing the definition in your own words. The gauge sits on high effort, because you have to rebuild the idea instead of flipping the card again. That is the part that pulls a stuck card loose.</p>
     </div>
-  </section>
-  <section id="contact" class="block">
-    <h2 class="reveal">Contact</h2>
-    <p class="email reveal" style="--d:80ms">[contact email]</p>
-  </section>
-  <section id="philosophy" class="block philosophy">
-    <h2 class="reveal">Core philosophy</h2>
-    <p class="reveal" style="--d:80ms">This app is built for people who value their time. It removes distractions, unnecessary complexity, and ads so users can focus on what actually matters: learning.</p>
-    <p class="reveal" style="--d:140ms">Every part of the app is designed to be difficult only where it needs to be—the studying should challenge you, not the process of navigating the app. The goal is to make studying feel effortless to start and simple to navigate, while still requiring real effort where it counts.</p>
-    <p class="reveal" style="--d:200ms">This app isn’t made for people who are lazy; it’s made for hardworking, forward-thinking people who put their effort into many areas of their lives and don’t want to spend hours figuring out how to study. It exists to make studying more efficient, more focused, and more worth their time.</p>
   </section>
 ${siteFooter()}`,
   });
 }
 
-function policyPage({ title, description, intro, sections }) {
+function policyPage({ title, description, intro, sections, path, firebaseConfig }) {
   return page({
     title: `${title} · bharris.app`,
     description,
-    body: `${navBar('/')}
+    foot: siteAuthFoot(firebaseConfig),
+    body: `${navBar({ prefix: '/', back: path })}
   <main class="block doc legal-page reveal">
     <h2>${escapeHtml(title)}</h2>
     <p>${escapeHtml(intro)}</p>
-    <p class="updated">Last updated October 1, 2026</p>
+    <p class="updated">Last updated October 6, 2026</p>
 ${sectionsHtml(sections)}
+  </main>
+${siteFooter()}`,
+  });
+}
+
+const FAQ = [
+  {
+    q: 'What is bharris.app?',
+    a: 'A cram app for the hours before an exam. Photograph your notes, type them, or start from the sample set. It pulls out the terms and builds a plan around the time you have.',
+  },
+  {
+    q: 'Which mode should I use?',
+    a: 'Independent Assisted is flashcards on the terms that matter, then a practice test. True Cram is a partner quiz of every term, then flashcards, a practice test, or explain it. Spaced Cram is for an exam that isn’t the same day: recall, quizzes, and writing the definition, with the same terms coming back overnight.',
+  },
+  {
+    q: 'What does it cost?',
+    a: 'Free includes 5 AI calls a month and 10 saved sessions. Study is $8 a month, with 30 AI calls and the last 30 sessions. Partner study is $12 a month and covers one friend. A plan bought in the app or on the website is the plan on both.',
+  },
+  {
+    q: 'How does a partner code work?',
+    a: 'You get one private code. A friend signs in and redeems it. Reset the code if it leaks, and the old one stops working. When the subscription ends, paid access ends for both of you.',
+  },
+  {
+    q: 'What counts toward the AI quota?',
+    a: 'Term extraction, definitions, triage, grading, explanations, and panic notes. Those answers can be wrong. Check important facts against your class materials.',
+  },
+  {
+    q: 'How do I delete my account?',
+    a: 'Delete account in Settings removes that login, your notes, stored photos, and your sessions.',
+  },
+];
+
+function philosophyPage(firebaseConfig) {
+  return page({
+    title: 'Core philosophy · bharris.app',
+    description: 'Why bharris.app keeps studying focused and difficult only where it needs to be.',
+    foot: siteAuthFoot(firebaseConfig),
+    body: `${navBar({ prefix: '/', back: '/philosophy/' })}
+  <main class="philosophy-page reveal">
+    <h1>Core philosophy</h1>
+    <div class="philosophy-copy">
+      <p>This app is built for people who value their time. It removes distractions, unnecessary complexity, and ads so users can focus on what actually matters: learning.</p>
+      <p>Every part of the app is designed to be difficult only where it needs to be—the studying should challenge you, not the process of navigating the app. The goal is to make studying feel effortless to start and simple to navigate, while still requiring real effort where it counts.</p>
+      <p>This app isn’t made for people who are lazy; it’s made for hardworking, forward-thinking people who put their effort into many areas of their lives and don’t want to spend hours figuring out how to study. It exists to make studying more efficient, more focused, and more worth their time.</p>
+    </div>
+  </main>
+${siteFooter()}`,
+  });
+}
+
+function contactPage(firebaseConfig) {
+  const items = FAQ.map((item) => `        <article class="faq-item">
+          <h3>${escapeHtml(item.q)}</h3>
+          <p>${escapeHtml(item.a)}</p>
+        </article>`).join('\n');
+  return page({
+    title: 'Contact · bharris.app',
+    description: 'Contact bharris.app and read answers to common questions.',
+    foot: siteAuthFoot(firebaseConfig),
+    body: `${navBar({ prefix: '/', back: '/contact/' })}
+  <main class="contact-page reveal">
+    <div class="contact-head">
+      <h1>Contact</h1>
+      <p class="contact-email">[contact email]</p>
+      <p class="lede">Questions about the app, a plan, or your account.</p>
+    </div>
+    <section class="faq" aria-labelledby="faq-title">
+      <h2 id="faq-title">FAQ</h2>
+      <div class="faq-grid">
+${items}
+      </div>
+    </section>
   </main>
 ${siteFooter()}`,
   });
@@ -1716,12 +2336,23 @@ function loadSiteEnv() {
   return env;
 }
 
+function browserScript(name) {
+  return readFileSync(path.join(root, 'scripts', name), 'utf8').replace(/^export /gm, '');
+}
+
 function plansPage(firebaseConfig) {
-  const plansClient = readFileSync(path.join(root, 'scripts', 'plans-client.js'), 'utf8');
+  const planMarks = browserScript('plan-marks.js');
+  const accountPlan = browserScript('account-plan.js');
+  const siteAccount = readFileSync(path.join(root, 'scripts', 'site-account.js'), 'utf8');
+  const plansClient = readFileSync(path.join(root, 'scripts', 'plans-client.js'), 'utf8')
+    .replace(
+      "import { getAuth, onAuthStateChanged, sendPasswordResetEmail } from 'https://www.gstatic.com/firebasejs/12.3.0/firebase-auth.js';",
+      `import { getAuth, onAuthStateChanged, sendPasswordResetEmail } from 'https://www.gstatic.com/firebasejs/12.3.0/firebase-auth.js';\n${accountPlan}\n${planMarks}\n${siteAccount}`,
+    );
   return page({
     title: 'Plans · bharris.app',
     description: 'Study is $8 a month. Partner study is $12 a month and covers one friend.',
-    body: `${navBar('/')}
+    body: `${navBar({ prefix: '/', back: '/plans/' })}
   <main class="block plans-wrap reveal">
     <h2>Plans</h2>
     <div class="plan-grid">
@@ -1730,6 +2361,7 @@ function plansPage(firebaseConfig) {
         <p class="price">$8<span> / month</span></p>
         ${featureList(STUDY_FEATURES)}
         <button class="plan-btn" id="solo-subscribe" type="button">Subscribe</button>
+        <p class="plan-current" id="solo-current" hidden>Current</p>
         <p class="note" id="solo-note" hidden>You're on Study.</p>
       </article>
       <article class="plan-card">
@@ -1746,6 +2378,7 @@ function plansPage(firebaseConfig) {
           </ol>
         </div>
         <button class="plan-btn" id="partner-subscribe" type="button">Subscribe</button>
+        <p class="plan-current" id="partner-current" hidden>Current</p>
         <div id="partner-owner" hidden>
           <p class="note">Your code</p>
           <p class="plan-code" id="partner-code"></p>
@@ -1790,15 +2423,118 @@ ${plansClient}
   });
 }
 
-function thanksPage() {
+function accountPage(firebaseConfig) {
+  const accountPlan = browserScript('account-plan.js');
+  const siteAccount = readFileSync(path.join(root, 'scripts', 'site-account.js'), 'utf8');
+  const accountClient = readFileSync(path.join(root, 'scripts', 'account-client.js'), 'utf8')
+    .replace(
+      "} from 'https://www.gstatic.com/firebasejs/12.3.0/firebase-auth.js';",
+      `} from 'https://www.gstatic.com/firebasejs/12.3.0/firebase-auth.js';\n${accountPlan}\n${siteAccount}`,
+    );
+  return page({
+    title: 'Account · bharris.app',
+    description: 'Your bharris.app account, plan, billing, and password.',
+    body: `${navBar({ prefix: '/', back: '/account/' })}
+  <main class="block account-page reveal">
+    <h2>Account</h2>
+    <p id="account-loading">Loading your account…</p>
+    <section id="account-signed-out" hidden>
+      <p>Sign in to see your plan, billing, and password.</p>
+      <a class="plan-btn" href="/app/#/account/signin?return=/account/">Sign in</a>
+    </section>
+    <div id="account-signed-in" hidden>
+      <section class="plan-card">
+        <h3>Your account</h3>
+        <dl class="account-rows">
+          <div><dt>Name</dt><dd id="account-name">—</dd></div>
+          <div><dt>Email</dt><dd id="account-email">—</dd></div>
+        </dl>
+      </section>
+      <section class="plan-card">
+        <h3>Plan</h3>
+        <p class="account-plan-name" id="account-plan">…</p>
+        <p class="note" id="account-price" hidden></p>
+        <div class="account-lines" id="account-lines"></div>
+        <div class="account-partner" id="account-partner" hidden>
+          <p>Partner code</p>
+          <div class="account-code">
+            <span id="account-code"></span>
+            <button class="account-copy" id="account-copy" type="button" hidden>Copy</button>
+          </div>
+        </div>
+        <div class="account-actions">
+          <button class="plan-btn" id="account-billing" type="button" hidden>Billing information</button>
+          <a class="plan-btn secondary" id="account-plans" href="/plans/" hidden>See plans</a>
+          <button class="plan-btn danger" id="account-cancel" type="button" hidden>Cancel plan</button>
+        </div>
+      </section>
+      <section class="plan-card account-password">
+        <h3>Password</h3>
+        <button class="plan-btn secondary" id="account-password-open" type="button" hidden>Change password</button>
+        <p class="note" id="account-password-note" hidden>This account signs in with Google or Apple, so there is no password to change.</p>
+      </section>
+      <div class="account-actions">
+        <button class="plan-btn secondary" id="account-sign-out" type="button">Sign out</button>
+        <button class="plan-btn danger" id="account-delete" type="button">Delete account</button>
+      </div>
+      <p class="account-status" id="account-status" role="status"></p>
+    </div>
+    <dialog class="sign-in password" id="account-password-dialog" aria-labelledby="account-password-title">
+      <p class="mark">bharris.app</p>
+      <h3 id="account-password-title">Change password</h3>
+      <form class="account-password" id="account-password-form">
+        <label for="account-current-password">Current password</label>
+        <input id="account-current-password" type="password" autocomplete="current-password" />
+        <label for="account-new-password">New password</label>
+        <input id="account-new-password" type="password" autocomplete="new-password" minlength="8" />
+        <label for="account-confirm-password">Confirm new password</label>
+        <input id="account-confirm-password" type="password" autocomplete="new-password" minlength="8" />
+        <button class="plan-btn" id="account-password-save" type="submit">Save password</button>
+      </form>
+      <p class="account-status" id="account-password-status" role="status"></p>
+      <button class="text-btn" id="account-password-close" type="button">Not now</button>
+    </dialog>
+  </main>
+${siteFooter()}`,
+    foot: `<script>window.BH_ACCOUNT = ${JSON.stringify(firebaseConfig)};</script>
+<script type="module">
+${accountClient}
+</script>`,
+  });
+}
+
+function thanksPage(firebaseConfig) {
+  const siteAccount = readFileSync(path.join(root, 'scripts', 'site-account.js'), 'utf8');
+  const thanksClient = readFileSync(path.join(root, 'scripts', 'thanks-client.js'), 'utf8')
+    .replace(
+      "import { getAuth, onAuthStateChanged } from 'https://www.gstatic.com/firebasejs/12.3.0/firebase-auth.js';",
+      `import { getAuth, onAuthStateChanged } from 'https://www.gstatic.com/firebasejs/12.3.0/firebase-auth.js';\n${siteAccount}`,
+    );
   return page({
     title: 'Thank you · bharris.app',
     description: 'Thank you for choosing bharris.app.',
     body: `  <main class="thanks">
     <h1>Thank you for choosing bharris.app</h1>
     <p>Let's get studying.</p>
+    <section class="thanks-partner" id="partner-thanks" hidden>
+      <h2>Here's your partner code</h2>
+      <div class="thanks-code-row">
+        <p class="thanks-code-value" id="partner-thanks-code"></p>
+        <button class="thanks-copy" id="partner-thanks-copy" type="button" aria-label="Copy code" hidden>
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <rect width="8" height="4" x="8" y="2" rx="1"></rect>
+            <path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"></path>
+          </svg>
+        </button>
+      </div>
+      <p class="thanks-manage">You can find and manage this code in <a href="/app/#/settings">Settings</a>.</p>
+    </section>
     <a class="thanks-open" href="/app/">Open bharris.app</a>
   </main>`,
+    foot: `<script>window.BH_THANKS = ${JSON.stringify(firebaseConfig)};</script>
+<script type="module">
+${thanksClient}
+</script>`,
   });
 }
 
@@ -1825,7 +2561,6 @@ await mkdir(path.join(webDir, 'app'), { recursive: true });
 await cp(distDir, path.join(webDir, 'app'), { recursive: true });
 await mkdir(path.join(webDir, 'mockup'), { recursive: true });
 await cp(path.join(root, 'site', 'mockup', 'phone.mp4'), path.join(webDir, 'mockup', 'phone.mp4'));
-await writeFile(path.join(webDir, 'index.html'), homePage());
 const siteEnv = loadSiteEnv();
 const firebaseConfig = {
   apiKey: siteEnv.VITE_FIREBASE_API_KEY || '',
@@ -1833,10 +2568,17 @@ const firebaseConfig = {
   projectId: siteEnv.VITE_FIREBASE_PROJECT_ID || '',
   appId: siteEnv.VITE_FIREBASE_APP_ID || '',
 };
+await writeFile(path.join(webDir, 'index.html'), homePage(firebaseConfig));
 await mkdir(path.join(webDir, 'plans'), { recursive: true });
 await writeFile(path.join(webDir, 'plans', 'index.html'), plansPage(firebaseConfig));
+await mkdir(path.join(webDir, 'account'), { recursive: true });
+await writeFile(path.join(webDir, 'account', 'index.html'), accountPage(firebaseConfig));
 await mkdir(path.join(webDir, 'thanks'), { recursive: true });
-await writeFile(path.join(webDir, 'thanks', 'index.html'), thanksPage());
+await writeFile(path.join(webDir, 'thanks', 'index.html'), thanksPage(firebaseConfig));
+await mkdir(path.join(webDir, 'philosophy'), { recursive: true });
+await writeFile(path.join(webDir, 'philosophy', 'index.html'), philosophyPage(firebaseConfig));
+await mkdir(path.join(webDir, 'contact'), { recursive: true });
+await writeFile(path.join(webDir, 'contact', 'index.html'), contactPage(firebaseConfig));
 await mkdir(path.join(webDir, 'legal'), { recursive: true });
 await writeFile(
   path.join(webDir, 'legal', 'index.html'),
@@ -1851,6 +2593,8 @@ await writeFile(
     description: 'How bharris.app handles your account, notes, photos, and study AI.',
     intro: 'How this app handles your account, notes, and study data.',
     sections: PRIVACY_SECTIONS,
+    path: '/privacy/',
+    firebaseConfig,
   }),
 );
 await writeFile(
@@ -1860,5 +2604,7 @@ await writeFile(
     description: 'The rules for using bharris.app.',
     intro: 'The rules for using bharris.app.',
     sections: TERMS_SECTIONS,
+    path: '/terms/',
+    firebaseConfig,
   }),
 );

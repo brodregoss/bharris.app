@@ -2,7 +2,7 @@ import React from 'react';
 import { Check } from 'lucide-react';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { cn } from '@/lib/utils';
-import { SESSION_TYPE_META, describeSittingQueue, planProgress, sittingDetail, sittingEstimate } from '@/lib/spacedCram';
+import { SESSION_TYPE_META, TEST_FORMAT_LINE, describeSittingQueue, hasTestFormatCards, planProgress, sittingDetail, sittingEstimate } from '@/lib/spacedCram';
 
 const KEY_ORDER = ['new', 'rev', 'rev_plus', 'free'];
 
@@ -48,9 +48,9 @@ function sittingSubtitle(sitting, { isCurrent, leftover, chunkN, meta }) {
   return meta?.meaning;
 }
 
-function rowEstimate(sitting, schedule, terms, spaced) {
-  if (!terms?.length || sitting?.done) return '';
-  const built = describeSittingQueue(terms, {
+function queueForSitting(sitting, schedule, terms, spaced) {
+  if (!terms?.length || !sitting || sitting.done) return null;
+  return describeSittingQueue(terms, {
     ...(spaced || {}),
     sittingIndex: sitting.sitting,
     lastLook: false,
@@ -58,7 +58,15 @@ function rowEstimate(sitting, schedule, terms, spaced) {
     resumeIds: sitting.sitting === spaced?.resumeSitting ? (spaced?.resumeIds || []) : [],
     resumeSitting: sitting.sitting === spaced?.resumeSitting ? spaced?.resumeSitting : 0,
   }, schedule);
-  return sittingEstimate(built.queue.length).line;
+}
+
+function rowEstimate(sitting, schedule, terms, spaced) {
+  const built = queueForSitting(sitting, schedule, terms, spaced);
+  if (!built) return '';
+  return sittingEstimate(built.queue.length, {
+    mcTermCards: (built.mcTermIds || []).length,
+    mcDefCards: (built.mcDefIds || []).length,
+  }).line;
 }
 
 function SittingRow({ sitting, schedule, currentSitting, defaultOpen, leftover, estimate }) {
@@ -126,7 +134,14 @@ export default function SpacedPlan({ schedule, currentSitting = 1, spaced, terms
   const progress = planProgress(schedule, spaced, terms);
   const leftover = progress.finishedAll ? null : progress.leftLine;
   const current = (schedule?.sittings || []).find((s) => s.sitting === currentSitting && !s.done);
-  const hereEstimate = current ? rowEstimate(current, schedule, terms, spaced) : '';
+  const currentQueue = current ? queueForSitting(current, schedule, terms, spaced) : null;
+  const hereEstimate = currentQueue
+    ? sittingEstimate(currentQueue.queue.length, {
+      mcTermCards: (currentQueue.mcTermIds || []).length,
+      mcDefCards: (currentQueue.mcDefIds || []).length,
+    }).line
+    : '';
+  const showFormat = hasTestFormatCards(currentQueue, schedule?.testType);
 
   return (
     <div className="space-y-3">
@@ -137,6 +152,9 @@ export default function SpacedPlan({ schedule, currentSitting = 1, spaced, terms
         </p>
         {schedule?.summaryLine && (
           <p className="text-sm text-foreground mt-1.5 font-medium">{schedule.summaryLine}</p>
+        )}
+        {showFormat && (
+          <p className="text-sm text-foreground mt-1.5 leading-relaxed">{TEST_FORMAT_LINE}</p>
         )}
         {schedule?.foldNote && (
           <p className="text-sm text-foreground mt-1.5 leading-relaxed">{schedule.foldNote}</p>

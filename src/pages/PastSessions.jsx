@@ -23,7 +23,7 @@ import { listRemoteSessions, loadPracticeSource, loadFinishedSession, loadRemote
 import { continueStudyPath, trueCramPracticeState } from '@/lib/studyUtils';
 import { listNotes, parseNoteTerms, deleteNote } from '@/lib/notesUpload';
 import { useAuth } from '@/lib/AuthContext';
-import { sessionLimitForUser } from '@/lib/plans';
+import { planLabel, sessionLimitForUser } from '@/lib/plans';
 
 function formatWhen(value) {
   if (!value) return '';
@@ -281,11 +281,11 @@ export default function PastSessions() {
       <p className="px-5 text-xs text-muted-foreground mb-3">
         {loading && !sessions.length
           ? (user?.subscriptionTier === 'pro'
-            ? `Study Pro keeps your last ${cap} crams.`
+            ? `${planLabel(user)} keeps your last ${cap} crams.`
             : `Free keeps your last ${cap} crams. Oldest drop off.`)
           : `You have ${pastCount} of ${cap} past sessions. ${
               user?.subscriptionTier === 'pro'
-                ? `Study Pro keeps your last ${cap} crams.`
+                ? `${planLabel(user)} keeps your last ${cap} crams.`
                 : 'Oldest drop off on Free.'
             }`}
       </p>

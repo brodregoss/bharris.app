@@ -117,6 +117,25 @@ export async function refreshSubscription() {
   return data;
 }
 
+export async function startCheckout(plan, code = '') {
+  const data = await workerRequest('POST', '/v1/billing/checkout', {
+    plan,
+    code: String(code || '').trim(),
+  });
+  if (data.user) cacheUser(data.user);
+  return data;
+}
+
+export async function openBillingPortal() {
+  return workerRequest('POST', '/v1/billing/portal', {});
+}
+
+export async function redeemPartnerCode(code) {
+  const data = await workerRequest('POST', '/v1/billing/partner/redeem', { code });
+  if (data.user) cacheUser(data.user);
+  return data;
+}
+
 export async function cancelWebsitePlan() {
   const data = await workerRequest('POST', '/v1/billing/cancel', {});
   if (data.user) cacheUser(data.user);

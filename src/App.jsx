@@ -23,6 +23,7 @@ import SpacedCram from './pages/SpacedCram';
 import PanicReview from './pages/PanicReview';
 import PastSessions from './pages/PastSessions';
 import Settings from './pages/Settings';
+import ManagePlan from './pages/ManagePlan';
 import Practice from './pages/Practice';
 import Account from './pages/Account';
 import AccountCreate from './pages/AccountCreate';
@@ -75,6 +76,7 @@ function AppRoutes({ location }) {
         <Route path="/review-notes" element={<ReviewNotes />} />
         <Route path="/history" element={<PastSessions />} />
         <Route path="/settings" element={<Settings />} />
+        <Route path="/manage" element={<ManagePlan />} />
         <Route path="/settings/accounts" element={<Navigate to="/settings" replace />} />
         <Route path="/practice" element={<Practice />} />
         <Route path="/upload-notes" element={<UploadNotes />} />

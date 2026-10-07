@@ -13,7 +13,7 @@ import { afterAuthPath, leaveForAuthReturn, rememberAuthReturn } from '@/lib/onb
 export default function AccountSignIn() {
   const navigate = useNavigate();
   const { search } = useLocation();
-  const { isAuthenticated, signIn, signInWithApple, signInWithGoogle } = useAuth();
+  const { isAuthenticated, isLoadingAuth, signIn, signInWithApple, signInWithGoogle } = useAuth();
   const [email, setEmail] = React.useState('');
   const [password, setPassword] = React.useState('');
   const [error, setError] = React.useState('');
@@ -28,6 +28,8 @@ export default function AccountSignIn() {
   const finish = () => {
     if (!leaveForAuthReturn()) navigate(afterAuthPath(), { replace: true });
   };
+
+  if (isLoadingAuth) return null;
 
   if (isAuthenticated) {
     if (leaveForAuthReturn()) return null;

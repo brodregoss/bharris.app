@@ -1,5 +1,5 @@
 import { initializeApp } from 'https://www.gstatic.com/firebasejs/12.3.0/firebase-app.js';
-import { getAuth, onAuthStateChanged } from 'https://www.gstatic.com/firebasejs/12.3.0/firebase-auth.js';
+import { getAuth, onAuthStateChanged, sendPasswordResetEmail } from 'https://www.gstatic.com/firebasejs/12.3.0/firebase-auth.js';
 
 const cfg = window.BH_PLANS || {};
 const statusEl = document.getElementById('plans-status');
@@ -67,28 +67,36 @@ async function api(path, { method = 'POST', body } = {}) {
 async function loadMe() {
   if (!auth?.currentUser) {
     me = null;
+    writePlanCookie(null);
     return;
   }
-  await api('/v1/users/me', {
-    body: {
-      email: auth.currentUser.email || '',
-      displayName: auth.currentUser.displayName || '',
-    },
-  });
   const data = await api('/v1/users/me', { method: 'GET' });
-  me = data.user || null;
+  me = data.user ? { ...data.user, uid: data.user.uid || auth.currentUser.uid } : null;
+  writePlanCookie(me);
 }
 
 function render() {
-  const signedIn = !!auth?.currentUser;
+  const signedIn = !!auth?.currentUser || !!me?.uid;
   if (signedIn) document.getElementById('sign-in-dialog')?.close();
+  const signIn = document.getElementById('site-sign-in');
+  if (signIn) signIn.hidden = signedIn;
   const plan = me?.billingPlan || '';
-  show('solo-subscribe', plan !== 'solo');
+  const marks = planMarks(me, signedIn);
+  show('solo-current', marks.currentStudy);
+  show('partner-current', plan === 'partner');
+  show('solo-subscribe', !marks.currentStudy);
   show('solo-note', plan === 'solo');
   show('partner-subscribe', plan !== 'partner');
   show('partner-owner', plan === 'partner');
   show('guest-note', plan === 'guest');
   show('manage', !!me?.hasBilling);
+  show('cancel-plan', canCancelWebsitePlan(me));
+  const cancelNote = document.getElementById('cancel-note');
+  const cancelText = cancelPlanNote(me);
+  if (cancelNote) {
+    cancelNote.hidden = !cancelText;
+    cancelNote.textContent = cancelText;
+  }
   const code = document.getElementById('partner-code');
   if (code) {
     code.textContent = plan === 'partner'
@@ -141,13 +149,17 @@ async function subscribe(plan) {
   const code = promoCode();
   setStatus(code ? 'Checking code…' : 'Opening checkout…');
   const data = await api('/v1/billing/checkout', { body: { plan, code } });
-  if (!data.url) throw new Error('Could not start checkout.');
+  const dest = checkoutDestination(plan, data);
+  if (!dest) throw new Error('Could not start checkout.');
   try {
     sessionStorage.removeItem(PROMO_KEY);
   } catch {
     // The redirect still continues.
   }
-  window.location.assign(data.url);
+  if (data.granted && data.user) {
+    writePlanCookie({ ...data.user, uid: data.user.uid || auth.currentUser.uid });
+  }
+  window.location.assign(dest);
 }
 
 function bind(id, fn) {
@@ -164,6 +176,17 @@ function bind(id, fn) {
 restorePromo();
 bind('solo-subscribe', () => subscribe('solo'));
 bind('partner-subscribe', () => subscribe('partner'));
+bind('cancel-plan', async () => {
+  if (!canCancelWebsitePlan(me)) return;
+  if (!window.confirm(cancelPlanQuestion(me))) return;
+  setStatus('Canceling plan…');
+  const data = await api('/v1/billing/cancel', { body: {} });
+  me = data.user || me;
+  if (me) me.uid = me.uid || auth?.currentUser?.uid || '';
+  writePlanCookie(me);
+  render();
+  setStatus('Plan canceled.');
+});
 bind('manage', async () => {
   setStatus('Opening billing…');
   const data = await api('/v1/billing/portal', { body: {} });
@@ -181,6 +204,8 @@ bind('reset-code', async () => {
   setStatus('Resetting code…');
   const data = await api('/v1/billing/partner/reset', { body: {} });
   me = data.user || me;
+  if (me) me.uid = me.uid || auth?.currentUser?.uid || '';
+  writePlanCookie(me);
   render();
   setStatus('New code ready. The old one no longer works.');
 });
@@ -189,6 +214,8 @@ bind('remove-partner', async () => {
   setStatus('Removing partner…');
   const data = await api('/v1/billing/partner/remove', { body: {} });
   me = data.user || me;
+  if (me) me.uid = me.uid || auth?.currentUser?.uid || '';
+  writePlanCookie(me);
   render();
   setStatus('Partner removed. This code will not work for anyone else. Reset it to make a new one.');
 });
@@ -217,13 +244,40 @@ document.getElementById('redeem-form')?.addEventListener('submit', async (event)
 if (!cfg.apiKey || !cfg.authDomain || !cfg.projectId || !cfg.appId) {
   render();
 } else {
+  const cachedPlan = readPlanCookie();
+  if (cachedPlan?.uid || cachedPlan?.billingPlan || cachedPlan?.subscriptionTier === 'pro') {
+    me = cachedPlan;
+    render();
+  } else {
+    show('solo-subscribe', false);
+    show('partner-subscribe', false);
+  }
   auth = getAuth(initializeApp({
     apiKey: cfg.apiKey,
     authDomain: cfg.authDomain,
     projectId: cfg.projectId,
     appId: cfg.appId,
   }));
-  onAuthStateChanged(auth, () => {
+  const account = bindSiteAccount(auth, sendPasswordResetEmail);
+  onAuthStateChanged(auth, (user) => {
+    account.setSignedIn(user);
+    if (!user) {
+      me = null;
+      writePlanCookie(null);
+      render();
+      return;
+    }
+    if (user) document.getElementById('sign-in-dialog')?.close();
+    const saved = readPlanCookie();
+    if (saved?.uid === user.uid) {
+      me = saved;
+      render();
+      return;
+    }
+    me = null;
+    writePlanCookie(null);
+    show('solo-subscribe', false);
+    show('partner-subscribe', false);
     refresh().catch((err) => {
       setStatus(err instanceof Error ? err.message : 'Could not load your account.');
       render();
