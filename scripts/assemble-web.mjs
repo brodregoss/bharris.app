@@ -2,7 +2,7 @@ import { existsSync, readFileSync } from 'node:fs';
 import { cp, mkdir, rm, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { PRIVACY_SECTIONS, TERMS_SECTIONS } from '../src/lib/legal.js';
+import { LEGAL_UPDATED, PRIVACY_LEAD, PRIVACY_SECTIONS, RENEWAL_NOTICE, TERMS_LEAD, TERMS_SECTIONS, legalCopy, legalRuns } from '../src/lib/legal.js';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const distDir = path.join(root, 'dist');
@@ -161,6 +161,14 @@ const css = `
     line-height: 1.55;
     color: #404040;
   }
+  .doc ul {
+    margin: 0.75rem 0 0;
+    padding-left: 1.25rem;
+    color: #404040;
+    font-size: 1.0625rem;
+    line-height: 1.55;
+  }
+  .doc li { margin-top: 0.35rem; }
   .modes-wrap {
     --phone-short: 16.5rem;
     width: 100%;
@@ -766,7 +774,18 @@ const css = `
   .doc { padding-bottom: 3rem; }
   .doc h3 { margin: 2.25rem 0 0; font-size: 1.35rem; letter-spacing: -0.03em; }
   .doc h4 { margin: 1.5rem 0 0; font-size: 1rem; letter-spacing: -0.02em; }
+  .doc h5 { margin: 1.15rem 0 0; font-size: 0.95rem; letter-spacing: -0.01em; }
   .legal-page { padding-top: 6rem; }
+  .legal-table-wrap { margin-top: 1rem; overflow-x: auto; }
+  .legal-table { width: 100%; border-collapse: collapse; font-size: 0.95rem; color: #404040; }
+  .legal-table th, .legal-table td {
+    text-align: left;
+    padding: 0.5rem 0.75rem 0.5rem 0;
+    border-bottom: 1px solid #e5e5e5;
+    vertical-align: top;
+  }
+  .legal-table th { font-size: 0.8rem; color: #0a0a0a; }
+  .legal-table th:not(:first-child), .legal-table td:not(:first-child) { text-align: right; padding-left: 0.75rem; }
   .site-footer {
     min-height: 100dvh;
     margin-top: 0;
@@ -1243,6 +1262,24 @@ const css = `
     letter-spacing: -0.02em;
   }
   .promo input { flex: 1; min-width: 0; }
+  .agree {
+    display: flex;
+    align-items: flex-start;
+    gap: 0.7rem;
+    width: min(40rem, 100%);
+    margin: 1rem 0 0;
+    font-size: 0.95rem;
+    line-height: 1.45;
+    color: #404040;
+  }
+  .agree input {
+    width: 1.05rem;
+    height: 1.05rem;
+    margin-top: 0.2rem;
+    flex: none;
+  }
+  .agree a { color: #0a0a0a; font-weight: 650; }
+  .renew-note { width: min(40rem, 100%); }
   button.text-btn {
     appearance: none;
     border: 0;
@@ -1368,6 +1405,8 @@ const css = `
     letter-spacing: -0.03em;
     color: #0a0a0a;
   }
+  .contact-email a { color: inherit; text-decoration: none; }
+  .contact-email a:hover { text-decoration: underline; }
   .contact-head .lede {
     margin: 0.7rem auto 0;
     max-width: 26rem;
@@ -1593,7 +1632,7 @@ const css = `
     box-shadow: 0 16px 40px rgba(0, 0, 0, 0.18);
     line-height: 0;
   }
-  .brain-scans svg { display: block; width: 100%; height: auto; }
+  .brain-scans img { display: block; width: 100%; height: auto; }
   .brain-sticky { margin-top: 5.5rem; }
   .brain-pair {
     display: grid;
@@ -1898,9 +1937,42 @@ const fadeScript = `
   }
 `.trim();
 
+function inlineHtml(text) {
+  return legalRuns(text).map((run) => {
+    if (run.kind === 'strong') return `<strong>${escapeHtml(run.value)}</strong>`;
+    if (run.kind === 'email') {
+      const email = escapeHtml(run.value);
+      return `<a href="mailto:${email}">${email}</a>`;
+    }
+    return escapeHtml(run.value);
+  }).join('');
+}
+
+function paragraphsHtml(paragraphs) {
+  return paragraphs.map((paragraph) => `      <p>${inlineHtml(paragraph)}</p>`).join('\n');
+}
+
+function tableHtml(table) {
+  if (!table?.headers?.length) return '';
+  const head = table.headers.map((header) => `<th>${escapeHtml(header)}</th>`).join('');
+  const body = table.rows.map((row) => `<tr>${row.map((cell) => `<td>${escapeHtml(cell)}</td>`).join('')}</tr>`).join('');
+  return `      <div class="legal-table-wrap"><table class="legal-table"><thead><tr>${head}</tr></thead><tbody>${body}</tbody></table></div>`;
+}
+
+function blockHtml(section, heading) {
+  const copy = legalCopy(section);
+  const items = copy.items.length
+    ? `      <ul>\n${copy.items.map((item) => `        <li>${inlineHtml(item)}</li>`).join('\n')}\n      </ul>`
+    : '';
+  const groups = (section.groups || []).map((group) => blockHtml(group, 'h5')).join('\n');
+  const title = section.title ? `      <${heading}>${escapeHtml(section.title)}</${heading}>` : '';
+  return [title, paragraphsHtml(copy.before), items, tableHtml(section.table), groups, paragraphsHtml(copy.after)]
+    .filter(Boolean)
+    .join('\n');
+}
+
 function sectionsHtml(sections) {
-  return sections.map((section) => `      <h4>${escapeHtml(section.title)}</h4>
-      <p>${escapeHtml(section.body)}</p>`).join('\n');
+  return sections.map((section) => blockHtml(section, 'h4')).join('\n');
 }
 
 function siteFooter() {
@@ -1931,7 +2003,7 @@ function siteFooter() {
         </div>
         <div class="footer-col">
           <h3>Contact</h3>
-          <a href="/contact/">[contact email]</a>
+          <a href="mailto:broderickharris11@gmail.com">broderickharris11@gmail.com</a>
         </div>
         <div class="footer-col">
           <h3>Socials</h3>
@@ -2073,54 +2145,11 @@ function trueCramPhone() {
           </div>`;
 }
 
-function wireBrain(view) {
-  const panel = (id, label, drawing) => `<svg viewBox="0 0 200 168" role="img" aria-label="${label}">
-    <defs>
-      <pattern id="${id}-grid" width="12" height="12" patternUnits="userSpaceOnUse">
-        <path d="M 12 0 L 0 0 0 12" fill="none" stroke="#12343a" stroke-width="0.45"></path>
-      </pattern>
-    </defs>
-    <rect width="200" height="168" fill="#061016"></rect>
-    <rect width="200" height="168" fill="url(#${id}-grid)"></rect>
-    ${drawing}
-  </svg>`;
-  const side = `
-    <g fill="none" stroke-linecap="round" stroke-linejoin="round">
-      <path d="M62 98 C48 90 40 72 48 54 C56 36 80 26 106 26 C134 26 160 38 172 56 C184 74 180 96 164 110 C150 122 132 120 122 110" stroke="#1d4f4c" stroke-width="5"></path>
-      <path d="M122 112 C132 126 156 132 172 120 C184 110 180 96 166 94 C154 92 140 100 130 108" stroke="#1d4f4c" stroke-width="4"></path>
-      <path d="M62 98 C48 90 40 72 48 54 C56 36 80 26 106 26 C134 26 160 38 172 56 C184 74 180 96 164 110 C150 122 132 120 122 110 C114 122 96 128 80 122 C66 116 60 106 62 98 Z" stroke="#d8fff6" stroke-width="1.15"></path>
-      <path d="M58 74 C78 50 118 44 156 60" stroke="#8ef0df" stroke-width="0.8"></path>
-      <path d="M56 86 C80 62 124 58 162 76" stroke="#8ef0df" stroke-width="0.8"></path>
-      <path d="M60 98 C86 76 128 74 158 92" stroke="#8ef0df" stroke-width="0.8"></path>
-      <path d="M72 108 C96 92 126 92 146 104" stroke="#8ef0df" stroke-width="0.8"></path>
-      <path d="M84 32 C74 54 78 80 72 108" stroke="#8ef0df" stroke-width="0.8"></path>
-      <path d="M110 28 C104 52 112 80 104 114" stroke="#8ef0df" stroke-width="0.8"></path>
-      <path d="M136 34 C146 56 138 82 132 108" stroke="#8ef0df" stroke-width="0.8"></path>
-      <path d="M156 46 C166 66 158 88 150 106" stroke="#8ef0df" stroke-width="0.8"></path>
-      <path d="M118 112 C112 128 106 140 98 150" stroke="#d8fff6" stroke-width="1.05"></path>
-      <path d="M126 110 C122 124 116 138 108 148" stroke="#8ef0df" stroke-width="0.8"></path>
-      <path d="M130 108 C146 120 168 122 176 110" stroke="#d8fff6" stroke-width="1.05"></path>
-      <path d="M136 104 C150 114 168 112 174 102" stroke="#8ef0df" stroke-width="0.8"></path>
-      <path d="M142 112 C156 118 170 114 172 106" stroke="#8ef0df" stroke-width="0.8"></path>
-    </g>`;
-  const top = `
-    <g fill="none" stroke-linecap="round" stroke-linejoin="round">
-      <path d="M100 34 C74 32 48 46 40 72 C32 98 44 124 68 136 C82 142 94 132 100 116 C106 132 118 142 132 136 C156 124 168 98 160 72 C152 46 126 32 100 34 Z" stroke="#1d4f4c" stroke-width="5"></path>
-      <path d="M100 34 C74 32 48 46 40 72 C32 98 44 124 68 136 C82 142 94 132 100 116 C106 132 118 142 132 136 C156 124 168 98 160 72 C152 46 126 32 100 34 Z" stroke="#d8fff6" stroke-width="1.15"></path>
-      <path d="M100 40 C96 62 104 86 100 112" stroke="#d8fff6" stroke-width="1.05"></path>
-      <ellipse cx="100" cy="86" rx="62" ry="16" stroke="#8ef0df" stroke-width="0.8"></ellipse>
-      <ellipse cx="100" cy="86" rx="50" ry="28" stroke="#8ef0df" stroke-width="0.8"></ellipse>
-      <ellipse cx="100" cy="86" rx="34" ry="40" stroke="#8ef0df" stroke-width="0.8"></ellipse>
-      <path d="M72 46 C56 62 52 96 66 122" stroke="#8ef0df" stroke-width="0.8"></path>
-      <path d="M86 40 C74 60 74 100 84 128" stroke="#8ef0df" stroke-width="0.8"></path>
-      <path d="M128 46 C144 62 148 96 134 122" stroke="#8ef0df" stroke-width="0.8"></path>
-      <path d="M114 40 C126 60 126 100 116 128" stroke="#8ef0df" stroke-width="0.8"></path>
-      <path d="M58 78 C78 70 92 86 100 86 C108 86 122 70 142 78" stroke="#8ef0df" stroke-width="0.8"></path>
-      <path d="M52 100 C76 92 90 108 100 104 C110 108 124 92 148 100" stroke="#8ef0df" stroke-width="0.8"></path>
-    </g>`;
-  return view === 'top'
-    ? panel('bw-top', 'Wireframe brain, top view', top)
-    : panel('bw-side', 'Wireframe brain, side view', side);
+function brainScan(view) {
+  const side = view !== 'top';
+  const src = side ? '/brain-side.jpg' : '/brain-top.jpg';
+  const label = side ? 'Side view of a human brain' : 'Top view of a human brain';
+  return `<img src="${src}" alt="${label}" width="1024" height="768">`;
 }
 
 function homePage(firebaseConfig) {
@@ -2214,8 +2243,8 @@ ${siteAuthFoot(firebaseConfig)}`,
         <p><strong>A cleaner environment leaves more room for learning.</strong> Cognitive Load Theory suggests that our working memory has limited capacity. When an interface is cluttered with unnecessary buttons, information, and distractions, part of that capacity is spent figuring out the interface instead of learning. By removing unnecessary complexity, bharris.app reduces <strong>extraneous cognitive load</strong>, helping you focus your attention on what actually matters: the material.</p>
       </div>
       <div class="brain-scans reveal" style="--d:120ms">
-        <div class="scan">${wireBrain('side')}</div>
-        <div class="scan">${wireBrain('top')}</div>
+        <div class="scan">${brainScan('side')}</div>
+        <div class="scan">${brainScan('top')}</div>
       </div>
     </div>
     <div class="brain-sticky reveal" style="--d:80ms">
@@ -2244,8 +2273,9 @@ function policyPage({ title, description, intro, sections, path, firebaseConfig 
     body: `${navBar({ prefix: '/', back: path })}
   <main class="block doc legal-page reveal">
     <h2>${escapeHtml(title)}</h2>
-    <p>${escapeHtml(intro)}</p>
-    <p class="updated">Last updated October 6, 2026</p>
+    <p class="updated">Effective ${escapeHtml(LEGAL_UPDATED)}</p>
+${(Array.isArray(intro) ? intro : [intro]).filter(Boolean).map((line) => `    <p>${inlineHtml(line)}</p>`).join('\n')}
+    <p class="updated">Last updated ${escapeHtml(LEGAL_UPDATED)}</p>
 ${sectionsHtml(sections)}
   </main>
 ${siteFooter()}`,
@@ -2271,11 +2301,11 @@ const FAQ = [
   },
   {
     q: 'What counts toward the AI quota?',
-    a: 'Term extraction, definitions, triage, grading, explanations, and panic notes. Those answers can be wrong. Check important facts against your class materials.',
+    a: 'Term extraction, definitions, triage, grading, explanations, panic notes, and wrong answers for multiple-choice questions. Only a successful call counts. Those answers can be wrong. Check important facts against your class materials.',
   },
   {
     q: 'How do I delete my account?',
-    a: 'Delete account in Settings removes that login, your notes, stored photos, and your sessions.',
+    a: 'Delete account in Settings removes that login, your notes, and your sessions, and cancels the Stripe subscription. It does not cancel an App Store subscription. Photos of your notes are not kept.',
   },
 ];
 
@@ -2310,7 +2340,7 @@ function contactPage(firebaseConfig) {
   <main class="contact-page reveal">
     <div class="contact-head">
       <h1>Contact</h1>
-      <p class="contact-email">[contact email]</p>
+      <p class="contact-email"><a href="mailto:broderickharris11@gmail.com">broderickharris11@gmail.com</a></p>
       <p class="lede">Questions about the app, a plan, or your account.</p>
     </div>
     <section class="faq" aria-labelledby="faq-title">
@@ -2393,6 +2423,11 @@ function plansPage(firebaseConfig) {
     body: `${navBar({ prefix: '/', back: '/plans/' })}
   <main class="block plans-wrap reveal">
     <h2>Plans</h2>
+    <p class="note renew-note">${escapeHtml(RENEWAL_NOTICE)}</p>
+    <label class="agree" for="terms-agree">
+      <input id="terms-agree" type="checkbox" />
+      <span>I agree to the <a href="/terms/">Terms of Service</a> and <a href="/privacy/">Privacy Policy</a>.</span>
+    </label>
     <div class="plan-grid">
       <article class="plan-card">
         <h3>Study</h3>
@@ -2599,6 +2634,8 @@ await mkdir(path.join(webDir, 'app'), { recursive: true });
 await cp(distDir, path.join(webDir, 'app'), { recursive: true });
 await mkdir(path.join(webDir, 'mockup'), { recursive: true });
 await cp(path.join(root, 'site', 'mockup', 'phone.mp4'), path.join(webDir, 'mockup', 'phone.mp4'));
+await cp(path.join(root, 'site', 'brain-side.jpg'), path.join(webDir, 'brain-side.jpg'));
+await cp(path.join(root, 'site', 'brain-top.jpg'), path.join(webDir, 'brain-top.jpg'));
 const siteEnv = loadSiteEnv();
 const firebaseConfig = {
   apiKey: siteEnv.VITE_FIREBASE_API_KEY || '',
@@ -2629,7 +2666,7 @@ await writeFile(
   policyPage({
     title: 'Privacy Policy',
     description: 'How bharris.app handles your account, notes, photos, and study AI.',
-    intro: 'How this app handles your account, notes, and study data.',
+    intro: PRIVACY_LEAD,
     sections: PRIVACY_SECTIONS,
     path: '/privacy/',
     firebaseConfig,
@@ -2640,7 +2677,7 @@ await writeFile(
   policyPage({
     title: 'Terms of Service',
     description: 'The rules for using bharris.app.',
-    intro: 'The rules for using bharris.app.',
+    intro: TERMS_LEAD,
     sections: TERMS_SECTIONS,
     path: '/terms/',
     firebaseConfig,

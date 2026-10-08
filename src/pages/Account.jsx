@@ -6,6 +6,8 @@ import { useAuth } from '@/lib/AuthContext';
 import { afterAuthPath, leaveForAuthReturn } from '@/lib/onboarding';
 import AppleSignInButton from '@/components/account/AppleSignInButton';
 import GoogleSignInButton from '@/components/account/GoogleSignInButton';
+import TermsAgreement from '@/components/account/TermsAgreement';
+import { TERMS_AGREE_ERROR } from '@/lib/legal';
 
 export default function Account() {
   const navigate = useNavigate();
@@ -16,6 +18,7 @@ export default function Account() {
   const [appleLoading, setAppleLoading] = React.useState(false);
   const [googleLoading, setGoogleLoading] = React.useState(false);
   const [socialError, setSocialError] = React.useState('');
+  const [agreed, setAgreed] = React.useState(false);
   const safeFrom = from === '/' || from === '/welcome' || from === '/settings' || from === '/history' || from === '/practice';
 
   if (isLoadingAuth) {
@@ -42,6 +45,10 @@ export default function Account() {
 
   const handleApple = async () => {
     setSocialError('');
+    if (!agreed) {
+      setSocialError(TERMS_AGREE_ERROR);
+      return;
+    }
     setAppleLoading(true);
     try {
       await signInWithApple();
@@ -55,6 +62,10 @@ export default function Account() {
 
   const handleGoogle = async () => {
     setSocialError('');
+    if (!agreed) {
+      setSocialError(TERMS_AGREE_ERROR);
+      return;
+    }
     setGoogleLoading(true);
     try {
       const signedIn = await signInWithGoogle();
@@ -102,6 +113,7 @@ export default function Account() {
 
       <footer className="px-6 pb-safe pt-4">
         <div className="max-w-md mx-auto w-full flex flex-col gap-3">
+          <TermsAgreement checked={agreed} onCheckedChange={setAgreed} />
           <AppleSignInButton onClick={handleApple} loading={appleLoading} disabled={googleLoading} />
           <GoogleSignInButton onClick={handleGoogle} loading={googleLoading} disabled={appleLoading} />
           <Button

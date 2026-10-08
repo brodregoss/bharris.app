@@ -47,11 +47,15 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
+import LegalSections, { LegalText } from '@/components/account/LegalSections';
 import {
   APP_NAME,
   APP_VERSION,
   ABOUT_SECTIONS,
+  LEGAL_UPDATED,
+  PRIVACY_LEAD,
   PRIVACY_SECTIONS,
+  TERMS_LEAD,
   TERMS_SECTIONS,
 } from '@/lib/legal';
 import { devToolsUnlocked, lockDevTools, tryUnlockDevTools } from '@/lib/devToolsLock';
@@ -65,12 +69,14 @@ const DOCS = {
   },
   privacy: {
     title: 'Privacy Policy',
-    description: 'How this app handles your notes and data.',
+    description: `Effective ${LEGAL_UPDATED}.`,
+    lead: PRIVACY_LEAD,
     sections: PRIVACY_SECTIONS,
   },
   terms: {
     title: 'Terms of Service',
-    description: 'The rules for using bharris.app.',
+    description: `Effective ${LEGAL_UPDATED}.`,
+    lead: TERMS_LEAD,
     sections: TERMS_SECTIONS,
   },
 };
@@ -587,12 +593,13 @@ export default function Settings() {
                 <SheetDescription>{open.description}</SheetDescription>
               </SheetHeader>
               <div className="space-y-4 pt-4 pb-6">
-                {open.sections.map((s) => (
-                  <div key={s.title}>
-                    <h3 className="text-sm font-semibold text-foreground mb-1">{s.title}</h3>
-                    <p className="text-sm text-muted-foreground leading-relaxed">{s.body}</p>
-                  </div>
+                {open.lead?.map((line) => (
+                  <p key={line} className="text-sm text-muted-foreground leading-relaxed">
+                    <LegalText text={line} />
+                  </p>
                 ))}
+                <p className="text-xs text-muted-foreground">Last updated {LEGAL_UPDATED}</p>
+                <LegalSections sections={open.sections} />
               </div>
             </>
           )}

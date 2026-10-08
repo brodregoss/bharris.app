@@ -146,7 +146,17 @@ function restorePromo() {
   }
 }
 
+const TERMS_AGREE_ERROR = 'Agree to the Terms of Service and Privacy Policy first.';
+
+function agreedToTerms() {
+  return document.getElementById('terms-agree')?.checked === true;
+}
+
 async function subscribe(plan) {
+  if (!agreedToTerms()) {
+    setStatus(TERMS_AGREE_ERROR);
+    return;
+  }
   rememberPromo();
   if (!auth?.currentUser) {
     promptSignIn();
@@ -268,6 +278,10 @@ document.getElementById('redeem-form')?.addEventListener('submit', async (event)
   try {
     if (!auth?.currentUser) {
       promptSignIn();
+      return;
+    }
+    if (!agreedToTerms()) {
+      setRedeemStatus(TERMS_AGREE_ERROR);
       return;
     }
     const code = document.getElementById('redeem-code')?.value || '';

@@ -30,6 +30,7 @@ import AccountCreate from './pages/AccountCreate';
 import AccountSignIn from './pages/AccountSignIn';
 import ForgotPassword from './pages/ForgotPassword';
 import AccountResetPassword from './pages/AccountResetPassword';
+import LegalDocument from './pages/LegalDocument';
 import VideoPreview from './pages/VideoPreview';
 import RequireAccount from '@/components/RequireAccount';
 import { PaywallProvider } from '@/lib/PaywallContext';
@@ -57,7 +58,9 @@ function DevToolsGate() {
 function AuthReturnScope() {
   const { pathname } = useLocation();
   useEffect(() => {
-    if (!pathname.startsWith('/account')) clearStaleAuthReturn();
+    if (!pathname.startsWith('/account') && pathname !== '/terms' && pathname !== '/privacy') {
+      clearStaleAuthReturn();
+    }
   }, [pathname]);
   return null;
 }
@@ -70,6 +73,8 @@ function AppRoutes({ location }) {
       <Route path="/account/create" element={<AccountCreate />} />
       <Route path="/account/forgot" element={<ForgotPassword />} />
       <Route path="/account/reset" element={<AccountResetPassword />} />
+      <Route path="/terms" element={<LegalDocument doc="terms" />} />
+      <Route path="/privacy" element={<LegalDocument doc="privacy" />} />
       <Route element={<RequireAccount />}>
         <Route path="/" element={<Landing />} />
         <Route path="/welcome" element={<Welcome />} />

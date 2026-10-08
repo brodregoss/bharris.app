@@ -33,6 +33,8 @@ import {
   startCheckout,
 } from '@/lib/accountStore';
 import { openBillingUrl } from '@/lib/billingUrl';
+import TermsAgreement from '@/components/account/TermsAgreement';
+import { RENEWAL_NOTICE, TERMS_AGREE_ERROR } from '@/lib/legal';
 import { cn } from '@/lib/utils';
 
 function formatPlanDate(iso) {
@@ -96,6 +98,7 @@ export default function PaywallSheet({ open, onOpenChange }) {
   const [code, setCode] = React.useState('');
   const [redeemCode, setRedeemCode] = React.useState('');
   const [cancelOpen, setCancelOpen] = React.useState(false);
+  const [agreed, setAgreed] = React.useState(false);
 
   const billingPlan = user?.billingPlan || '';
   const websitePlan = billingPlan === 'solo' || billingPlan === 'partner';
@@ -111,6 +114,7 @@ export default function PaywallSheet({ open, onOpenChange }) {
       setError('');
       setBusy('');
       setCancelOpen(false);
+      setAgreed(false);
       return undefined;
     }
     let cancelled = false;
@@ -132,23 +136,29 @@ export default function PaywallSheet({ open, onOpenChange }) {
     }
   };
 
-  const subscribe = (plan) => run(plan, async () => {
-    const data = await startCheckout(plan, code);
-    if (data.granted) {
-      const path = checkoutDestination(plan, data);
-      if (Capacitor.isNativePlatform()) {
-        const origin = APP_CONFIG.workerUrl;
-        if (origin) await openBillingUrl(`${origin}${path}`);
-        onOpenChange(false);
-        return;
-      }
-      window.location.assign(path);
+  const subscribe = (plan) => {
+    if (!agreed) {
+      setError(TERMS_AGREE_ERROR);
       return;
     }
-    if (!data.url) throw new Error('Could not start checkout.');
-    await openBillingUrl(data.url);
-    if (!Capacitor.isNativePlatform()) onOpenChange(false);
-  });
+    run(plan, async () => {
+      const data = await startCheckout(plan, code);
+      if (data.granted) {
+        const path = checkoutDestination(plan, data);
+        if (Capacitor.isNativePlatform()) {
+          const origin = APP_CONFIG.workerUrl;
+          if (origin) await openBillingUrl(`${origin}${path}`);
+          onOpenChange(false);
+          return;
+        }
+        window.location.assign(path);
+        return;
+      }
+      if (!data.url) throw new Error('Could not start checkout.');
+      await openBillingUrl(data.url);
+      if (!Capacitor.isNativePlatform()) onOpenChange(false);
+    });
+  };
 
   const subscribeAction = (planId, isCurrent) => {
     if (isCurrent && billingPlan !== 'guest') return null;
@@ -167,6 +177,10 @@ export default function PaywallSheet({ open, onOpenChange }) {
       setError('Enter a code.');
       return;
     }
+    if (!agreed) {
+      setError(TERMS_AGREE_ERROR);
+      return;
+    }
     run('redeem', async () => {
       await redeemPartnerCode(attempt);
       setRedeemCode('');
@@ -176,6 +190,7 @@ export default function PaywallSheet({ open, onOpenChange }) {
 
   const studyAction = subscribeAction('solo', currentStudy);
   const partnerAction = subscribeAction('partner', currentPartner);
+  const needsAgreement = Boolean(studyAction || partnerAction || !billingPlan);
 
   return (
     <>
@@ -189,6 +204,12 @@ export default function PaywallSheet({ open, onOpenChange }) {
           </SheetHeader>
           <div className="space-y-3 pt-4 pb-6">
             {error && <p className="text-sm text-destructive">{error}</p>}
+            {(studyAction || partnerAction) && (
+              <p className="text-xs text-muted-foreground leading-relaxed">{RENEWAL_NOTICE}</p>
+            )}
+            {needsAgreement && (
+              <TermsAgreement id="paywall-agree-terms" checked={agreed} onCheckedChange={setAgreed} />
+            )}
             {user?.billingNotice === 'beta_ended' && !billingPlan && (
               <p className="text-sm text-muted-foreground">Your free week ended.</p>
             )}

@@ -7,6 +7,8 @@ import { Label } from '@/components/ui/label';
 import AuthShell from '@/components/AuthShell';
 import AppleSignInButton from '@/components/account/AppleSignInButton';
 import GoogleSignInButton from '@/components/account/GoogleSignInButton';
+import TermsAgreement from '@/components/account/TermsAgreement';
+import { TERMS_AGREE_ERROR } from '@/lib/legal';
 import { useAuth } from '@/lib/AuthContext';
 import { afterAuthPath, leaveForAuthReturn, rememberAuthReturn } from '@/lib/onboarding';
 
@@ -22,6 +24,7 @@ export default function AccountCreate() {
   const [loading, setLoading] = React.useState(false);
   const [appleLoading, setAppleLoading] = React.useState(false);
   const [googleLoading, setGoogleLoading] = React.useState(false);
+  const [agreed, setAgreed] = React.useState(false);
 
   React.useEffect(() => {
     rememberAuthReturn();
@@ -45,9 +48,16 @@ export default function AccountCreate() {
     return <Navigate to={afterAuthPath()} replace />;
   }
 
+  const requireAgreement = () => {
+    if (agreed) return true;
+    setError(TERMS_AGREE_ERROR);
+    return false;
+  };
+
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError('');
+    if (!requireAgreement()) return;
     const trimmedName = name.trim().replace(/\s+/g, ' ');
     if (!trimmedName) {
       setError('Enter your name.');
@@ -70,6 +80,7 @@ export default function AccountCreate() {
 
   const handleApple = async () => {
     setError('');
+    if (!requireAgreement()) return;
     setAppleLoading(true);
     try {
       await signInWithApple();
@@ -83,6 +94,7 @@ export default function AccountCreate() {
 
   const handleGoogle = async () => {
     setError('');
+    if (!requireAgreement()) return;
     setGoogleLoading(true);
     try {
       const signedIn = await signInWithGoogle();
@@ -107,6 +119,7 @@ export default function AccountCreate() {
         </div>
       )}
       <div className="space-y-3">
+        <TermsAgreement id="create-agree-terms" checked={agreed} onCheckedChange={setAgreed} />
         <AppleSignInButton onClick={handleApple} loading={appleLoading} disabled={loading || googleLoading} />
         <GoogleSignInButton onClick={handleGoogle} loading={googleLoading} disabled={loading || appleLoading} />
       </div>
