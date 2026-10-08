@@ -1627,9 +1627,6 @@ const css = `
   .brain-copy strong { color: #0a0a0a; font-weight: 700; }
   .brain-scans { display: flex; flex-direction: column; gap: 0.7rem; }
   .brain-scans .scan {
-    overflow: hidden;
-    border-radius: 0.9rem;
-    box-shadow: 0 16px 40px rgba(0, 0, 0, 0.18);
     line-height: 0;
   }
   .brain-scans img { display: block; width: 100%; height: auto; }
@@ -2147,7 +2144,7 @@ function trueCramPhone() {
 
 function brainScan(view) {
   const side = view !== 'top';
-  const src = side ? '/brain-side.jpg' : '/brain-top.jpg';
+  const src = side ? '/brain-side.png' : '/brain-top.png';
   const label = side ? 'Side view of a human brain' : 'Top view of a human brain';
   return `<img src="${src}" alt="${label}" width="1024" height="768">`;
 }
@@ -2634,8 +2631,8 @@ await mkdir(path.join(webDir, 'app'), { recursive: true });
 await cp(distDir, path.join(webDir, 'app'), { recursive: true });
 await mkdir(path.join(webDir, 'mockup'), { recursive: true });
 await cp(path.join(root, 'site', 'mockup', 'phone.mp4'), path.join(webDir, 'mockup', 'phone.mp4'));
-await cp(path.join(root, 'site', 'brain-side.jpg'), path.join(webDir, 'brain-side.jpg'));
-await cp(path.join(root, 'site', 'brain-top.jpg'), path.join(webDir, 'brain-top.jpg'));
+await cp(path.join(root, 'site', 'brain-side.png'), path.join(webDir, 'brain-side.png'));
+await cp(path.join(root, 'site', 'brain-top.png'), path.join(webDir, 'brain-top.png'));
 const siteEnv = loadSiteEnv();
 const firebaseConfig = {
   apiKey: siteEnv.VITE_FIREBASE_API_KEY || '',
