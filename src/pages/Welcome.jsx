@@ -1,23 +1,65 @@
 import React from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ArrowLeft, Upload, Loader2 } from 'lucide-react';
+import { ArrowLeft, Upload, Loader2, Lock } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { makePhotoSource } from '@/lib/notesSource';
 import { fileToJpegDataUrl, stashPhotos, validateNotePhotos } from '@/lib/imageData';
 import { uploadNoteImages } from '@/lib/notesUpload';
 import { isOnboarded } from '@/lib/onboarding';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import {
+  clearNotesScanToken,
+  isScanLockError,
+  notesScanUnlocked,
+  refreshNotesScanUnlock,
+  unlockNotesScan,
+} from '@/lib/notesScanLock';
 
 export default function Welcome() {
   const navigate = useNavigate();
   const [dragging, setDragging] = React.useState(false);
   const [reading, setReading] = React.useState(false);
   const [readError, setReadError] = React.useState('');
+  const [unlocked, setUnlocked] = React.useState(() => notesScanUnlocked());
+  const [scanPassword, setScanPassword] = React.useState('');
+  const [checkingPassword, setCheckingPassword] = React.useState(false);
   const inputRef = React.useRef(null);
+
+  React.useEffect(() => {
+    let cancelled = false;
+    refreshNotesScanUnlock().then((ok) => {
+      if (!cancelled) setUnlocked(ok);
+    });
+    return () => { cancelled = true; };
+  }, []);
 
   const canGoBack = typeof window !== 'undefined' ? isOnboarded() : false;
 
+  const unlockScan = async (event) => {
+    event.preventDefault();
+    if (checkingPassword) return;
+    const password = scanPassword;
+    if (!password.trim()) {
+      setReadError('Enter the notes password.');
+      return;
+    }
+    setCheckingPassword(true);
+    setReadError('');
+    try {
+      await unlockNotesScan(password);
+      setScanPassword('');
+      setUnlocked(true);
+    } catch (err) {
+      const message = err instanceof Error ? err.message : '';
+      setReadError(message || 'That password is wrong.');
+    } finally {
+      setCheckingPassword(false);
+    }
+  };
+
   const takeFiles = async (fileList) => {
-    if (reading) return;
+    if (reading || !notesScanUnlocked()) return;
     const checked = validateNotePhotos(fileList);
     if (checked.error) {
       setReadError(checked.error);
@@ -38,7 +80,14 @@ export default function Welcome() {
       try {
         const note = await uploadNoteImages(images, { title: 'Untitled' });
         noteId = note?.id || '';
-      } catch {
+      } catch (err) {
+        if (isScanLockError(err)) {
+          clearNotesScanToken();
+          setUnlocked(false);
+          setReadError(err instanceof Error ? err.message : 'Enter the notes password to upload.');
+          setReading(false);
+          return;
+        }
         // Extract still runs from the in-memory photos; R2 persist can retry later.
       }
       navigate('/highlight-notes', {
@@ -83,60 +132,109 @@ export default function Welcome() {
             <p className="text-base text-muted-foreground mt-4">Lets get moving</p>
           </div>
 
-          <div
-            onClick={() => !reading && inputRef.current?.click()}
-            onDragOver={(e) => {
-              e.preventDefault();
-              if (!reading) setDragging(true);
-            }}
-            onDragLeave={() => setDragging(false)}
-            onDrop={onDrop}
-            className={cn(
-              'w-full rounded-3xl border-2 border-dashed px-6 py-12 flex flex-col items-center gap-4 transition text-center',
-              reading ? 'cursor-wait opacity-80' : 'cursor-pointer',
-              dragging
-                ? 'border-primary bg-primary/5'
-                : 'border-border bg-card hover:border-muted-foreground'
-            )}
-          >
-            <div className="w-12 h-12 rounded-full bg-muted flex items-center justify-center">
-              {reading ? (
-                <Loader2 className="w-5 h-5 text-muted-foreground animate-spin" />
-              ) : (
-                <Upload className="w-5 h-5 text-muted-foreground" />
-              )}
-            </div>
-            <div>
-              <p className="text-base font-semibold">{reading ? 'Opening photo…' : 'Drop notes here'}</p>
-              <p className="text-xs text-muted-foreground mt-1">
-                Up to 2 photos · a page or two of notes
-              </p>
-            </div>
-            <button
-              type="button"
-              onClick={(e) => {
-                e.stopPropagation();
-                if (!reading) navigate('/create-notes');
+          {unlocked ? (
+            <div
+              onClick={() => !reading && inputRef.current?.click()}
+              onDragOver={(e) => {
+                e.preventDefault();
+                if (!reading) setDragging(true);
               }}
-              className="text-sm text-foreground underline underline-offset-4 hover:text-muted-foreground"
+              onDragLeave={() => setDragging(false)}
+              onDrop={onDrop}
+              className={cn(
+                'w-full rounded-3xl border-2 border-dashed px-6 py-12 flex flex-col items-center gap-4 transition text-center',
+                reading ? 'cursor-wait opacity-80' : 'cursor-pointer',
+                dragging
+                  ? 'border-primary bg-primary/5'
+                  : 'border-border bg-card hover:border-muted-foreground'
+              )}
             >
-              create manually
-            </button>
-          </div>
+              <div className="w-12 h-12 rounded-full bg-muted flex items-center justify-center">
+                {reading ? (
+                  <Loader2 className="w-5 h-5 text-muted-foreground animate-spin" />
+                ) : (
+                  <Upload className="w-5 h-5 text-muted-foreground" />
+                )}
+              </div>
+              <div>
+                <p className="text-base font-semibold">{reading ? 'Opening photo…' : 'Drop notes here'}</p>
+                <p className="text-xs text-muted-foreground mt-1">
+                  Up to 2 photos · a page or two of notes
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  if (!reading) navigate('/create-notes');
+                }}
+                className="text-sm text-foreground underline underline-offset-4 hover:text-muted-foreground"
+              >
+                create manually
+              </button>
+            </div>
+          ) : (
+            <form
+              onSubmit={unlockScan}
+              className="w-full rounded-3xl border border-border bg-card px-6 py-10 flex flex-col items-center gap-4 text-center"
+            >
+              <div className="w-12 h-12 rounded-full bg-muted flex items-center justify-center">
+                <Lock className="w-5 h-5 text-muted-foreground" />
+              </div>
+              <div>
+                <p className="text-base font-semibold">Notes are locked</p>
+                <p className="text-xs text-muted-foreground mt-1">
+                  Type the notes password to scan and upload photos.
+                </p>
+              </div>
+              <Input
+                type="password"
+                name="notes-scan-password"
+                autoComplete="off"
+                autoCapitalize="none"
+                autoCorrect="off"
+                spellCheck={false}
+                enterKeyHint="go"
+                maxLength={128}
+                value={scanPassword}
+                onChange={(event) => setScanPassword(event.target.value)}
+                placeholder="Password"
+                aria-label="Notes password"
+                className="h-12 rounded-2xl text-center"
+              />
+              <Button
+                type="submit"
+                size="lg"
+                disabled={checkingPassword || !scanPassword.trim()}
+                className="w-full h-12 rounded-2xl text-base font-semibold"
+              >
+                {checkingPassword ? 'Checking…' : 'Unlock'}
+              </Button>
+              <button
+                type="button"
+                onClick={() => navigate('/create-notes')}
+                className="text-sm text-foreground underline underline-offset-4 hover:text-muted-foreground"
+              >
+                create manually
+              </button>
+            </form>
+          )}
           {readError && (
             <p className="text-xs text-rose-600 dark:text-rose-300 text-center mt-3">{readError}</p>
           )}
-          <input
-            ref={inputRef}
-            type="file"
-            accept="image/*"
-            multiple
-            className="hidden"
-            onChange={(e) => {
-              takeFiles(e.target.files);
-              e.target.value = '';
-            }}
-          />
+          {unlocked && (
+            <input
+              ref={inputRef}
+              type="file"
+              accept="image/*"
+              multiple
+              className="hidden"
+              onChange={(e) => {
+                takeFiles(e.target.files);
+                e.target.value = '';
+              }}
+            />
+          )}
 
           <button
             type="button"

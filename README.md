@@ -91,8 +91,13 @@ npx wrangler secret put STRIPE_SECRET_KEY
 npx wrangler secret put STRIPE_WEBHOOK_SECRET
 npx wrangler secret put STRIPE_PRICE_SOLO
 npx wrangler secret put STRIPE_PRICE_PARTNER
+npx wrangler secret put NOTES_SCAN_PASSWORD_HASH
+npx wrangler secret put NOTES_SCAN_TOKEN_SECRET
+npx wrangler secret put DEV_TOOLS_CODE_HASH
 npm run worker:deploy
 ```
+
+Photo uploads stay locked until the notes password is entered. `node scripts/notes-scan-secret.mjs --write` creates that password for local development and prints it once. Use the same two values for the Worker secrets above. The password is not stored in the app. Settings has a Dev tools code. After that code checks out, Kill current code is on the same screen. That turns the live notes code off immediately. Save new code replaces it. The dev code is checked on the server and is not stored in the app.
 
 Website plans are Study at $8/month and Partner study at $12/month.
 

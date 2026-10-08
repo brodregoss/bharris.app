@@ -54,7 +54,8 @@ import {
   PRIVACY_SECTIONS,
   TERMS_SECTIONS,
 } from '@/lib/legal';
-import { devToolsUnlocked, tryUnlockDevTools } from '@/lib/devToolsLock';
+import { devToolsUnlocked, lockDevTools, tryUnlockDevTools } from '@/lib/devToolsLock';
+import NotesScanLockCard from '@/components/account/NotesScanLockCard';
 
 const DOCS = {
   about: {
@@ -177,8 +178,13 @@ export default function Settings() {
   const [partnerNote, setPartnerNote] = React.useState('');
   const [codeShown, setCodeShown] = React.useState(false);
   const [devCode, setDevCode] = React.useState('');
+  const accountUid = firebaseUser?.uid || user?.uid || '';
   const [devUnlocked, setDevUnlocked] = React.useState(() => devToolsUnlocked());
-  const [devCodeError, setDevCodeError] = React.useState(false);
+
+  React.useEffect(() => {
+    setDevUnlocked(devToolsUnlocked(accountUid));
+  }, [accountUid]);
+  const [devCodeError, setDevCodeError] = React.useState('');
 
   React.useEffect(() => {
     setReady(true);
@@ -415,43 +421,61 @@ export default function Settings() {
           <section className="rounded-2xl border border-border bg-card p-5">
             <p className="text-sm font-bold tracking-tight">Dev tools</p>
             {devUnlocked ? (
-              <p className="text-xs text-muted-foreground mt-1">On</p>
+              <Button
+                type="button"
+                variant="outline"
+                className="mt-3 h-11 rounded-xl"
+                onClick={() => {
+                  lockDevTools(accountUid);
+                  setDevUnlocked(false);
+                  setDevCode('');
+                  setDevCodeError('');
+                }}
+              >
+                Lock
+              </Button>
             ) : (
               <form
                 className="mt-3 flex items-center gap-2"
-                onSubmit={(event) => {
+                onSubmit={async (event) => {
                   event.preventDefault();
-                  if (tryUnlockDevTools(devCode)) {
+                  if (!devCode.trim()) return;
+                  setDevCodeError('');
+                  try {
+                    await tryUnlockDevTools(devCode, accountUid);
                     setDevUnlocked(true);
                     setDevCode('');
-                    setDevCodeError(false);
-                    return;
+                  } catch (err) {
+                    setDevCodeError(err instanceof Error ? err.message : 'That code is wrong.');
                   }
-                  setDevCodeError(true);
                 }}
               >
                 <input
                   type="password"
-                  inputMode="numeric"
                   autoComplete="off"
+                  autoCapitalize="none"
+                  autoCorrect="off"
+                  spellCheck={false}
                   value={devCode}
                   onChange={(event) => {
                     setDevCode(event.target.value);
-                    setDevCodeError(false);
+                    setDevCodeError('');
                   }}
                   aria-label="Dev tools code"
-                  placeholder="Code"
+                  placeholder="Dev code"
                   className="h-11 min-w-0 flex-1 rounded-xl border border-border bg-background px-3 text-sm"
                 />
-                <Button type="submit" variant="outline" className="h-11 rounded-xl shrink-0">
+                <Button type="submit" variant="outline" className="h-11 rounded-xl shrink-0" disabled={!devCode.trim()}>
                   Unlock
                 </Button>
               </form>
             )}
             {devCodeError && (
-              <p className="text-xs text-destructive mt-2">Wrong code</p>
+              <p className="text-xs text-destructive mt-2">{devCodeError}</p>
             )}
           </section>
+
+          {devUnlocked && <NotesScanLockCard />}
 
           <section className="rounded-2xl border border-border bg-card overflow-hidden divide-y divide-border">
             <Row label="Version" value={APP_VERSION} />

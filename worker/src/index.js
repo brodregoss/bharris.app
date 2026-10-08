@@ -20,6 +20,14 @@ import {
   handleDeleteNote,
   deleteUserNotes,
 } from './notes.js';
+import {
+  handleScanUnlock,
+  handleScanAdmin,
+  handleScanKill,
+  handleScanPassword,
+  handleDevUnlock,
+  requireScanToken,
+} from './notesScanLock.js';
 import { handleRevenueCatWebhook, handleSubscriptionRefresh, handleProUnlock } from './billing.js';
 import { handleCheckout, handlePortal, handleStripeWebhook, handleCancel, billingForRequest, cancelStripeSubscription } from './stripeBilling.js';
 import {
@@ -248,6 +256,18 @@ export default {
         response = await handlePartnerRemove(env, identity);
       } else if (parts[1] === 'ai' && request.method === 'POST') {
         response = await handleAi(request, env, identity, parts[2] || 'complete');
+      } else if (parts[1] === 'dev-tools' && parts[2] === 'unlock' && request.method === 'POST') {
+        response = await handleDevUnlock(request, env, identity);
+      } else if (parts[1] === 'notes' && parts[2] === 'scan-unlock' && request.method === 'POST') {
+        response = await handleScanUnlock(request, env, identity);
+      } else if (parts[1] === 'notes' && parts[2] === 'scan-admin' && request.method === 'GET') {
+        response = await handleScanAdmin(request, env, identity);
+      } else if (parts[1] === 'notes' && parts[2] === 'scan-kill' && request.method === 'POST') {
+        response = await handleScanKill(request, env, identity);
+      } else if (parts[1] === 'notes' && parts[2] === 'scan-password' && request.method === 'POST') {
+        response = await handleScanPassword(request, env, identity);
+      } else if (parts[1] === 'notes' && parts[2] === 'scan-session' && request.method === 'GET') {
+        response = await requireScanToken(request, env, identity) || json({ ok: true });
       } else if (parts[1] === 'notes' && request.method === 'GET' && !parts[2]) {
         response = await handleListNotes(env, identity);
       } else if (parts[1] === 'notes' && request.method === 'POST' && !parts[2]) {

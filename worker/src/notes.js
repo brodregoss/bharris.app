@@ -1,5 +1,6 @@
 import { errorJson, json, readJson } from './util.js';
 import { userStudyStub } from './users.js';
+import { requireScanToken } from './notesScanLock.js';
 
 function padPage(index) {
   return String(index + 1).padStart(3, '0');
@@ -31,6 +32,10 @@ export async function handleCreateNote(request, env, identity) {
   const terms = Array.isArray(body.terms) ? body.terms : null;
   const images = Array.isArray(body.images) ? body.images : body.image ? [body.image] : [];
   const kind = body.kind || (images.length ? 'photo' : 'manual');
+  if (images.length) {
+    const denied = await requireScanToken(request, env, identity);
+    if (denied) return denied;
+  }
   if (!images.length && kind !== 'manual' && !terms?.length && !body.transcript) {
     return errorJson('Attach at least one photo', 400);
   }

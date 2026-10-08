@@ -1,5 +1,6 @@
 import { workerRequest } from '@/lib/workerClient';
 import { userStorageKey } from '@/lib/userStorage';
+import { scanAuthHeaders } from '@/lib/notesScanLock';
 
 const LOCAL_NOTES = 'lms_note_sets_v1';
 
@@ -42,11 +43,15 @@ function localNoteRecord({ id, title, terms, kind = 'manual' }) {
 export async function uploadNoteImages(images, { title, kind = 'photo' } = {}) {
   const list = (Array.isArray(images) ? images : [images]).filter(Boolean);
   if (!list.length) throw new Error('Attach at least one photo');
+  const scanHeaders = scanAuthHeaders();
+  if (!scanHeaders['X-Notes-Scan-Token']) {
+    throw new Error('Enter the notes password to upload.');
+  }
   const data = await workerRequest('POST', '/v1/notes', {
     title: title || 'Untitled',
     kind,
     images: list,
-  });
+  }, scanHeaders);
   return upsertLocalNote(data.note);
 }
 

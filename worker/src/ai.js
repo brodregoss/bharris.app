@@ -2,6 +2,7 @@ import { errorJson, json, readJson } from './util.js';
 import { assertQuota, incrementQuota } from './quota.js';
 import { toPublicUser } from './users.js';
 import { runLlm } from './llm.js';
+import { requireScanToken } from './notesScanLock.js';
 
 const FEATURES = new Set([
   'extract',
@@ -21,6 +22,10 @@ export async function handleAi(request, env, identity, featureFromPath) {
     : FEATURES.has(body.feature)
       ? body.feature
       : 'complete';
+  if (body.image) {
+    const denied = await requireScanToken(request, env, identity);
+    if (denied) return denied;
+  }
   const consumed = await assertQuota(env, identity.uid);
   if (consumed.error) return consumed.error;
 

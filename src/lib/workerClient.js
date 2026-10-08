@@ -70,11 +70,16 @@ async function nativeJson(url, { method, headers, body }) {
   return throwIfNotOk(data || {}, res.status);
 }
 
-export async function workerRequest(method, path, body) {
+export async function workerRequest(method, path, body, extraHeaders) {
   const url = workerPath(path);
   const token = await getIdToken();
   if (!token) throw new Error('Sign in to continue.');
   const headers = { Authorization: `Bearer ${token}` };
+  if (extraHeaders) {
+    Object.entries(extraHeaders).forEach(([key, value]) => {
+      if (value) headers[key] = value;
+    });
+  }
   if (body !== undefined) headers['Content-Type'] = 'application/json';
   const payload = body !== undefined ? JSON.stringify(body) : undefined;
 

@@ -1,4 +1,5 @@
 import { DurableObject } from 'cloudflare:workers';
+import { nextScanFailure } from './notesScanLock.js';
 
 function nowIso() {
   return new Date().toISOString();
@@ -347,5 +348,55 @@ export class UserStudyDO extends DurableObject {
   async getPanic(sessionId) {
     await this.ready;
     return one(this.ctx.storage.sql, 'SELECT * FROM panic_summaries WHERE session_id = ?', sessionId);
+  }
+
+  async scanLockState() {
+    await this.ready;
+    return {
+      fails: Number(this.metaGet('scan_fail_count') || 0),
+      lockedUntil: Number(this.metaGet('scan_locked_until') || 0),
+    };
+  }
+
+  async recordScanFailure(now) {
+    await this.ready;
+    const next = nextScanFailure({
+      fails: Number(this.metaGet('scan_fail_count') || 0),
+      lockedUntil: Number(this.metaGet('scan_locked_until') || 0),
+    }, now);
+    this.metaSet('scan_fail_count', String(next.fails));
+    this.metaSet('scan_locked_until', String(next.lockedUntil || 0));
+    return next;
+  }
+
+  async clearScanFailures() {
+    await this.ready;
+    this.metaSet('scan_fail_count', '0');
+    this.metaSet('scan_locked_until', '0');
+  }
+
+  async devLockState() {
+    await this.ready;
+    return {
+      fails: Number(this.metaGet('dev_fail_count') || 0),
+      lockedUntil: Number(this.metaGet('dev_locked_until') || 0),
+    };
+  }
+
+  async recordDevFailure(now) {
+    await this.ready;
+    const next = nextScanFailure({
+      fails: Number(this.metaGet('dev_fail_count') || 0),
+      lockedUntil: Number(this.metaGet('dev_locked_until') || 0),
+    }, now);
+    this.metaSet('dev_fail_count', String(next.fails));
+    this.metaSet('dev_locked_until', String(next.lockedUntil || 0));
+    return next;
+  }
+
+  async clearDevFailures() {
+    await this.ready;
+    this.metaSet('dev_fail_count', '0');
+    this.metaSet('dev_locked_until', '0');
   }
 }

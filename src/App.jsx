@@ -44,7 +44,11 @@ function DevToolsGate() {
   useEffect(() => {
     const sync = () => setUnlocked(devToolsUnlocked());
     window.addEventListener('bharris-dev-tools', sync);
-    return () => window.removeEventListener('bharris-dev-tools', sync);
+    window.addEventListener('lms:session', sync);
+    return () => {
+      window.removeEventListener('bharris-dev-tools', sync);
+      window.removeEventListener('lms:session', sync);
+    };
   }, []);
   if (!unlocked) return null;
   return <DebugPanel />;
