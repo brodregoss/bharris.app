@@ -23,6 +23,8 @@ const USER_EXTRA_COLUMNS = [
   ['photo_strikes', 'INTEGER NOT NULL DEFAULT 0'],
   ['photo_unlocked_at', 'TEXT'],
   ['photo_revoked_at', 'TEXT'],
+  ['photo_terms_accepted_at', 'TEXT'],
+  ['photo_terms_version', 'TEXT'],
 ];
 
 export const ACTIVE_WINDOW_DAYS = 7;
@@ -186,6 +188,19 @@ export async function setPhotoRevoked(env, uid, revoked) {
   return getUserRow(env, uid);
 }
 
+export async function acceptPhotoTerms(env, uid, version) {
+  const next = String(version || '').trim();
+  if (!next) return getUserRow(env, uid);
+  const { binding, db } = await userShard(env, uid);
+  await ensureUserTable(binding, db);
+  const now = new Date().toISOString();
+  await db.prepare(
+    `UPDATE users SET photo_terms_accepted_at = ?, photo_terms_version = ?, updated_at = ?
+     WHERE firebase_uid = ?`,
+  ).bind(now, next, now, uid).run();
+  return getUserRow(env, uid);
+}
+
 export async function acceptTerms(env, uid) {
   const { binding, db } = await userShard(env, uid);
   await ensureUserTable(binding, db);
@@ -275,6 +290,7 @@ export async function toPublicUser(env, row) {
     isAdmin: admin,
     partnerCode,
     partnerLinked,
+    photoFeatureEnabled: String(env?.PHOTO_FEATURE_ENABLED || '').trim().toLowerCase() === 'true',
   });
 }
 

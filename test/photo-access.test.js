@@ -7,6 +7,8 @@ import { handleCreateNote, handleGetNotePage } from '../worker/src/notes.js';
 import {
   CODE_REJECTED,
   PHOTO_INVITE_ONLY,
+  PHOTO_TERMS_REQUIRED,
+  PHOTO_TERMS_VERSION,
   PHOTO_UNAVAILABLE,
   canonicalAccessCode,
   enforceSuspension,
@@ -26,6 +28,7 @@ import {
   getUserRow,
   setPhotoRevoked,
   setUserSuspended,
+  toPublicUser,
   upsertUser,
 } from '../worker/src/users.js';
 import moderationConfig from '../config/moderation.json' with { type: 'json' };
@@ -77,14 +80,17 @@ function testEnv(overrides = {}) {
 
 const env = testEnv();
 
-function redeemRequest(code, ip = '203.0.113.10') {
+function redeemRequest(code, ip = '203.0.113.10', extra = {}) {
   return new Request('https://app.test/v1/notes/photo-access', {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
       'CF-Connecting-IP': ip,
     },
-    body: JSON.stringify({ code }),
+    body: JSON.stringify({
+      code,
+      acceptPhotoTerms: extra.acceptPhotoTerms !== false,
+    }),
   });
 }
 
@@ -200,6 +206,45 @@ test('wrong, expired, used, and revoked codes return the same error', async () =
   const stored = JSON.stringify(sqlite.prepare('SELECT * FROM photo_access_codes').all());
   assert.equal(stored.includes(usedCode), false);
   assert.equal(stored.includes(revokedCode), false);
+});
+
+test('a photo code is not used until the 18+ box is checked', async () => {
+  env.PHOTO_FEATURE_ENABLED = 'true';
+  await user(UID);
+  const code = generateAccessCode();
+  await storeAccessCode(env, { code });
+  const blocked = await messageOf(await handleRedeemPhotoAccess(
+    redeemRequest(code, '203.0.113.10', { acceptPhotoTerms: false }),
+    env,
+    { uid: UID },
+    NOW,
+  ));
+  assert.equal(blocked.status, 400);
+  assert.equal(blocked.message, PHOTO_TERMS_REQUIRED);
+  assert.equal(Number(sqlite.prepare('SELECT use_count FROM photo_access_codes').get().use_count), 0);
+  const before = await getUserRow(env, UID);
+  assert.equal(before.photo_unlocked_at || '', '');
+  assert.equal(before.photo_terms_version || '', '');
+
+  const ok = await handleRedeemPhotoAccess(redeemRequest(code), env, { uid: UID }, NOW);
+  assert.equal(ok.status, 200);
+  const after = await getUserRow(env, UID);
+  assert.ok(after.photo_unlocked_at);
+  assert.equal(after.photo_terms_version, PHOTO_TERMS_VERSION);
+  assert.ok(after.photo_terms_accepted_at);
+  assert.equal(Number(sqlite.prepare('SELECT use_count FROM photo_access_codes').get().use_count), 1);
+});
+
+test('the account status reports whether photo import is enabled', async () => {
+  sqlite.exec('CREATE TABLE IF NOT EXISTS admins (firebase_uid TEXT PRIMARY KEY)');
+  await user('status-user');
+  env.PHOTO_FEATURE_ENABLED = 'false';
+  const off = await toPublicUser(env, await getUserRow(env, 'status-user'));
+  assert.equal(off.photoFeatureEnabled, false);
+  assert.equal(off.termsAccepted, false);
+  env.PHOTO_FEATURE_ENABLED = 'true';
+  const on = await toPublicUser(env, await getUserRow(env, 'status-user'));
+  assert.equal(on.photoFeatureEnabled, true);
 });
 
 test('a redeemed code unlocks only that account and can be typed with dashes', async () => {

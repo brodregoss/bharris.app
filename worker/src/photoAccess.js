@@ -1,6 +1,6 @@
 import moderationConfig from '../../config/moderation.json' with { type: 'json' };
 import { errorJson, json, readJson } from './util.js';
-import { getUserRow, markPhotoUnlocked } from './users.js';
+import { acceptPhotoTerms, getUserRow, markPhotoUnlocked } from './users.js';
 
 const ALPHABET = '0123456789ABCDEFGHJKMNPQRSTVWXYZ';
 const CODE_CHARS = 26;
@@ -8,6 +8,8 @@ const MIN_SECRET_CHARS = 32;
 
 export const PHOTO_UNAVAILABLE = 'Photo import is temporarily unavailable.';
 export const PHOTO_INVITE_ONLY = 'Photo import is invitation-only during the beta.';
+export const PHOTO_TERMS_REQUIRED = 'Check the box to continue.';
+export const PHOTO_TERMS_VERSION = '2026-10-14';
 export const CODE_REJECTED = "That code can't be used.";
 
 let photoTablesReady = null;
@@ -325,6 +327,7 @@ export async function handleRedeemPhotoAccess(request, env, identity, now = Date
     if (await lockedOut(env, subjects, now)) return rejectedCode();
 
     const body = await readJson(request);
+    if (body.acceptPhotoTerms !== true) return errorJson(PHOTO_TERMS_REQUIRED, 400);
     const submitted = typeof body.code === 'string' ? body.code : '';
     if (submitted.length > 80) {
       await recordFailure(env, subjects, now);
@@ -344,6 +347,7 @@ export async function handleRedeemPhotoAccess(request, env, identity, now = Date
       'SELECT firebase_uid FROM photo_access_redemptions WHERE code_hash = ? AND firebase_uid = ?',
     ).bind(codeHash, uid).first();
     if (prior) {
+      await acceptPhotoTerms(env, uid, PHOTO_TERMS_VERSION);
       await markPhotoUnlocked(env, uid);
       await clearUserFailures(env, subjects.uidSubject);
       return json({ ok: true });
@@ -363,6 +367,7 @@ export async function handleRedeemPhotoAccess(request, env, identity, now = Date
       return rejectedCode();
     }
 
+    await acceptPhotoTerms(env, uid, PHOTO_TERMS_VERSION);
     await env.APP.prepare(
       'INSERT INTO photo_access_redemptions (code_hash, firebase_uid, redeemed_at) VALUES (?, ?, ?)',
     ).bind(codeHash, uid, nowIso).run();

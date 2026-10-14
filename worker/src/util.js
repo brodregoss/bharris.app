@@ -35,7 +35,7 @@ export function sessionHistoryLimit(tier) {
   return tier === 'pro' ? 30 : 10;
 }
 
-export function publicUser(row, { isAdmin = false, partnerCode = '', partnerLinked = false } = {}) {
+export function publicUser(row, { isAdmin = false, partnerCode = '', partnerLinked = false, photoFeatureEnabled = false } = {}) {
   const used = Number(row.ai_quota_used) || 0;
   const limit = Number(row.ai_quota_limit) || 0;
   const remaining = Math.max(0, limit - used);
@@ -65,6 +65,7 @@ export function publicUser(row, { isAdmin = false, partnerCode = '', partnerLink
     unlimited,
     period: row.ai_quota_period || periodKey(),
     termsAccepted: !!row.terms_accepted_at,
+    photoFeatureEnabled: photoFeatureEnabled === true,
     suspended: Number(row.suspended) === 1,
     photoStrikes: Number(row.photo_strikes) || 0,
     photoUnlocked: !!row.photo_unlocked_at && !row.photo_revoked_at,

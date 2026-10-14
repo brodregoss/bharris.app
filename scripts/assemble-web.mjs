@@ -3,6 +3,7 @@ import { cp, mkdir, rm, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { LEGAL_UPDATED, PRIVACY_LEAD, PRIVACY_SECTIONS, RENEWAL_NOTICE, TERMS_LEAD, TERMS_SECTIONS, legalCopy, legalRuns } from '../src/lib/legal.js';
+import { assertNoDraftLegal } from './check-draft-legal.mjs';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const distDir = path.join(root, 'dist');
@@ -2685,3 +2686,4 @@ await writeFile(
     firebaseConfig,
   }),
 );
+assertNoDraftLegal([webDir]);

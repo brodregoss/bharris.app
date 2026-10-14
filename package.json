@@ -5,15 +5,15 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "build": "vite build",
+    "build": "vite build && node scripts/check-draft-legal.mjs src/lib/legal.js dist",
     "lint": "eslint . --quiet",
     "lint:fix": "eslint . --fix",
     "typecheck": "tsc -p ./jsconfig.json",
     "preview": "vite preview",
-    "test": "node --import ./test/register-alias.mjs --test src/lib/spacedCram.test.js test/site-plans.test.js test/billing-fresh.test.js test/notes-scan-lock.test.js test/account-stats.test.js test/ads.test.js test/extract-progress.test.js test/note-photos.test.js test/ad-credit.test.js test/terms-agreement.test.js test/photo-access.test.js test/moderation.test.js test/image-storage.test.js",
+    "test": "node --import ./test/register-alias.mjs --test src/lib/spacedCram.test.js test/site-plans.test.js test/billing-fresh.test.js test/notes-scan-lock.test.js test/account-stats.test.js test/ads.test.js test/extract-progress.test.js test/note-photos.test.js test/ad-credit.test.js test/terms-agreement.test.js test/photo-access.test.js test/moderation.test.js test/image-storage.test.js test/draft-legal-guard.test.js",
     "worker:dev": "node scripts/assemble-web.mjs || mkdir -p web-dist; npm run start --prefix worker",
-    "worker:deploy": "npm run build && node scripts/assemble-web.mjs && npm run deploy --prefix worker",
-    "ios:sync": "npm run build && npx cap sync ios",
+    "worker:deploy": "npm run build && node scripts/assemble-web.mjs && node scripts/check-draft-legal.mjs web-dist && npm run deploy --prefix worker",
+    "ios:sync": "npm run build && npx cap sync ios && node scripts/check-draft-legal.mjs ios/App/App/public",
     "ios:open": "npx cap open ios"
   },
   "dependencies": {

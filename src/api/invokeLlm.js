@@ -14,9 +14,6 @@ export async function invokeLlm({ prompt, response_json_schema, image, feature =
     throw err;
   }
   const scanHeaders = image ? scanAuthHeaders() : null;
-  if (image && !scanHeaders?.['X-Notes-Scan-Token']) {
-    throw new Error('Enter the notes password to upload.');
-  }
   try {
     const data = await workerRequest('POST', `/v1/ai/${feature}`, {
       prompt,
