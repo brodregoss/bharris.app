@@ -3,8 +3,9 @@ import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { ArrowRight, Loader2 } from 'lucide-react';
 import { invokeLlm } from '@/api/invokeLlm';
-import { parseExplainGrade, sortForPractice, MASTERY, MASTERY_LEVELS, localExplainLevel } from '@/lib/mastery';
+import { parseExplainGrade, MASTERY_LEVELS, localExplainLevel } from '@/lib/mastery';
 import UnderstandingPyramid from './UnderstandingPyramid';
+import TermPicker from '@/components/practice/TermPicker';
 
 const MAX_EXPLAIN_CHARS = 200;
 
@@ -12,12 +13,9 @@ function clampChars(text, max) {
   return String(text).slice(0, max);
 }
 
-export default function ExplainIt({ terms, onUpdateTerm, onDone }) {
-  const [queue] = React.useState(() =>
-    sortForPractice(terms)
-      .filter((t) => (t.mastery || 0) < MASTERY.MASTERED)
-      .map((t) => t.id)
-  );
+export default function ExplainIt({ terms, onUpdateTerm, onDone, rankMode }) {
+  const [picked, setPicked] = React.useState(null);
+  const queue = React.useMemo(() => (picked || []).map((t) => t.id), [picked]);
   const byId = React.useMemo(() => Object.fromEntries(terms.map((t) => [t.id, t])), [terms]);
   const [pos, setPos] = React.useState(0);
   const [draft, setDraft] = React.useState('');
@@ -98,6 +96,18 @@ export default function ExplainIt({ terms, onUpdateTerm, onDone }) {
     if (pos + 1 >= queue.length) setFinished(true);
     else setPos((p) => p + 1);
   };
+
+  if (!picked) {
+    return (
+      <TermPicker
+        terms={terms}
+        rankMode={rankMode}
+        verb="explain"
+        action="Start explaining"
+        onStart={setPicked}
+      />
+    );
+  }
 
   if (!queue.length || finished) {
     return (

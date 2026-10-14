@@ -243,6 +243,38 @@ html.page-transitioning {
   animation: brain-caret 0.85s steps(1) infinite;
 }
 
+/* Practice hub previews. Hover on the mode box plays one short motion. */
+.practice-flip-scene {
+  height: 100%;
+  perspective: 700px;
+}
+.practice-flip-card {
+  position: relative;
+  height: 100%;
+  transform-style: preserve-3d;
+  transition: transform 1.15s cubic-bezier(0.4, 0.05, 0.2, 1);
+}
+.group:hover .practice-flip-card {
+  transform: rotateY(180deg);
+}
+.practice-flip-face {
+  position: absolute;
+  inset: 0;
+  backface-visibility: hidden;
+  -webkit-backface-visibility: hidden;
+}
+.practice-flip-back {
+  transform: rotateY(180deg);
+}
+@keyframes practice-tap {
+  0% { transform: scale(1); }
+  40% { transform: scale(0.92); }
+  100% { transform: scale(1); }
+}
+.group:hover .practice-choice-right {
+  animation: practice-tap 0.9s ease 0.55s both;
+}
+
 @media (prefers-reduced-motion: reduce) {
   .page-in,
   .page-slide-over,
@@ -253,6 +285,16 @@ html.page-transitioning {
 
   .brain-prompt-in,
   .brain-caret {
+    animation: none;
+  }
+
+  .practice-flip-card {
+    transition: none;
+  }
+  .group:hover .practice-flip-card {
+    transform: none;
+  }
+  .group:hover .practice-choice-right {
     animation: none;
   }
 }

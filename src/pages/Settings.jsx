@@ -26,6 +26,8 @@ import { useAuth } from '@/lib/AuthContext';
 import ChangePasswordSheet from '@/components/account/ChangePasswordSheet';
 import EditNameSheet from '@/components/account/EditNameSheet';
 import { getUsage, removePartner, resetPartnerCode } from '@/lib/accountStore';
+import { adsEnabledFor } from '@/lib/adAccess';
+import { watchAdForCredit } from '@/lib/adCredit';
 import { formatPersonName } from '@/lib/personName';
 import { greetingLine, greetingNameStyle, setGreetingNameStyle } from '@/lib/greeting';
 import { usePaywall } from '@/lib/PaywallContext';
@@ -60,6 +62,7 @@ import {
 } from '@/lib/legal';
 import { devToolsUnlocked, lockDevTools, tryUnlockDevTools } from '@/lib/devToolsLock';
 import NotesScanLockCard from '@/components/account/NotesScanLockCard';
+import AccountStatsCard from '@/components/account/AccountStatsCard';
 
 const DOCS = {
   about: {
@@ -123,10 +126,11 @@ function usedPct(person) {
   return Math.min(100, ((person.aiQuotaUsed || 0) / person.aiQuotaLimit) * 100);
 }
 
-function UsageBlock({ heading, person, onUpgrade, loading = false }) {
+function UsageBlock({ heading, person, onUpgrade, onWatchAd, watchBusy = false, loading = false }) {
   const remaining = person?.remainingQuota ?? 0;
   const used = person?.aiQuotaUsed || 0;
   const limit = person?.aiQuotaLimit || 0;
+  const outOfCalls = !person?.unlimited && !person?.hasBudget && remaining <= 0;
   return (
     <div className="p-5 space-y-3">
       <div className="flex items-center gap-2">
@@ -152,9 +156,22 @@ function UsageBlock({ heading, person, onUpgrade, loading = false }) {
           </p>
         </>
       ) : (
-        <p className="text-sm text-muted-foreground">
-          This month’s AI limit is used up.
-        </p>
+        <div className="space-y-3">
+          <p className="text-sm text-muted-foreground">
+            This month’s AI limit is used up.
+          </p>
+          {outOfCalls && onWatchAd && (
+            <Button
+              type="button"
+              variant="outline"
+              className="w-full h-11 rounded-2xl"
+              onClick={onWatchAd}
+              disabled={watchBusy}
+            >
+              {watchBusy ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Watch an ad for 10 more calls'}
+            </Button>
+          )}
+        </div>
       )}
       {person?.subscriptionTier !== 'pro' && onUpgrade && (
         <Button className="w-full h-11 rounded-2xl" onClick={onUpgrade}>
@@ -182,6 +199,8 @@ export default function Settings() {
   const [partnerBusy, setPartnerBusy] = React.useState('');
   const [signingOut, setSigningOut] = React.useState(false);
   const [partnerNote, setPartnerNote] = React.useState('');
+  const [creditBusy, setCreditBusy] = React.useState(false);
+  const [creditError, setCreditError] = React.useState('');
   const [codeShown, setCodeShown] = React.useState(false);
   const [devCode, setDevCode] = React.useState('');
   const accountUid = firebaseUser?.uid || user?.uid || '';
@@ -217,6 +236,19 @@ export default function Settings() {
   const trialLabel = onTrial ? trialRemainingLabel(me.trialEndsAt) : '';
   const displayName = me?.displayName || firebaseUser?.displayName || '';
   const greetingPreview = greetingLine(displayName, new Date(), nameStyle);
+
+  const watchForCredit = async () => {
+    setCreditBusy(true);
+    setCreditError('');
+    try {
+      const data = await watchAdForCredit();
+      if (data?.user) setUsage((current) => ({ ...(current || {}), me: data.user, user: data.user }));
+    } catch (err) {
+      setCreditError(err instanceof Error ? err.message : 'Could not add that AI call.');
+    } finally {
+      setCreditBusy(false);
+    }
+  };
 
   const chooseGreetingName = (style) => {
     setGreetingNameStyle(style);
@@ -292,7 +324,19 @@ export default function Settings() {
                 </p>
               )}
             </div>
-            <UsageBlock heading="AI this month" person={me} onUpgrade={openPaywall} loading={!usage} />
+            <UsageBlock
+              heading="AI this month"
+              person={me}
+              onUpgrade={openPaywall}
+              onWatchAd={adsEnabledFor(me) ? watchForCredit : null}
+              watchBusy={creditBusy}
+              loading={!usage}
+            />
+            {creditError && (
+              <div className="px-5 pb-5">
+                <p className="text-xs text-destructive">{creditError}</p>
+              </div>
+            )}
             {me?.billingNotice === 'beta_ended' && !me?.billingPlan && (
               <div className="px-5 pb-5">
                 <p className="text-xs text-muted-foreground">Your free week ended.</p>
@@ -481,6 +525,7 @@ export default function Settings() {
             )}
           </section>
 
+          {devUnlocked && <AccountStatsCard />}
           {devUnlocked && <NotesScanLockCard />}
 
           <section className="rounded-2xl border border-border bg-card overflow-hidden divide-y divide-border">

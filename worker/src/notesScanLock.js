@@ -147,7 +147,8 @@ async function pbkdf2(password, saltBytes, iterations) {
   return new Uint8Array(bits);
 }
 
-export async function formatScanPasswordHash(password, { saltBytes, iterations = 210_000 } = {}) {
+// Workers reject PBKDF2 above 100,000 iterations.
+export async function formatScanPasswordHash(password, { saltBytes, iterations = 100_000 } = {}) {
   const salt = saltBytes || crypto.getRandomValues(new Uint8Array(MIN_SALT_BYTES));
   const hash = await pbkdf2(String(password), salt, iterations);
   return `${HASH_ALGO}$${iterations}$${bytesToB64url(salt)}$${bytesToB64url(hash)}`;

@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { ArrowLeft, Upload, Loader2, Lock } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { makePhotoSource } from '@/lib/notesSource';
-import { fileToJpegDataUrl, stashPhotos, validateNotePhotos } from '@/lib/imageData';
+import { copyFileList, fileToJpegDataUrl, stashPhotos, validateNotePhotos } from '@/lib/imageData';
 import { uploadNoteImages } from '@/lib/notesUpload';
 import { isOnboarded } from '@/lib/onboarding';
 import { Button } from '@/components/ui/button';
@@ -15,7 +15,6 @@ import {
   refreshNotesScanUnlock,
   unlockNotesScan,
 } from '@/lib/notesScanLock';
-
 export default function Welcome() {
   const navigate = useNavigate();
   const [dragging, setDragging] = React.useState(false);
@@ -99,10 +98,17 @@ export default function Welcome() {
     }
   };
 
+  const onPick = (fileList) => {
+    const files = copyFileList(fileList);
+    if (inputRef.current) inputRef.current.value = '';
+    if (!files.length) return;
+    takeFiles(files);
+  };
+
   const onDrop = (e) => {
     e.preventDefault();
     setDragging(false);
-    takeFiles(e.dataTransfer.files);
+    onPick(e.dataTransfer?.files);
   };
 
   return (
@@ -134,7 +140,6 @@ export default function Welcome() {
 
           {unlocked ? (
             <div
-              onClick={() => !reading && inputRef.current?.click()}
               onDragOver={(e) => {
                 e.preventDefault();
                 if (!reading) setDragging(true);
@@ -142,21 +147,31 @@ export default function Welcome() {
               onDragLeave={() => setDragging(false)}
               onDrop={onDrop}
               className={cn(
-                'w-full rounded-3xl border-2 border-dashed px-6 py-12 flex flex-col items-center gap-4 transition text-center',
+                'relative w-full rounded-3xl border-2 border-dashed px-6 py-12 flex flex-col items-center gap-4 transition text-center',
                 reading ? 'cursor-wait opacity-80' : 'cursor-pointer',
                 dragging
                   ? 'border-primary bg-primary/5'
                   : 'border-border bg-card hover:border-muted-foreground'
               )}
             >
-              <div className="w-12 h-12 rounded-full bg-muted flex items-center justify-center">
+              <input
+                ref={inputRef}
+                type="file"
+                accept="image/*,.heic,.heif"
+                multiple
+                disabled={reading}
+                aria-label="Choose a photo of your notes"
+                className="absolute inset-0 z-10 h-full w-full cursor-pointer opacity-0 disabled:cursor-wait"
+                onChange={(e) => onPick(e.target.files)}
+              />
+              <div className="pointer-events-none w-12 h-12 rounded-full bg-muted flex items-center justify-center">
                 {reading ? (
                   <Loader2 className="w-5 h-5 text-muted-foreground animate-spin" />
                 ) : (
                   <Upload className="w-5 h-5 text-muted-foreground" />
                 )}
               </div>
-              <div>
+              <div className="pointer-events-none">
                 <p className="text-base font-semibold">{reading ? 'Opening photo…' : 'Drop notes here'}</p>
                 <p className="text-xs text-muted-foreground mt-1">
                   Up to 2 photos · a page or two of notes
@@ -165,10 +180,11 @@ export default function Welcome() {
               <button
                 type="button"
                 onClick={(e) => {
+                  e.preventDefault();
                   e.stopPropagation();
                   if (!reading) navigate('/create-notes');
                 }}
-                className="text-sm text-foreground underline underline-offset-4 hover:text-muted-foreground"
+                className="relative z-20 text-sm text-foreground underline underline-offset-4 hover:text-muted-foreground"
               >
                 create manually
               </button>
@@ -221,19 +237,6 @@ export default function Welcome() {
           )}
           {readError && (
             <p className="text-xs text-rose-600 dark:text-rose-300 text-center mt-3">{readError}</p>
-          )}
-          {unlocked && (
-            <input
-              ref={inputRef}
-              type="file"
-              accept="image/*"
-              multiple
-              className="hidden"
-              onChange={(e) => {
-                takeFiles(e.target.files);
-                e.target.value = '';
-              }}
-            />
           )}
 
           <button

@@ -12,6 +12,7 @@ import CheatSheet from '@/components/study/CheatSheet';
 import RoadMapDialog from '@/components/study/RoadMapDialog';
 import ScreenSwap from '@/components/ScreenSwap';
 import { NotesOfferPrompt, NotesSkim } from '@/components/study/NotesOffer';
+import { showRewarded } from '@/lib/ads';
 import {
   priority,
   computeReadiness,
@@ -459,7 +460,9 @@ function StudyFlow() {
         <BlockSummary
           title="All reviewed"
           message="That's everything reviewed. Time for a practice test."
-          onContinue={() => setPhase('test')}
+          onContinue={async () => {
+            if (await showRewarded('practice')) setPhase('test');
+          }}
         />
       );
       break;

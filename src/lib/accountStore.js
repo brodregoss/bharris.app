@@ -1,5 +1,6 @@
 import { workerRequest } from '@/lib/workerClient';
 import { cancelPendingCloudSave } from '@/lib/sessionStore';
+import { hasAcceptedTerms, rememberTermsAccepted } from '@/lib/termsAgreement';
 import { getActiveUid, setActiveUid } from '@/lib/userStorage';
 
 const USER_KEY = 'lms_user_v2';
@@ -59,6 +60,7 @@ export function cacheUser(user) {
   // already saved for this account so the home greeting does not go blank.
   const keptName = !user.displayName && previous?.uid === user.uid ? previous.displayName : '';
   const next = keptName ? { ...user, displayName: keptName } : user;
+  if (next.termsAccepted) rememberTermsAccepted();
   localStorage.setItem(USER_KEY, JSON.stringify(next));
   if (next.uid) setActiveUid(next.uid, previousUid);
   notify();
@@ -85,7 +87,14 @@ export async function ensureCloudUser(firebaseUser) {
   const data = await workerRequest('POST', '/v1/users/me', {
     email: firebaseUser?.email || '',
     displayName: firebaseUser?.displayName || '',
+    acceptTerms: hasAcceptedTerms(),
   });
+  return cacheUser(data.user);
+}
+
+export async function acceptTermsOnAccount() {
+  rememberTermsAccepted();
+  const data = await workerRequest('POST', '/v1/users/me', { acceptTerms: true });
   return cacheUser(data.user);
 }
 
@@ -96,6 +105,12 @@ export async function refreshUser() {
   } catch {
     return readUser();
   }
+}
+
+export async function grantAdCredit() {
+  const data = await workerRequest('POST', '/v1/users/me/ad-credit', {});
+  if (data.user) cacheUser(data.user);
+  return data;
 }
 
 export async function getUsage() {

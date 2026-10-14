@@ -22,6 +22,7 @@ export const PLANS = {
       'Triage, True Cram, Spaced Cram, and Independent study',
       '30 AI calls a month',
       'The last 30 sessions saved',
+      'No ads',
     ],
     sessionLimit: 30,
   },

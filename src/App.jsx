@@ -39,6 +39,7 @@ import DebugPanel from '@/components/dev/DebugPanel';
 import { devToolsUnlocked } from '@/lib/devToolsLock';
 import PageTransition from '@/components/PageTransition';
 import { clearStaleAuthReturn } from '@/lib/onboarding';
+import { AdsProvider } from '@/components/ads/RewardedAdSheet';
 
 function DevToolsGate() {
   const [unlocked, setUnlocked] = useState(devToolsUnlocked);
@@ -106,21 +107,23 @@ function App() {
     <ThemeProvider attribute="class" defaultTheme="light" enableSystem={false} storageKey="bharris-theme">
       <NativeChrome />
       <AuthProvider>
-        <PaywallProvider>
         <QueryClientProvider client={queryClientInstance}>
           <DebugProvider>
             <Router>
+              <AdsProvider>
+              <PaywallProvider>
               <ScrollToTop />
               <AuthReturnScope />
               <PageTransition>
                 {(location) => <AppRoutes location={location} />}
               </PageTransition>
               <DevToolsGate />
+              </PaywallProvider>
+              </AdsProvider>
             </Router>
             <Toaster />
           </DebugProvider>
         </QueryClientProvider>
-        </PaywallProvider>
       </AuthProvider>
     </ThemeProvider>
   )

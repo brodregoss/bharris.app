@@ -13,6 +13,13 @@ export function LegalText({ text, className }) {
             </a>
           );
         }
+        if (run.kind === 'link') {
+          return (
+            <a key={index} href={run.value} className="underline underline-offset-4 break-all" target="_blank" rel="noopener noreferrer">
+              {run.value}
+            </a>
+          );
+        }
         return <React.Fragment key={index}>{run.value}</React.Fragment>;
       })}
     </span>

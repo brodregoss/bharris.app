@@ -1,4 +1,5 @@
 import { errorJson, json, quotaLimit } from './util.js';
+import { adCreditGrant } from './adCredit.js';
 import { getUserRow, requireFreshQuota, toPublicUser, updateQuota } from './users.js';
 
 export function quotaPayload(row) {
@@ -39,4 +40,18 @@ export async function incrementQuota(env, uid, row) {
   const used = Number(row.ai_quota_used) || 0;
   const limit = Number(row.ai_quota_limit) || quotaLimit(env, row.subscription_tier);
   return updateQuota(env, uid, { used: used + 1, limit });
+}
+
+export async function handleAdCredit(env, identity) {
+  const fresh = await requireFreshQuota(env, await getUserRow(env, identity.uid));
+  if (!fresh) return errorJson('Account not found', 404);
+  const decision = adCreditGrant(fresh);
+  if (!decision.ok) return errorJson(decision.message, decision.status);
+  const row = decision.granted
+    ? await updateQuota(env, identity.uid, { used: decision.used, limit: decision.limit })
+    : fresh;
+  return json({
+    user: await toPublicUser(env, row),
+    granted: decision.granted,
+  });
 }

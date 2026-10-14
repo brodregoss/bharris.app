@@ -2,6 +2,7 @@ import React from 'react';
 import { Navigate, useLocation, useNavigate } from 'react-router-dom';
 import { ArrowLeft, Moon } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { showRewarded } from '@/lib/ads';
 import { continueStudyPath, normalizeStudyMode, STUDY_MODE, spacedCramAvailable } from '@/lib/studyUtils';
 import {
   AHEAD_LINE,
@@ -756,7 +757,12 @@ export default function SpacedCram() {
         </main>
         <footer className="px-6 pt-2 pb-safe">
           <div className="max-w-md mx-auto w-full flex flex-col gap-3">
-            <Button className="h-14 rounded-2xl text-base font-semibold" onClick={() => startSitting({ keepResults: true })}>
+            <Button
+              className="h-14 rounded-2xl text-base font-semibold"
+              onClick={async () => {
+                if (await showRewarded('spaced')) startSitting({ keepResults: true });
+              }}
+            >
               Continue
             </Button>
             <Button variant="outline" className="h-14 rounded-2xl text-base font-semibold" onClick={endToHome}>
@@ -840,7 +846,8 @@ export default function SpacedCram() {
       (spaced.resumeIds || []).length > 0
       && (!spaced.resumeSitting || spaced.resumeSitting === sittingN)
     );
-    const beginSitting = () => {
+    const beginSitting = async () => {
+      if (!(await showRewarded('spaced'))) return;
       setReviewingPlan(false);
       if (spaced.phase === 'drill') return;
       if (spaced.phase === 'chunk_break') {

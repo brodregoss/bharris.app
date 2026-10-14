@@ -108,6 +108,8 @@ function render() {
   show('copy-code', !!me?.partnerCode);
   show('reset-code', !!me?.partnerCode);
   show('remove-partner', !!me?.partnerLinked);
+  if (me?.termsAccepted) rememberTerms();
+  syncTermsBox();
   ['solo-subscribe', 'partner-subscribe'].forEach((id) => {
     const button = document.getElementById(id);
     if (!button || button.classList.contains('is-busy')) return;
@@ -147,8 +149,36 @@ function restorePromo() {
 }
 
 const TERMS_AGREE_ERROR = 'Agree to the Terms of Service and Privacy Policy first.';
+const TERMS_KEY = 'bharris.termsAccepted';
+
+function deviceAcceptedTerms() {
+  try {
+    return !!localStorage.getItem(TERMS_KEY);
+  } catch {
+    return false;
+  }
+}
+
+function rememberTerms() {
+  try {
+    if (!localStorage.getItem(TERMS_KEY)) localStorage.setItem(TERMS_KEY, new Date().toISOString());
+  } catch {
+    // The account record still keeps the acceptance.
+  }
+}
+
+function termsStillNeeded() {
+  if (deviceAcceptedTerms() || me?.termsAccepted === true) return false;
+  return me?.termsAccepted === false;
+}
+
+function syncTermsBox() {
+  const label = document.querySelector('label.agree');
+  if (label) label.hidden = !termsStillNeeded();
+}
 
 function agreedToTerms() {
+  if (!termsStillNeeded()) return true;
   return document.getElementById('terms-agree')?.checked === true;
 }
 
@@ -271,6 +301,23 @@ bind('remove-partner', async () => {
 document.getElementById('sign-in-close')?.addEventListener('click', closeSignIn);
 document.getElementById('sign-in-dialog')?.addEventListener('click', (event) => {
   if (event.target?.id === 'sign-in-dialog') closeSignIn();
+});
+
+document.getElementById('terms-agree')?.addEventListener('change', async (event) => {
+  if (!event.target.checked) {
+    try { localStorage.removeItem(TERMS_KEY); } catch { /* keep the box blocking */ }
+    return;
+  }
+  rememberTerms();
+  syncTermsBox();
+  if (!auth?.currentUser) return;
+  try {
+    const data = await api('/v1/users/me', { body: { acceptTerms: true } });
+    if (data.user) me = { ...data.user, uid: data.user.uid || auth.currentUser.uid };
+    render();
+  } catch {
+    // This device already remembers the check.
+  }
 });
 
 document.getElementById('redeem-form')?.addEventListener('submit', async (event) => {

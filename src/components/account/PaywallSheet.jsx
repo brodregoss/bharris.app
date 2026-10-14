@@ -21,11 +21,14 @@ import {
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
 import { APP_CONFIG } from '@/lib/appConfig';
+import { adsEnabledFor } from '@/lib/adAccess';
+import { watchAdForCredit } from '@/lib/adCredit';
 import { PLANS, planLabel } from '@/lib/plans';
 import { checkoutDestination } from '../../../scripts/plan-marks.js';
 import { canCancelWebsitePlan, cancelPlanConfirm, cancelPlanNote } from '../../../scripts/account-plan.js';
 import { useAuth } from '@/lib/AuthContext';
 import {
+  acceptTermsOnAccount,
   cancelWebsitePlan,
   getUsage,
   openBillingPortal,
@@ -35,6 +38,7 @@ import {
 import { openBillingUrl } from '@/lib/billingUrl';
 import TermsAgreement from '@/components/account/TermsAgreement';
 import { RENEWAL_NOTICE, TERMS_AGREE_ERROR } from '@/lib/legal';
+import { hasAcceptedTerms, shouldAskForTerms } from '@/lib/termsAgreement';
 import { cn } from '@/lib/utils';
 
 function formatPlanDate(iso) {
@@ -98,7 +102,7 @@ export default function PaywallSheet({ open, onOpenChange }) {
   const [code, setCode] = React.useState('');
   const [redeemCode, setRedeemCode] = React.useState('');
   const [cancelOpen, setCancelOpen] = React.useState(false);
-  const [agreed, setAgreed] = React.useState(false);
+  const [agreed, setAgreed] = React.useState(() => hasAcceptedTerms());
 
   const billingPlan = user?.billingPlan || '';
   const websitePlan = billingPlan === 'solo' || billingPlan === 'partner';
@@ -106,6 +110,7 @@ export default function PaywallSheet({ open, onOpenChange }) {
   const canceledNote = cancelPlanNote(user);
   const accessUntil = formatPlanDate(user?.subscriptionStatus === 'trialing' ? user?.trialEndsAt : user?.periodEndsAt);
   const currentFree = !billingPlan && user?.subscriptionTier !== 'pro';
+  const outOfCalls = !!user?.uid && adsEnabledFor(user) && !user.unlimited && !user.hasBudget && (user.remainingQuota ?? 0) <= 0;
   const currentStudy = billingPlan === 'solo';
   const currentPartner = billingPlan === 'partner' || billingPlan === 'guest';
 
@@ -114,7 +119,7 @@ export default function PaywallSheet({ open, onOpenChange }) {
       setError('');
       setBusy('');
       setCancelOpen(false);
-      setAgreed(false);
+      setAgreed(hasAcceptedTerms());
       return undefined;
     }
     let cancelled = false;
@@ -136,8 +141,19 @@ export default function PaywallSheet({ open, onOpenChange }) {
     }
   };
 
+  const askForTerms = shouldAskForTerms({
+    termsAccepted: user?.termsAccepted,
+    deviceAccepted: hasAcceptedTerms(),
+  });
+
+  const acceptTerms = (value) => {
+    setAgreed(value);
+    if (!value) return;
+    acceptTermsOnAccount().catch(() => {});
+  };
+
   const subscribe = (plan) => {
-    if (!agreed) {
+    if (askForTerms && !agreed) {
       setError(TERMS_AGREE_ERROR);
       return;
     }
@@ -170,6 +186,11 @@ export default function PaywallSheet({ open, onOpenChange }) {
     await openBillingUrl(data.url);
   });
 
+  const watchForCredit = () => run('credit', async () => {
+    const data = await watchAdForCredit();
+    if (data?.granted) onOpenChange(false);
+  });
+
   const redeem = (event) => {
     event.preventDefault();
     const attempt = redeemCode.trim();
@@ -177,7 +198,7 @@ export default function PaywallSheet({ open, onOpenChange }) {
       setError('Enter a code.');
       return;
     }
-    if (!agreed) {
+    if (askForTerms && !agreed) {
       setError(TERMS_AGREE_ERROR);
       return;
     }
@@ -190,7 +211,6 @@ export default function PaywallSheet({ open, onOpenChange }) {
 
   const studyAction = subscribeAction('solo', currentStudy);
   const partnerAction = subscribeAction('partner', currentPartner);
-  const needsAgreement = Boolean(studyAction || partnerAction || !billingPlan);
 
   return (
     <>
@@ -204,11 +224,27 @@ export default function PaywallSheet({ open, onOpenChange }) {
           </SheetHeader>
           <div className="space-y-3 pt-4 pb-6">
             {error && <p className="text-sm text-destructive">{error}</p>}
+            {outOfCalls && (
+              <div className="rounded-2xl border border-border p-4 space-y-3">
+                <p className="text-sm font-bold tracking-tight">This month’s AI limit is used up.</p>
+                <p className="text-xs text-muted-foreground">
+                  A finished ad adds 10 AI calls. Closing it early adds nothing.
+                </p>
+                <Button
+                  type="button"
+                  className="w-full h-11 rounded-2xl font-semibold"
+                  disabled={!!busy}
+                  onClick={watchForCredit}
+                >
+                  {busy === 'credit' ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Watch an ad for 10 more calls'}
+                </Button>
+              </div>
+            )}
             {(studyAction || partnerAction) && (
               <p className="text-xs text-muted-foreground leading-relaxed">{RENEWAL_NOTICE}</p>
             )}
-            {needsAgreement && (
-              <TermsAgreement id="paywall-agree-terms" checked={agreed} onCheckedChange={setAgreed} />
+            {askForTerms && (
+              <TermsAgreement id="paywall-agree-terms" checked={agreed} onCheckedChange={acceptTerms} />
             )}
             {user?.billingNotice === 'beta_ended' && !billingPlan && (
               <p className="text-sm text-muted-foreground">Your free week ended.</p>

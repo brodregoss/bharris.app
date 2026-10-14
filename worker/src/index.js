@@ -2,15 +2,18 @@ import { errorJson, json, periodKey, readJson, sessionHistoryLimit } from './uti
 import { verifyFirebaseToken } from './auth.js';
 import { withCors, corsHeaders } from './cors.js';
 import {
+  acceptTerms,
   deleteUserRow,
   getUserRow,
   markDoReady,
   requireFreshQuota,
   toPublicUser,
+  touchLastSeen,
   upsertUser,
   userStudyStub,
 } from './users.js';
 import { handleAi } from './ai.js';
+import { handleAdCredit } from './quota.js';
 import {
   handleCreateNote,
   handleGetNote,
@@ -39,6 +42,7 @@ import {
 import { UserStudyDO } from './user-do.js';
 import { isFirebaseAuthProxyPath, nativeGoogleHandoffResponse, proxyFirebaseAuth } from './firebaseAuthProxy.js';
 import { openAppPage, passwordResetRedirect } from './passwordReset.js';
+import { handleAccountStats } from './accountStats.js';
 
 export { UserStudyDO };
 
@@ -56,6 +60,17 @@ async function warmDo(env, uid) {
   const { id, stub } = userStudyStub(env, uid);
   const ping = await stub.ping();
   await markDoReady(env, uid, ping.storeId || id.toString());
+}
+
+// Accounts created before agreement was stored already accepted it in the app.
+const TERMS_REQUIRED_AFTER = Date.parse('2026-10-13T16:30:00.000Z');
+
+async function settleTerms(env, row, { accept }) {
+  if (!row?.firebase_uid || row.terms_accepted_at) return row;
+  const created = Date.parse(row.created_at || '');
+  const alreadyAgreed = Number.isFinite(created) && created < TERMS_REQUIRED_AFTER;
+  if (!alreadyAgreed && accept !== true) return row;
+  return acceptTerms(env, row.firebase_uid);
 }
 
 async function handleUsersMe(request, env, identity, ctx) {
@@ -76,7 +91,9 @@ async function handleUsersMe(request, env, identity, ctx) {
     } else if (row.ai_quota_period !== periodKey()) {
       row = await requireFreshQuota(env, row);
     }
+    row = await settleTerms(env, row, {});
     row = await billingForRequest(env, ctx, row, { fresh });
+    ctx.waitUntil(touchLastSeen(env, row).catch(() => {}));
     return json({ user: await toPublicUser(env, row) });
   }
   const body = await readJson(request);
@@ -91,7 +108,9 @@ async function handleUsersMe(request, env, identity, ctx) {
     name: updateName ? submitted : (submitted || identity.name),
     updateName,
   });
+  row = await settleTerms(env, row, { accept: body.acceptTerms === true });
   if (!updateName) row = await billingForRequest(env, ctx, row, { fresh });
+  ctx.waitUntil(touchLastSeen(env, row).catch(() => {}));
   return json({ user: await toPublicUser(env, row) });
 }
 
@@ -226,6 +245,8 @@ export default {
         if (request.method === 'POST') ctx.waitUntil(warmDo(env, identity.uid).catch(() => {}));
       } else if (parts[1] === 'users' && parts[2] === 'me' && parts[3] === 'usage' && request.method === 'GET') {
         response = await handleUsage(env, identity, ctx);
+      } else if (parts[1] === 'users' && parts[2] === 'me' && parts[3] === 'ad-credit' && request.method === 'POST') {
+        response = await handleAdCredit(env, identity);
       } else if (
         parts[1] === 'users'
         && parts[2] === 'me'
@@ -258,6 +279,8 @@ export default {
         response = await handleAi(request, env, identity, parts[2] || 'complete');
       } else if (parts[1] === 'dev-tools' && parts[2] === 'unlock' && request.method === 'POST') {
         response = await handleDevUnlock(request, env, identity);
+      } else if (parts[1] === 'dev-tools' && parts[2] === 'stats' && request.method === 'GET') {
+        response = await handleAccountStats(request, env, identity);
       } else if (parts[1] === 'notes' && parts[2] === 'scan-unlock' && request.method === 'POST') {
         response = await handleScanUnlock(request, env, identity);
       } else if (parts[1] === 'notes' && parts[2] === 'scan-admin' && request.method === 'GET') {

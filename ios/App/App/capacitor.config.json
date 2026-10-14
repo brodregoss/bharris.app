@@ -30,6 +30,7 @@
 		}
 	},
 	"packageClassList": [
+		"AdMobPlugin",
 		"FirebaseAuthenticationPlugin",
 		"CAPBrowserPlugin",
 		"LocalNotificationsPlugin",

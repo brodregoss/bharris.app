@@ -8,6 +8,7 @@ import AppleSignInButton from '@/components/account/AppleSignInButton';
 import GoogleSignInButton from '@/components/account/GoogleSignInButton';
 import TermsAgreement from '@/components/account/TermsAgreement';
 import { TERMS_AGREE_ERROR } from '@/lib/legal';
+import { forgetTermsAccepted, hasAcceptedTerms, rememberTermsAccepted } from '@/lib/termsAgreement';
 
 export default function Account() {
   const navigate = useNavigate();
@@ -18,7 +19,8 @@ export default function Account() {
   const [appleLoading, setAppleLoading] = React.useState(false);
   const [googleLoading, setGoogleLoading] = React.useState(false);
   const [socialError, setSocialError] = React.useState('');
-  const [agreed, setAgreed] = React.useState(false);
+  const [askForTerms] = React.useState(() => !hasAcceptedTerms());
+  const [agreed, setAgreed] = React.useState(() => hasAcceptedTerms());
   const safeFrom = from === '/' || from === '/welcome' || from === '/settings' || from === '/history' || from === '/practice';
 
   if (isLoadingAuth) {
@@ -43,9 +45,15 @@ export default function Account() {
     );
   }
 
+  const acceptTerms = (value) => {
+    setAgreed(value);
+    if (value) rememberTermsAccepted();
+    else forgetTermsAccepted();
+  };
+
   const handleApple = async () => {
     setSocialError('');
-    if (!agreed) {
+    if (askForTerms && !agreed) {
       setSocialError(TERMS_AGREE_ERROR);
       return;
     }
@@ -62,7 +70,7 @@ export default function Account() {
 
   const handleGoogle = async () => {
     setSocialError('');
-    if (!agreed) {
+    if (askForTerms && !agreed) {
       setSocialError(TERMS_AGREE_ERROR);
       return;
     }
@@ -113,7 +121,9 @@ export default function Account() {
 
       <footer className="px-6 pb-safe pt-4">
         <div className="max-w-md mx-auto w-full flex flex-col gap-3">
-          <TermsAgreement checked={agreed} onCheckedChange={setAgreed} />
+          {askForTerms && (
+            <TermsAgreement checked={agreed} onCheckedChange={acceptTerms} />
+          )}
           <AppleSignInButton onClick={handleApple} loading={appleLoading} disabled={googleLoading} />
           <GoogleSignInButton onClick={handleGoogle} loading={googleLoading} disabled={appleLoading} />
           <Button

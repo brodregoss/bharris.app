@@ -1,6 +1,6 @@
 export const APP_NAME = 'bharris.app';
 export const APP_VERSION = '1.0.0';
-export const LEGAL_UPDATED = 'October 8, 2026';
+export const LEGAL_UPDATED = 'October 9, 2026';
 export const LEGAL_EMAIL = 'broderickharris11@gmail.com';
 
 function asParagraphs(value) {
@@ -19,13 +19,19 @@ export function legalCopy(section) {
 export function legalRuns(text) {
   const value = String(text || '');
   const runs = [];
-  const re = /\*\*([^*]+)\*\*|(broderickharris11@gmail\.com)/g;
+  const re = /\*\*([^*]+)\*\*|(broderickharris11@gmail\.com)|(https:\/\/[^\s<>"']+)/g;
   let last = 0;
   let match = re.exec(value);
   while (match) {
     if (match.index > last) runs.push({ kind: 'text', value: value.slice(last, match.index) });
     if (match[1]) runs.push({ kind: 'strong', value: match[1] });
-    else runs.push({ kind: 'email', value: LEGAL_EMAIL });
+    else if (match[2]) runs.push({ kind: 'email', value: LEGAL_EMAIL });
+    else {
+      const raw = match[3];
+      const url = raw.replace(/[.,;:]+$/, '');
+      runs.push({ kind: 'link', value: url });
+      if (url.length < raw.length) runs.push({ kind: 'text', value: raw.slice(url.length) });
+    }
     last = match.index + match[0].length;
     match = re.exec(value);
   }
@@ -115,11 +121,11 @@ export const TERMS_SECTIONS = [
     title: '6. Subscriptions and Plans',
     body: 'The Service currently offers the following plans. A plan bought on the website or in the iPhone app is the plan on both.',
     table: {
-      headers: ['Plan', 'Price', 'AI calls / month', 'Saved finished sessions'],
+      headers: ['Plan', 'Price', 'AI calls / month', 'Saved finished sessions', 'Ads'],
       rows: [
-        ['Free', '$0', '5', '10'],
-        ['Study', '$8/month', '30', '30'],
-        ['Partner study', '$12/month', '30', '30'],
+        ['Free', '$0', '5', '10', 'Yes'],
+        ['Study', '$8/month', '30', '30', 'No'],
+        ['Partner study', '$12/month', '30', '30', 'No'],
       ],
     },
     after: [
@@ -129,7 +135,20 @@ export const TERMS_SECTIONS = [
     ],
   },
   {
-    title: '7. Payments and Renewals',
+    title: '7. Advertising',
+    body: [
+      'The Free plan shows ads. Study, Partner study, and a friend\'s seat on Partner study do not.',
+      'On the iPhone app, Google AdMob serves the ads.',
+      'A rewarded ad runs before a practice test starts and before a spaced-cram sitting continues. If you close that ad before it finishes, you stay on the previous screen and that step does not start. If an ad cannot be loaded, the step starts.',
+      'While the app is reading a photo of your notes, the Free plan may show up to two rewarded ads, one after another, for as long as that read is still running. Closing one stops the next ad. It does not cancel the read. The terms appear when the read finishes.',
+      'A banner ad may stay on screen while panic notes are being written. When the notes are ready, you can dismiss it. The notes are still written if you dismiss the banner.',
+      'On the website, the Free plan uses a short timer in those same places. The timer is part of the Service. The website does not load Google AdMob or any other advertising network.',
+      'Watching an ad does not increase the monthly AI limit or the number of saved sessions.',
+      'Notes, photos, terms, definitions, answers, and your account email are not sent to an advertising network. Information Google receives when it serves an iPhone ad is described in the Privacy Policy.',
+    ],
+  },
+  {
+    title: '8. Payments and Renewals',
     body: [
       'Website purchases are processed through Stripe Checkout.',
       'Before completing a purchase, the checkout process displays the applicable price and recurring renewal information.',
@@ -139,7 +158,7 @@ export const TERMS_SECTIONS = [
     ],
   },
   {
-    title: '8. Partner Study',
+    title: '9. Partner Study',
     body: [
       'Partner study allows a subscription owner to invite one friend using a private partner code.',
       'The partner receives access to the same study features included with the applicable Partner study plan.',
@@ -150,7 +169,7 @@ export const TERMS_SECTIONS = [
     ],
   },
   {
-    title: '9. Trials and Promotional Offers',
+    title: '10. Trials and Promotional Offers',
     body: [
       'A beta promotional code may provide one free week of access without requiring a payment card. The promotion is limited to one use per account and does not automatically renew. When that week ends, access ends. It does not become a paid plan.',
       'If a user cancels the promotional access during the free period, access ends immediately.',
@@ -159,7 +178,7 @@ export const TERMS_SECTIONS = [
     ],
   },
   {
-    title: '10. App Store Subscriptions',
+    title: '11. App Store Subscriptions',
     body: [
       'An older App Store subscription may remain supported through Apple and RevenueCat.',
       'App Store subscriptions are billed and managed by Apple. The current paywall does not sell a new App Store subscription. New purchases use Stripe.',
@@ -168,7 +187,7 @@ export const TERMS_SECTIONS = [
     ],
   },
   {
-    title: '11. Account Deletion',
+    title: '12. Account Deletion',
     body: [
       'Signing out does not delete the data stored for your account. You may delete your account through Settings.',
       'Deleting your account removes or ends, as applicable:',
@@ -184,16 +203,16 @@ export const TERMS_SECTIONS = [
     ],
     after: [
       'You are responsible for saving anything you want to keep before deleting your account. There is no full-account download.',
-      'Account deletion does not cancel an Apple App Store subscription, remove failed Partner study code-attempt records retained for security, or retrieve information that has already been sent to third-party AI providers. It also does not require Stripe to delete records that Stripe is independently required or permitted to retain. Notes-scan password failure counts stored on the account are removed with the account.',
+      'Account deletion does not cancel an Apple App Store subscription, remove failed Partner study code-attempt records retained for security, retrieve information that has already been sent to third-party AI providers, or remove information Google already received to serve an iPhone ad. It also does not require Stripe to delete records that Stripe is independently required or permitted to retain. Notes-scan password failure counts stored on the account are removed with the account.',
     ],
   },
   {
-    title: '12. Acceptable Use',
+    title: '13. Acceptable Use',
     body: 'You agree not to:',
     items: [
       'Use the Service for unlawful purposes.',
       'Attempt to gain unauthorized access to another account.',
-      'Circumvent subscription or AI usage limits.',
+      'Circumvent subscription, AI usage, or Free-plan ad limits.',
       'Attempt to interfere with the Service or its servers.',
       'Reverse engineer or exploit security features.',
       'Upload malicious code or files.',
@@ -204,7 +223,7 @@ export const TERMS_SECTIONS = [
     after: 'We may suspend or terminate access when reasonably necessary to protect the Service, its users, or its security. Paid access ends when an account is closed for that reason.',
   },
   {
-    title: '13. Educational Disclaimer',
+    title: '14. Educational Disclaimer',
     body: [
       'bharris.app is an educational tool. It is not a teacher, school, tutor, testing authority, or academic institution.',
       'The Service does not guarantee a particular grade, a passing score, test readiness, academic improvement, the accuracy of generated material, or that a study plan is appropriate for your particular exam.',
@@ -212,7 +231,7 @@ export const TERMS_SECTIONS = [
     ],
   },
   {
-    title: '14. Availability',
+    title: '15. Availability',
     body: [
       'We try to keep the Service available and functional, but we do not guarantee uninterrupted or error-free operation.',
       'The Service may occasionally be unavailable because of maintenance, technical problems, third-party service outages, updates, security issues, or other circumstances.',
@@ -220,22 +239,22 @@ export const TERMS_SECTIONS = [
     ],
   },
   {
-    title: '15. Third-Party Services',
+    title: '16. Third-Party Services',
     body: [
-      'The Service depends on third-party providers, including Firebase, Cloudflare, OpenAI, Stripe, Apple, and RevenueCat.',
+      'The Service depends on third-party providers, including Firebase, Cloudflare, OpenAI, Stripe, Apple, RevenueCat, and Google AdMob for ads in the iPhone app.',
       'Those providers operate under their own terms and privacy policies.',
       'The Service may become unavailable or behave differently if a third-party provider experiences an outage, changes its service, or stops supporting a feature.',
     ],
   },
   {
-    title: '16. Intellectual Property',
+    title: '17. Intellectual Property',
     body: [
       'The Service, including its software, design, branding, original text, graphics, and other original materials, is owned by the Service operator or used with permission.',
       'Except for content you provide yourself, you may not copy, reproduce, modify, distribute, sell, or commercially exploit the Service or its original materials without permission.',
     ],
   },
   {
-    title: '17. Disclaimer of Warranties',
+    title: '18. Disclaimer of Warranties',
     body: [
       'To the maximum extent permitted by applicable law, the Service is provided on an "as is" and "as available" basis.',
       'We do not guarantee that the Service will always be accurate, available, secure, uninterrupted, or free of errors.',
@@ -243,7 +262,7 @@ export const TERMS_SECTIONS = [
     ],
   },
   {
-    title: '18. Limitation of Liability',
+    title: '19. Limitation of Liability',
     body: [
       'To the maximum extent permitted by applicable law, the Service operator will not be responsible for indirect, incidental, special, consequential, or punitive damages arising from your use of, or inability to use, the Service.',
       'This includes, where legally permitted, losses related to grades, exams, missed deadlines, inaccurate study information, loss of data, service interruptions, or reliance on AI-generated content.',
@@ -251,7 +270,7 @@ export const TERMS_SECTIONS = [
     ],
   },
   {
-    title: '19. Changes to These Terms',
+    title: '20. Changes to These Terms',
     body: [
       'These Terms may be updated as the Service changes.',
       'When material changes are made, the updated effective date will be shown at the top of this document.',
@@ -259,11 +278,11 @@ export const TERMS_SECTIONS = [
     ],
   },
   {
-    title: '20. Governing Law',
+    title: '21. Governing Law',
     body: 'These Terms are governed by the laws applicable in the United States and the state in which the Service operator resides, except where applicable law requires otherwise. This does not take away a right the law says cannot be waived, including a right to contact a consumer protection agency or to use small claims court where you live.',
   },
   {
-    title: '21. Contact',
+    title: '22. Contact',
     body: 'Questions about these Terms can be sent to broderickharris11@gmail.com.',
   },
 ];
@@ -333,13 +352,12 @@ export const PRIVACY_SECTIONS = [
       'Contacts',
       'Microphone recordings',
       'Payment-card numbers',
-      'Advertising profiles or third-party advertising analytics',
       'Passwords in plaintext',
     ],
     after: [
-      'Notes are not sent to advertising networks.',
+      'Notes, photos, terms, definitions, and answers are not sent to advertising networks. We do not build an advertising profile from your account or your study content.',
       'The Service does not use a third-party analytics product to create an analytics profile about you. The last_seen_at value is used only to count how many accounts were active in the previous seven days.',
-      'The Service does not intentionally store your IP address as part of your account record. Cloudflare, as the infrastructure provider, may still receive normal technical request information through its infrastructure and logs.',
+      'The Service does not intentionally store your IP address as part of your account record. Cloudflare may still receive ordinary technical request information through its infrastructure and logs. On the iPhone app, Google may receive an IP address when it serves an ad, as described under Advertising.',
     ],
   },
   {
@@ -368,6 +386,7 @@ export const PRIVACY_SECTIONS = [
       'Prevent abuse of Partner study codes',
       'Protect the security of the Service',
       'Provide customer support',
+      'Show ads to Free-plan users',
       'Count how many accounts were active in the previous seven days',
     ],
     after: 'A last_seen_at value may be updated no more than once per hour for that limited activity count. There is no third-party analytics product associated with it. The count itself is available only after the development-tools code is entered.',
@@ -394,7 +413,22 @@ export const PRIVACY_SECTIONS = [
     ],
   },
   {
-    title: '6. Third-Party Services',
+    title: '6. Advertising',
+    body: [
+      'The Free plan shows ads. Study, Partner study, and a friend\'s seat on Partner study do not.',
+      'On the iPhone app, Google AdMob serves the ads. A rewarded ad runs before a practice test starts and before a spaced-cram sitting continues. If you close that ad before it finishes, you stay on the previous screen and that step does not start. If an ad cannot be loaded, the step starts.',
+      'While the app is reading a photo of your notes, the Free plan may show up to two rewarded ads, one after another, for as long as that read is still running. Closing one stops the next ad. It does not cancel the read. The terms appear when the read finishes.',
+      'A banner ad may stay on screen while panic notes are being written. When the notes are ready, you can dismiss it. The notes are still written if you dismiss the banner.',
+      'On the website, the Free plan uses a short timer in those same places. The timer is part of the Service. The website does not load Google AdMob, does not set an advertising cookie, and does not send your information to an advertiser.',
+      'We do **not** send your notes, photos, terms, definitions, answers, display name, or email address to Google for advertising. We do not use your study content to choose which ad you see.',
+      'When the iPhone app requests an ad, Google and companies that deliver ads through AdMob may collect or receive technical information. That can include an IP address, device and app information, coarse location inferred from the IP address, and information about which ads were shown and how you interacted with them. Google uses that information to deliver and measure ads and, where allowed, to personalize them.',
+      'The iPhone app does not ask for permission to track you across other companies\' apps and websites, and it does not read the device advertising identifier for that kind of tracking.',
+      'Google describes how it uses information from apps that use its services at https://policies.google.com/technologies/partner-sites. Google\'s privacy policy is at https://policies.google.com/privacy. You can manage Google ad personalization at https://adssettings.google.com. On iPhone, you can also limit Apple advertising under Settings, Privacy & Security.',
+      'We do not keep a copy of the ads you were shown. Google may keep ad-delivery information under its own policy. Deleting your bharris.app account does not delete information Google already received.',
+    ],
+  },
+  {
+    title: '7. Third-Party Services',
     body: 'The Service relies on several third-party providers. The app and the website connect to our server over HTTPS.',
     groups: [
       {
@@ -437,10 +471,18 @@ export const PRIVACY_SECTIONS = [
           'The current paywall does not sell a new App Store subscription. New purchases use Stripe.',
         ],
       },
+      {
+        title: 'Google AdMob',
+        body: [
+          'Google AdMob serves ads in the iPhone app for Free-plan accounts.',
+          'What Google may receive, and what we do not send, is described under Advertising.',
+          'AdMob is not used on the website.',
+        ],
+      },
     ],
   },
   {
-    title: '7. Cookies',
+    title: '8. Cookies',
     body: 'The website uses a small number of cookies. The iPhone application does not use these website cookies. The website shows a notice where you can accept or decline.',
     groups: [
       {
@@ -460,10 +502,10 @@ export const PRIVACY_SECTIONS = [
         after: 'It does not contain your name, email address, notes, photos, or payment-card information.',
       },
     ],
-    after: 'There are no advertising or analytics cookies. If you decline, the site does not remember your plan between pages and checks it when a page needs it.',
+    after: 'The website has no advertising or analytics cookies. AdMob on the iPhone app is separate from these cookies. If you decline, the site does not remember your plan between pages and checks it when a page needs it.',
   },
   {
-    title: '8. Local Storage and Device Data',
+    title: '9. Local Storage and Device Data',
     body: [
       'The website and iPhone application may keep certain information locally on your device, associated with your signed-in account. Firebase also keeps its own sign-in session on the device.',
       'Photos used for scanning are held in memory while the scan is taking place and are not normally saved to local storage.',
@@ -476,7 +518,7 @@ export const PRIVACY_SECTIONS = [
     after: 'Website session storage may temporarily contain a notes-scan unlock token lasting about eight hours, the page to return to after signing in, and a development-tools unlock flag. Those values are cleared when the tab closes.',
   },
   {
-    title: '9. Reminders',
+    title: '10. Reminders',
     body: [
       'Spaced Cram may provide a reminder that says "Time for your next sitting" and "Your memory needs this gap to stick." These reminders do not contain your notes.',
       'On iPhone, the reminder is stored as a local notification on the device. On the website, the reminder only operates while the relevant browser tab remains open.',
@@ -484,17 +526,17 @@ export const PRIVACY_SECTIONS = [
     ],
   },
   {
-    title: '10. Data Retention',
+    title: '11. Data Retention',
     body: [
       'We retain information for as long as reasonably necessary to provide the Service, maintain accounts, provide study history, manage subscriptions, maintain security, or comply with legal obligations.',
       'Completed study sessions are subject to the saved-session limit of the applicable plan. Older finished sessions may be removed when the applicable limit is reached. The active session is not counted against that limit.',
       'Monthly AI usage information is retained to enforce monthly limits.',
       'Certain security records, such as failed Partner study code attempts, may be retained even after account deletion.',
-      'Third-party providers may retain information according to their own policies and legal obligations.',
+      'Third-party providers, including Google for iPhone ads, may retain information according to their own policies and legal obligations. We do not keep a record of which ads were shown.',
     ],
   },
   {
-    title: '11. Account Deletion',
+    title: '12. Account Deletion',
     body: 'You may delete your account through Settings. Signing out does not delete your cloud data. When you delete your account, the Service removes or ends, as applicable:',
     items: [
       'Your Firebase account',
@@ -505,36 +547,37 @@ export const PRIVACY_SECTIONS = [
       'Notes-scan password failure counts stored on the account',
     ],
     after: [
-      'Account deletion does not cancel an Apple App Store subscription, delete failed Partner study code-attempt records, or remove information already sent to OpenAI. It does not require Stripe to delete records it independently retains.',
+      'Account deletion does not cancel an Apple App Store subscription, delete failed Partner study code-attempt records, remove information already sent to OpenAI, or remove information Google already received to serve an ad. It does not require Stripe to delete records it independently retains.',
       'There is currently no full-account download feature. You can view your notes and sessions in the Service, and you can change your display name in Settings, before deleting your account.',
     ],
   },
   {
-    title: '12. Your Privacy Rights',
+    title: '13. Your Privacy Rights',
     body: [
       'Depending on where you live, you may have legal rights concerning your personal information. These rights may include rights to request access to, correction of, deletion of, or information about the processing of your personal information.',
       'Users in California, the European Union, the European Economic Area, and other jurisdictions with applicable privacy laws may submit privacy requests to broderickharris11@gmail.com. We will evaluate and respond to requests according to applicable law.',
-      'Deleting your account in Settings is how the data we hold is removed, with the limits in Account Deletion. We do not sell personal information, and a privacy request does not change your price or your access.',
+      'Deleting your account in Settings is how the data we hold is removed, with the limits in Account Deletion. We do not sell personal information for money. A privacy request does not change your price or your access, and it does not delete information Google already received to serve an ad.',
       'If you are in the EU or EEA, you can also complain to your local data protection authority.',
     ],
   },
   {
-    title: '13. California Privacy Information',
+    title: '14. California Privacy Information',
     body: [
       'If California privacy law applies to you, you may have rights concerning your personal information, including certain rights to know, delete, correct, or limit certain uses of information.',
-      'The Service does not sell your personal information for money. The Service does not use your information to create advertising profiles.',
+      'The Service does not sell your personal information for money. We do not use your notes or account information to build an advertising profile.',
+      'On the iPhone app, Google AdMob may use device and ad-interaction information to deliver ads, as described under Advertising. If California law treats that use as a sale or a share, you can limit it in iPhone Settings under Privacy & Security, and at https://adssettings.google.com. Study and Partner study do not show these ads.',
       'To submit a California privacy request, contact broderickharris11@gmail.com. We may need to verify your identity before completing certain requests.',
     ],
   },
   {
-    title: '14. Children\'s Privacy',
+    title: '15. Children\'s Privacy',
     body: [
-      'The Service does not check a user\'s age. The Service is **not intended for children under 13**.',
+      'The Service does not check a user\'s age. The Service is **not intended for children under 13**, and ads in the iPhone app are not directed to children under 13.',
       'Do not create an account if you are under 13. If you believe a child under 13 has provided personal information to the Service, contact broderickharris11@gmail.com. We will delete that account.',
     ],
   },
   {
-    title: '15. Data Security',
+    title: '16. Data Security',
     body: [
       'We take reasonable measures to protect information used by the Service. These measures include server-side authentication, restricted access to server credentials, password hashing where applicable, and controls intended to prevent unauthorized access.',
       'The notes-scan password and the development-tools code are stored as hashes on the server, not as the passwords themselves. The app does not save those passwords.',
@@ -542,11 +585,11 @@ export const PRIVACY_SECTIONS = [
     ],
   },
   {
-    title: '16. International Data Transfers',
+    title: '17. International Data Transfers',
     body: 'The Service operator is located in the United States and uses service providers that may process information in the United States or other locations where those providers operate. By using the Service, you understand that your information may be processed in countries other than the country where you live, subject to applicable law and the practices of the third-party providers described in this Policy.',
   },
   {
-    title: '17. Changes to This Privacy Policy',
+    title: '18. Changes to This Privacy Policy',
     body: [
       'This Privacy Policy may be updated as the Service changes.',
       'When changes are made, the updated effective date will be shown at the top of the Policy.',
@@ -554,7 +597,7 @@ export const PRIVACY_SECTIONS = [
     ],
   },
   {
-    title: '18. Contact',
+    title: '19. Contact',
     body: 'For privacy questions, requests, or concerns, contact broderickharris11@gmail.com.',
   },
 ];

@@ -56,8 +56,21 @@ export function clearPhoto() {
   pendingMarks = [];
 }
 
+function isNotePhoto(file) {
+  const type = String(file?.type || '').toLowerCase();
+  if (!type || type === 'application/octet-stream' || type.startsWith('image/')) return true;
+  const name = String(file?.name || '').toLowerCase();
+  return /\.(heic|heif|jpe?g|png|webp|gif|bmp|tiff?)$/.test(name);
+}
+
+// Copy before clearing an <input type="file">. Its FileList is live, and
+// emptying the input on iOS drops the photo the student just chose.
+export function copyFileList(fileList) {
+  return Array.from(fileList || []).filter(Boolean);
+}
+
 export function validateNotePhotos(fileList) {
-  const files = [...(fileList || [])].filter(Boolean);
+  const files = copyFileList(fileList);
   if (!files.length) {
     return { error: 'Please choose a photo of your notes.' };
   }
@@ -67,7 +80,7 @@ export function validateNotePhotos(fileList) {
     };
   }
   for (const file of files) {
-    if (file.type && !file.type.startsWith('image/')) {
+    if (!isNotePhoto(file)) {
       return { error: 'Please choose photos of your notes.' };
     }
     if (file.size > MAX_NOTE_PHOTO_BYTES) {

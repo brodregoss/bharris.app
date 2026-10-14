@@ -7,6 +7,17 @@ import { Textarea } from '@/components/ui/textarea';
 import { extractTermsFromPhotos, generateDefinitions, regenerateDefinition } from '@/lib/extractNotes';
 import { peekPhotos, peekPhoto, peekExtractPlan, clearPhoto } from '@/lib/imageData';
 import { patchNote, saveManualNote } from '@/lib/notesUpload';
+import { adsEnabledFor } from '@/lib/adAccess';
+import { watchAdForCredit } from '@/lib/adCredit';
+import { endRewarded, publishRewardProgress, showRewarded } from '@/lib/ads';
+import { getCurrentUser, subscribeAccount } from '@/lib/accountStore';
+import {
+  addExtractPass,
+  formatExtractRemaining,
+  planDefinitions,
+  snapshotExtractProgress,
+  startExtractProgress,
+} from '@/lib/extractProgress';
 
 function photosFor(source) {
   const plan = peekExtractPlan();
@@ -24,6 +35,7 @@ export default function ReviewNotes() {
   const location = useLocation();
   const source = location.state?.source;
   const setup = location.state?.setup;
+  const readLocked = source?.kind === 'photo' && !source?.items?.length && photosFor(source).length > 0;
   const [title, setTitle] = React.useState(() => (
     source?.title && source.title !== 'Your notes' ? source.title : ''
   ));
@@ -39,14 +51,14 @@ export default function ReviewNotes() {
       depends_on: t.depends_on,
     }));
   });
-  const [extracting, setExtracting] = React.useState(
-    () => source?.kind === 'photo' && !source?.items?.length && photosFor(source).length > 0
-  );
+  const [extracting, setExtracting] = React.useState(() => readLocked);
   const [extractHint, setExtractHint] = React.useState('Finding terms…');
   const [extractError, setExtractError] = React.useState('');
   const [regenId, setRegenId] = React.useState(null);
-  const foundRef = React.useRef(null);
+  const [creditBusy, setCreditBusy] = React.useState(false);
+  const [bar, setBar] = React.useState({ fraction: 0, remainingMs: null });
   const ranExtract = React.useRef(false);
+  const progressRef = React.useRef(null);
 
   const update = (id, patch) => {
     setItems((prev) => prev.map((t) => (t.id === id ? { ...t, ...patch } : t)));
@@ -78,15 +90,19 @@ export default function ReviewNotes() {
   const runExtract = React.useCallback(async () => {
     const images = photosFor(source);
     if (!images.length) return;
+    progressRef.current = startExtractProgress(images.length);
+    setBar(snapshotExtractProgress(progressRef.current));
     setExtracting(true);
     setExtractError('');
     try {
-      let found = foundRef.current;
-      if (!found?.length) {
-        setExtractHint('Finding terms…');
-        found = await extractTermsFromPhotos(images, setExtractHint);
-        foundRef.current = found;
-      }
+      setExtractHint('Finding terms…');
+      const found = await extractTermsFromPhotos(images, (msg) => {
+        setExtractHint(msg);
+        if (/Looking for more/i.test(msg)) {
+          progressRef.current = addExtractPass(progressRef.current);
+        }
+      });
+      progressRef.current = planDefinitions(progressRef.current, found.length);
       setExtractHint('Writing definitions…');
       const withDefs = await generateDefinitions(found, setExtractHint);
       setItems(withDefs);
@@ -119,12 +135,65 @@ export default function ReviewNotes() {
     }
   }, [source, runExtract]);
 
+  React.useEffect(() => {
+    if (!extracting) {
+      publishRewardProgress(null);
+      return undefined;
+    }
+    const publish = () => {
+      const snap = snapshotExtractProgress(progressRef.current);
+      setBar(snap);
+      if (adsEnabledFor(getCurrentUser())) {
+        publishRewardProgress({
+          fraction: snap.fraction,
+          label: formatExtractRemaining(snap.remainingMs),
+        });
+      }
+    };
+    publish();
+    const id = window.setInterval(publish, 250);
+    return () => window.clearInterval(id);
+  }, [extracting]);
+
+  React.useEffect(() => subscribeAccount(() => {
+    const next = getCurrentUser();
+    if (!next?.hasBudget) return;
+    setExtractError((current) => (
+      /limit is used/i.test(current) ? '10 AI calls added. Try again.' : current
+    ));
+  }), []);
+
+  React.useEffect(() => {
+    if (!extracting || !adsEnabledFor(getCurrentUser())) return undefined;
+    showRewarded('review', { prompted: true, withProgress: true });
+    return () => {
+      endRewarded();
+    };
+  }, [extracting]);
+
   if (!source) {
     return <Navigate to="/welcome" replace />;
   }
 
+  const watchForCredit = async () => {
+    setCreditBusy(true);
+    try {
+      const data = await watchAdForCredit();
+      if (!data?.granted) return;
+      setExtractError('');
+      runExtract();
+    } catch (err) {
+      setExtractError(err instanceof Error ? err.message : 'Could not add that AI call.');
+    } finally {
+      setCreditBusy(false);
+    }
+  };
+
   const filled = items.filter((t) => t.term.trim() && t.definition.trim());
   const trimmedTitle = title.trim();
+  const showPageBar = extracting && !extractError && !adsEnabledFor(getCurrentUser());
+  const quotaUsedUp = /limit is used/i.test(extractError) && adsEnabledFor(getCurrentUser());
+  const callAdded = extractError === '10 AI calls added. Try again.';
 
   const continueSetup = async () => {
     if (!filled.length || !trimmedTitle || extracting || saving) return;
@@ -201,7 +270,7 @@ export default function ReviewNotes() {
 
   return (
     <div className="min-h-[100dvh] bg-background text-foreground flex flex-col">
-      <header className="px-3 pt-safe pb-2 flex items-center gap-1">
+      <header className={`px-3 pb-2 flex items-center gap-1 ${showPageBar ? 'pt-[calc(env(safe-area-inset-top)+4.25rem)]' : 'pt-safe'}`}>
         <button
           type="button"
           onClick={goBack}
@@ -224,9 +293,30 @@ export default function ReviewNotes() {
         </div>
       </header>
 
+      {showPageBar && (
+        <div className="fixed top-0 inset-x-0 z-[90] bg-background px-5 pt-safe pb-2">
+          <div
+            className="h-1.5 rounded-full bg-muted overflow-hidden"
+            role="progressbar"
+            aria-valuemin={0}
+            aria-valuemax={100}
+            aria-valuenow={Math.round(bar.fraction * 100)}
+            aria-label="Notes generating"
+          >
+            <div
+              className="h-full bg-primary rounded-full transition-[width] duration-300"
+              style={{ width: `${Math.round(bar.fraction * 100)}%` }}
+            />
+          </div>
+          <p className="text-[11px] text-muted-foreground mt-1.5 text-center">
+            {formatExtractRemaining(bar.remainingMs)}
+          </p>
+        </div>
+      )}
+
       <main className="flex-1 px-5 pt-3 overflow-y-auto">
         <div className="max-w-md mx-auto w-full space-y-3 pb-4">
-          {extracting ? (
+          {extracting && !extractError ? (
             <div className="flex flex-col items-center justify-center py-16 text-center gap-3">
               <Loader2 className="w-8 h-8 text-muted-foreground animate-spin" />
               <p className="text-sm font-medium">{extractHint}</p>
@@ -238,14 +328,30 @@ export default function ReviewNotes() {
             </div>
           ) : extractError ? (
             <div className="flex flex-col items-center justify-center py-16 text-center gap-3">
-              <p className="text-sm font-medium">Couldn't read that photo</p>
-              <p className="text-xs text-muted-foreground max-w-xs">{extractError}</p>
+              <p className="text-sm font-medium">
+                {quotaUsedUp
+                  ? 'This month’s AI limit is used up.'
+                  : callAdded
+                    ? '10 AI calls added.'
+                    : "Couldn't read that photo"}
+              </p>
+              {!callAdded && (
+                <p className="text-xs text-muted-foreground max-w-xs">{extractError}</p>
+              )}
+              {quotaUsedUp && (
+                <Button
+                  type="button"
+                  onClick={watchForCredit}
+                  disabled={creditBusy}
+                  className="mt-2 rounded-2xl"
+                >
+                  {creditBusy ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Watch an ad for 10 more calls'}
+                </Button>
+              )}
               <Button
                 type="button"
-                onClick={() => {
-                  ranExtract.current = true;
-                  runExtract();
-                }}
+                variant={quotaUsedUp ? 'outline' : 'default'}
+                onClick={() => runExtract()}
                 className="mt-2 rounded-2xl"
               >
                 Try again

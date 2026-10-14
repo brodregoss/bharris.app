@@ -1,4 +1,4 @@
-import { periodKey, publicUser, quotaLimit } from './util.js';
+import { periodKey, publicUser, quotaLimit, SHARD_BINDINGS } from './util.js';
 import { userShard } from './routing.js';
 
 const userTablesReady = new Map();
@@ -17,7 +17,12 @@ const USER_EXTRA_COLUMNS = [
   ['stripe_cancel_at_period_end', 'INTEGER'],
   ['stripe_promo', 'TEXT'],
   ['billing_checked_at', 'TEXT'],
+  ['last_seen_at', 'TEXT'],
+  ['terms_accepted_at', 'TEXT'],
 ];
+
+export const ACTIVE_WINDOW_DAYS = 7;
+const SEEN_WRITE_MS = 60 * 60 * 1000;
 
 async function migrateUserTable(db) {
   await db.prepare(
@@ -136,6 +141,17 @@ export async function deleteUserRow(env, uid) {
   await env.APP.prepare('DELETE FROM bucket_overrides WHERE firebase_uid = ?').bind(uid).run();
 }
 
+export async function acceptTerms(env, uid) {
+  const { binding, db } = await userShard(env, uid);
+  await ensureUserTable(binding, db);
+  const now = new Date().toISOString();
+  await db.prepare(
+    `UPDATE users SET terms_accepted_at = ?, updated_at = ?
+     WHERE firebase_uid = ? AND (terms_accepted_at IS NULL OR terms_accepted_at = '')`,
+  ).bind(now, now, uid).run();
+  return getUserRow(env, uid);
+}
+
 export async function markDoReady(env, uid, storeId) {
   const { db } = await userShard(env, uid);
   await db
@@ -224,13 +240,55 @@ export async function alignQuotaLimit(env, row) {
   const stored = Number(row.ai_quota_limit) || 0;
   const unlimited = tier === 'pro' && stored >= 100000;
   if (unlimited || stored === expected) return row;
+  // A finished ad raises a free account above the plan quota. Keep that until the month rolls.
+  if (tier !== 'pro' && stored > expected) return row;
   return updateQuota(env, row.firebase_uid, { limit: expected });
 }
 
 export async function requireFreshQuota(env, row) {
   if (!row) return null;
-  const current = row.ai_quota_period === periodKey()
-    ? row
-    : await updateQuota(env, row.firebase_uid, { used: 0 });
+  if (row.ai_quota_period === periodKey()) return alignQuotaLimit(env, row);
+  const tier = row.subscription_tier || 'free';
+  const stored = Number(row.ai_quota_limit) || 0;
+  const unlimited = tier === 'pro' && stored >= 100000;
+  const current = await updateQuota(env, row.firebase_uid, unlimited
+    ? { used: 0 }
+    : { used: 0, limit: quotaLimit(env, tier) });
   return alignQuotaLimit(env, current);
+}
+
+export async function touchLastSeen(env, row, now = Date.now()) {
+  if (!row?.firebase_uid) return row;
+  const seen = Date.parse(row.last_seen_at || '');
+  if (Number.isFinite(seen) && now - seen < SEEN_WRITE_MS) return row;
+  const { binding, db } = await userShard(env, row.firebase_uid);
+  await ensureUserTable(binding, db);
+  const stamp = new Date(now).toISOString();
+  await db.prepare('UPDATE users SET last_seen_at = ? WHERE firebase_uid = ?')
+    .bind(stamp, row.firebase_uid)
+    .run();
+  return { ...row, last_seen_at: stamp };
+}
+
+export async function countAccounts(env, now = Date.now()) {
+  const since = new Date(now - ACTIVE_WINDOW_DAYS * 24 * 60 * 60 * 1000).toISOString();
+  const counts = await Promise.all(SHARD_BINDINGS.map(async (binding) => {
+    const db = env[binding];
+    if (!db?.prepare) return { total: 0, active: 0 };
+    await ensureUserTable(binding, db);
+    const row = await db.prepare(
+      `SELECT COUNT(*) AS total,
+              SUM(CASE WHEN COALESCE(last_seen_at, updated_at) >= ? THEN 1 ELSE 0 END) AS active
+       FROM users`,
+    ).bind(since).first();
+    return {
+      total: Number(row?.total) || 0,
+      active: Number(row?.active) || 0,
+    };
+  }));
+  return {
+    total: counts.reduce((sum, row) => sum + row.total, 0),
+    active: counts.reduce((sum, row) => sum + row.active, 0),
+    activeDays: ACTIVE_WINDOW_DAYS,
+  };
 }

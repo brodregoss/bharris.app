@@ -1,5 +1,6 @@
 import React from 'react';
 import { useNavigate } from 'react-router-dom';
+import { Capacitor } from '@capacitor/core';
 import { X, FileText, RefreshCw, Loader2, ALargeSmall } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 import { invokeLlm } from '@/api/invokeLlm';
@@ -8,6 +9,10 @@ import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover
 import { Slider } from '@/components/ui/slider';
 import { loadLatestCram } from '@/lib/sessionStore';
 import { panicSignature, loadPanicSummary, savePanicSummary } from '@/lib/panicCache';
+import { adsEnabledFor } from '@/lib/adAccess';
+import { getCurrentUser } from '@/lib/accountStore';
+import { hidePanicBanner, showPanicBanner } from '@/lib/ads';
+import { PanicAdSlot } from '@/components/ads/RewardedAdSheet';
 
 const TEXT_KEY = 'lms_panic_text_px';
 const TEXT_MIN = 15;
@@ -40,6 +45,44 @@ const MD_COMPONENTS = {
   strong: (p) => <strong className="font-semibold text-foreground" {...p} />,
   hr: () => <hr className="my-6 border-border" />,
 };
+
+function splitQuickReview(text) {
+  const source = String(text || '').replace(/\r\n/g, '\n').trim();
+  const parts = source.split(/\n(?=## )/);
+  if (parts.length < 2) return { intro: source, sections: [] };
+  return {
+    intro: parts[0].trim(),
+    sections: parts.slice(1).map((part) => part.trim()).filter(Boolean),
+  };
+}
+
+function storedDefinition(term) {
+  return String(term?.definition || '').trim();
+}
+
+function TermGlossary({ terms, textPx, wideWeb }) {
+  const listed = (terms || []).filter((term) => String(term?.term || '').trim());
+  if (!listed.length) return null;
+  return (
+    <section
+      aria-label="All terms"
+      className={`mt-8 rounded-2xl border border-border bg-card p-6 shadow-sm ${wideWeb ? 'lg:p-8' : ''}`}
+      style={{ fontSize: `${textPx}px` }}
+    >
+      <h2 className="text-[1.12em] font-bold tracking-tight mb-[0.9em]">All terms</h2>
+      <div className={wideWeb ? 'lg:columns-2 lg:gap-x-14' : undefined}>
+        {listed.map((term, index) => (
+          <div key={term.id || index} className="mb-[1.35em] break-inside-avoid">
+            <p className="font-semibold leading-snug">{term.term}</p>
+            <p className="mt-[0.35em] leading-relaxed text-foreground/90">
+              {storedDefinition(term) || 'No definition yet.'}
+            </p>
+          </div>
+        ))}
+      </div>
+    </section>
+  );
+}
 
 function TextSizePopover({ textPx, onChange }) {
   return (
@@ -94,6 +137,9 @@ export default function PanicReview() {
   const [summary, setSummary] = React.useState(null);
   const [generating, setGenerating] = React.useState(false);
   const [error, setError] = React.useState(false);
+  const [adVisible, setAdVisible] = React.useState(false);
+  const [canSkipAd, setCanSkipAd] = React.useState(false);
+  const adOn = React.useRef(false);
   const [textPx, setTextPx] = React.useState(TEXT_DEFAULT);
 
   const session = loadLatestCram();
@@ -101,6 +147,11 @@ export default function PanicReview() {
   React.useEffect(() => {
     setSummary(loadPanicSummary());
     setTextPx(loadTextPx());
+  }, []);
+
+  React.useEffect(() => () => {
+    adOn.current = false;
+    hidePanicBanner();
   }, []);
 
   const changeTextPx = (n) => {
@@ -126,10 +177,33 @@ export default function PanicReview() {
   const signature = panicSignature(terms);
   const hasSummary = !!summary?.text;
   const isStale = hasSummary && summary.signature !== signature;
+  const wideWeb = !Capacitor.isNativePlatform();
+  const review = hasSummary ? splitQuickReview(summary.text) : { intro: '', sections: [] };
+  const columns = wideWeb && review.sections.length > 1;
+
+  const skipAd = () => {
+    if (!canSkipAd) return;
+    adOn.current = false;
+    setAdVisible(false);
+    hidePanicBanner();
+  };
 
   const generate = async () => {
     setGenerating(true);
     setError(false);
+    setCanSkipAd(false);
+    const ads = adsEnabledFor(getCurrentUser());
+    if (ads) {
+      adOn.current = true;
+      setAdVisible(true);
+      if (Capacitor.isNativePlatform()) {
+        const shown = await showPanicBanner();
+        if (!shown) {
+          adOn.current = false;
+          setAdVisible(false);
+        }
+      }
+    }
     try {
       const payload = terms
         .filter((t) => t.tier === 'critical' || t.tier === 'core')
@@ -168,8 +242,12 @@ export default function PanicReview() {
       setSummary({ signature, text });
     } catch {
       setError(true);
+      adOn.current = false;
+      setAdVisible(false);
+      hidePanicBanner();
     }
     setGenerating(false);
+    if (adOn.current) setCanSkipAd(true);
   };
 
   return (
@@ -186,10 +264,10 @@ export default function PanicReview() {
         <TextSizePopover textPx={textPx} onChange={changeTextPx} />
       </header>
 
-      <main className="flex-1 px-5 pt-2 overflow-y-auto pb-safe">
-        <div className="max-w-md mx-auto w-full pb-8">
+      <main className={`flex-1 overflow-y-auto px-5 pt-2 pb-safe ${wideWeb ? 'lg:px-10' : ''}`}>
+        <div className={`mx-auto w-full max-w-md pb-8 ${wideWeb ? 'lg:max-w-6xl' : ''}`}>
           {!hasSummary && !generating && (
-            <div className="rounded-2xl border border-border bg-card p-6 text-center shadow-sm">
+            <div className={`rounded-2xl border border-border bg-card p-6 text-center shadow-sm ${wideWeb ? 'lg:mx-auto lg:mt-[12vh] lg:max-w-md' : ''}`}>
               <div className="flex items-center justify-center w-11 h-11 rounded-xl bg-primary text-primary-foreground mx-auto mb-3">
                 <FileText className="w-5 h-5" />
               </div>
@@ -206,14 +284,32 @@ export default function PanicReview() {
             </div>
           )}
 
-          {generating && (
-            <div className="flex flex-col items-center justify-center py-16">
-              <Loader2 className="w-7 h-7 text-muted-foreground animate-spin mb-3" />
-              <p className="text-sm text-muted-foreground">Writing your notes…</p>
+          {(generating || adVisible) && (
+            <div className="flex flex-col items-center justify-center py-8">
+              {adVisible && !Capacitor.isNativePlatform() && <PanicAdSlot />}
+              {adVisible && Capacitor.isNativePlatform() && <div className="h-16 w-full" aria-hidden="true" />}
+              {generating ? (
+                <>
+                  <Loader2 className="w-7 h-7 text-muted-foreground animate-spin mb-3" />
+                  <p className="text-sm text-muted-foreground">Writing your notes…</p>
+                </>
+              ) : (
+                <>
+                  <p className="text-sm font-medium mb-4">Notes are ready</p>
+                  <Button
+                    type="button"
+                    onClick={skipAd}
+                    disabled={!canSkipAd}
+                    className="h-11 rounded-2xl font-semibold"
+                  >
+                    Skip ad
+                  </Button>
+                </>
+              )}
             </div>
           )}
 
-          {hasSummary && isStale && !generating && (
+          {hasSummary && isStale && !generating && !adVisible && (
             <div className="rounded-xl border border-border bg-card p-3 mb-4 flex items-center gap-3">
               <RefreshCw className="w-4 h-4 text-muted-foreground shrink-0" />
               <p className="text-xs text-muted-foreground flex-1 leading-snug">
@@ -230,18 +326,34 @@ export default function PanicReview() {
             </div>
           )}
 
-          {hasSummary && !generating && (
+          {hasSummary && !generating && !adVisible && (
             <>
               <article
-                className="rounded-2xl border border-border bg-card p-6 shadow-sm"
+                className={`rounded-2xl border border-border bg-card p-6 shadow-sm ${wideWeb ? 'lg:p-8' : ''}`}
                 style={{ fontSize: `${textPx}px` }}
               >
-                <ReactMarkdown components={MD_COMPONENTS}>{summary.text}</ReactMarkdown>
+                <ReactMarkdown components={MD_COMPONENTS}>{review.intro}</ReactMarkdown>
+                {review.sections.length > 0 && (
+                  <div className={columns ? 'lg:columns-2 lg:gap-x-14' : undefined}>
+                    {review.sections.map((section, index) => (
+                      <div
+                        key={index}
+                        className={`mt-[1.6em] break-inside-avoid ${columns ? 'lg:mb-[1.6em] lg:mt-0' : ''}`}
+                      >
+                        <ReactMarkdown components={MD_COMPONENTS}>{section}</ReactMarkdown>
+                      </div>
+                    ))}
+                  </div>
+                )}
               </article>
               <p className="text-[11px] text-muted-foreground text-center mt-5 leading-relaxed px-3">
                 These notes are generated with AI. Fact-check important information.
               </p>
             </>
+          )}
+
+          {!generating && !adVisible && (
+            <TermGlossary terms={terms} textPx={textPx} wideWeb={wideWeb} />
           )}
 
           {error && !generating && (

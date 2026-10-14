@@ -89,6 +89,8 @@
 	<string>UIStatusBarStyleDarkContent</string>
 	<key>UIStatusBarHidden</key>
 	<false/>
+	<key>GADApplicationIdentifier</key>
+	<string>ca-app-pub-2981637188874065~9628598029</string>
 	<key>NSCameraUsageDescription</key>
 	<string>bharris.app uses the camera so you can photograph your notes and extract study terms.</string>
 	<key>NSPhotoLibraryUsageDescription</key>

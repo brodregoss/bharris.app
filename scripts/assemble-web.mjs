@@ -1279,6 +1279,7 @@ const css = `
     flex: none;
   }
   .agree a { color: #0a0a0a; font-weight: 650; }
+  .agree[hidden] { display: none; }
   .renew-note { width: min(40rem, 100%); }
   button.text-btn {
     appearance: none;
@@ -1941,6 +1942,10 @@ function inlineHtml(text) {
       const email = escapeHtml(run.value);
       return `<a href="mailto:${email}">${email}</a>`;
     }
+    if (run.kind === 'link') {
+      const href = escapeHtml(run.value);
+      return `<a href="${href}">${href}</a>`;
+    }
     return escapeHtml(run.value);
   }).join('');
 }
@@ -2176,7 +2181,7 @@ ${siteAuthFoot(firebaseConfig)}`,
       <div class="paper-sheet reveal" style="--d:80ms">
         <div class="paper-nos">
           <div class="paper-no">
-            <p>No ads</p>
+            <p>No ads while you study</p>
             <p>No distractions</p>
             <p>No waste</p>
           </div>
@@ -2421,7 +2426,7 @@ function plansPage(firebaseConfig) {
   <main class="block plans-wrap reveal">
     <h2>Plans</h2>
     <p class="note renew-note">${escapeHtml(RENEWAL_NOTICE)}</p>
-    <label class="agree" for="terms-agree">
+    <label class="agree" for="terms-agree" hidden>
       <input id="terms-agree" type="checkbox" />
       <span>I agree to the <a href="/terms/">Terms of Service</a> and <a href="/privacy/">Privacy Policy</a>.</span>
     </label>

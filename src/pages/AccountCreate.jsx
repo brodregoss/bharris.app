@@ -9,6 +9,7 @@ import AppleSignInButton from '@/components/account/AppleSignInButton';
 import GoogleSignInButton from '@/components/account/GoogleSignInButton';
 import TermsAgreement from '@/components/account/TermsAgreement';
 import { TERMS_AGREE_ERROR } from '@/lib/legal';
+import { forgetTermsAccepted, hasAcceptedTerms, rememberTermsAccepted } from '@/lib/termsAgreement';
 import { useAuth } from '@/lib/AuthContext';
 import { afterAuthPath, leaveForAuthReturn, rememberAuthReturn } from '@/lib/onboarding';
 
@@ -24,7 +25,8 @@ export default function AccountCreate() {
   const [loading, setLoading] = React.useState(false);
   const [appleLoading, setAppleLoading] = React.useState(false);
   const [googleLoading, setGoogleLoading] = React.useState(false);
-  const [agreed, setAgreed] = React.useState(false);
+  const [askForTerms] = React.useState(() => !hasAcceptedTerms());
+  const [agreed, setAgreed] = React.useState(() => hasAcceptedTerms());
 
   React.useEffect(() => {
     rememberAuthReturn();
@@ -48,8 +50,14 @@ export default function AccountCreate() {
     return <Navigate to={afterAuthPath()} replace />;
   }
 
+  const acceptTerms = (value) => {
+    setAgreed(value);
+    if (value) rememberTermsAccepted();
+    else forgetTermsAccepted();
+  };
+
   const requireAgreement = () => {
-    if (agreed) return true;
+    if (!askForTerms || agreed) return true;
     setError(TERMS_AGREE_ERROR);
     return false;
   };
@@ -119,7 +127,9 @@ export default function AccountCreate() {
         </div>
       )}
       <div className="space-y-3">
-        <TermsAgreement id="create-agree-terms" checked={agreed} onCheckedChange={setAgreed} />
+        {askForTerms && (
+          <TermsAgreement id="create-agree-terms" checked={agreed} onCheckedChange={acceptTerms} />
+        )}
         <AppleSignInButton onClick={handleApple} loading={appleLoading} disabled={loading || googleLoading} />
         <GoogleSignInButton onClick={handleGoogle} loading={googleLoading} disabled={loading || appleLoading} />
       </div>
