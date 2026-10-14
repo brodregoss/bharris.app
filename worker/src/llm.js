@@ -20,7 +20,12 @@ function toStrictSchema(schema) {
 
 function openaiErrorMessage(payload, status) {
   const message = payload?.error?.message;
-  if (typeof message === 'string' && message.trim()) return message;
+  if (
+    typeof message === 'string'
+    && message.trim()
+    && message.length <= 180
+    && !/data:image|base64,/i.test(message)
+  ) return message;
   if (status === 401) return 'OpenAI rejected the server key.';
   return `OpenAI request failed (${status || 'network'})`;
 }

@@ -1,4 +1,4 @@
-import { errorJson, json, periodKey, readJson, sessionHistoryLimit } from './util.js';
+import { errorJson, json, periodKey, publicErrorMessage, readJson, sessionHistoryLimit } from './util.js';
 import { verifyFirebaseToken } from './auth.js';
 import { withCors, corsHeaders } from './cors.js';
 import {
@@ -326,7 +326,7 @@ export default {
       return withCors(response, request, env);
     } catch (err) {
       return withCors(
-        errorJson(err instanceof Error ? err.message : 'Server error', 500),
+        errorJson(publicErrorMessage(err, 'Server error'), 500),
         request,
         env,
       );

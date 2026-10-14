@@ -9,6 +9,7 @@ import {
   PHOTO_INVITE_ONLY,
   PHOTO_TERMS_REQUIRED,
   PHOTO_TERMS_VERSION,
+  PHOTO_DISABLED,
   PHOTO_UNAVAILABLE,
   canonicalAccessCode,
   enforceSuspension,
@@ -328,15 +329,15 @@ test('the kill switch blocks photo upload, page reads, and extract', async () =>
   }), env, { uid: UID });
   const uploadBody = await messageOf(upload);
   assert.equal(uploadBody.status, 403);
-  assert.equal(uploadBody.message, PHOTO_UNAVAILABLE);
+  assert.equal(uploadBody.message, PHOTO_DISABLED);
   const page = await handleGetNotePage(env, { uid: UID }, 'note', '0');
-  assert.equal((await messageOf(page)).message, PHOTO_UNAVAILABLE);
+  assert.equal((await messageOf(page)).message, PHOTO_DISABLED);
   const extract = await handleAi(new Request('https://app.test/v1/ai/extract', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ prompt: 'Read this', image: 'data:image/jpeg;base64,YQ==', feature: 'extract' }),
   }), env, { uid: UID }, 'extract');
-  assert.equal((await messageOf(extract)).message, PHOTO_UNAVAILABLE);
+  assert.equal((await messageOf(extract)).message, PHOTO_DISABLED);
   assert.equal(writes, 0);
   assert.equal(reads, 0);
 
@@ -381,7 +382,51 @@ test('an unlocked account still cannot use photos while the kill switch is off',
   assert.equal((await handleRedeemPhotoAccess(redeemRequest(code), env, { uid: UID }, NOW)).status, 200);
   env.PHOTO_FEATURE_ENABLED = 'false';
   const denied = await requirePhotoAccess(env, { uid: UID });
-  assert.equal((await messageOf(denied)).message, PHOTO_UNAVAILABLE);
+  assert.equal((await messageOf(denied)).message, PHOTO_DISABLED);
+});
+
+test('only a disabled photo feature uses the message old apps treat as fatal', async () => {
+  const sentence = "Photo import isn't available in this version of the app. Notes scanning is not set up.";
+  const oldAppStops = /notes password|notes scanning is not set up|too many tries|that password is wrong/i;
+  assert.equal(PHOTO_DISABLED, sentence);
+  assert.match(
+    readFileSync(new URL('../src/lib/notesScanLock.js', import.meta.url), 'utf8'),
+    /notes scanning is not set up/,
+  );
+  assert.equal(oldAppStops.test(sentence), true);
+  env.PHOTO_CODE_SECRET = 'x'.repeat(40);
+  await user(UID);
+  const code = generateAccessCode();
+  await storeAccessCode(env, { code });
+  for (const flag of ['false', 'FALSE', '', 'no']) {
+    env.PHOTO_FEATURE_ENABLED = flag;
+    const gate = await messageOf(await requirePhotoAccess(env, { uid: UID }));
+    const redeem = await messageOf(await handleRedeemPhotoAccess(
+      redeemRequest(code),
+      env,
+      { uid: UID },
+      NOW,
+    ));
+    assert.equal(gate.status, 403);
+    assert.equal(gate.message, sentence);
+    assert.equal(redeem.message, sentence);
+  }
+  const saved = sqlite.prepare('SELECT use_count, redeemed_uid FROM photo_access_codes').get();
+  assert.equal(Number(saved.use_count), 0);
+  assert.equal(saved.redeemed_uid, null);
+
+  env.PHOTO_FEATURE_ENABLED = 'true';
+  env.PHOTO_CODE_SECRET = 'short-secret';
+  const missing = await messageOf(await requirePhotoAccess(env, { uid: UID }));
+  const missingRedeem = await messageOf(await handleRedeemPhotoAccess(
+    redeemRequest(code),
+    env,
+    { uid: UID },
+    NOW,
+  ));
+  assert.equal(missing.message, PHOTO_UNAVAILABLE);
+  assert.equal(missingRedeem.message, PHOTO_UNAVAILABLE);
+  assert.equal(oldAppStops.test(missing.message), false);
 });
 
 test('locked accounts are rejected and strikes block only photo import', async () => {

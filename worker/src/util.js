@@ -17,6 +17,16 @@ export function json(data, status = 200, headers = {}) {
   });
 }
 
+const ACCESS_CODE_SHAPE = /\b[0-9A-HJKMNP-TV-Z]{4}(?:-[0-9A-HJKMNP-TV-Z]{4}){5}-[0-9A-HJKMNP-TV-Z]{2}\b/;
+
+export function publicErrorMessage(err, fallback = 'Server error') {
+  const message = err instanceof Error ? err.message : (typeof err === 'string' ? err : '');
+  if (!message || message.length > 300) return fallback;
+  if (/data:image|base64,/i.test(message)) return fallback;
+  if (ACCESS_CODE_SHAPE.test(message)) return fallback;
+  return message;
+}
+
 export function errorJson(message, status = 400, extra = {}) {
   return json({ error: { message, ...extra } }, status);
 }

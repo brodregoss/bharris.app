@@ -7,6 +7,7 @@ const CODE_CHARS = 26;
 const MIN_SECRET_CHARS = 32;
 
 export const PHOTO_UNAVAILABLE = 'Photo import is temporarily unavailable.';
+export const PHOTO_DISABLED = "Photo import isn't available in this version of the app. Notes scanning is not set up.";
 export const PHOTO_INVITE_ONLY = 'Photo import is invitation-only during the beta.';
 export const PHOTO_TERMS_REQUIRED = 'Check the box to continue.';
 export const PHOTO_TERMS_VERSION = '2026-10-14';
@@ -54,6 +55,10 @@ export function strikeLimitMessage(env) {
 
 function unavailable() {
   return errorJson(PHOTO_UNAVAILABLE, 403);
+}
+
+function featureDisabled() {
+  return errorJson(PHOTO_DISABLED, 403);
 }
 
 function inviteOnly() {
@@ -251,7 +256,8 @@ function photoRowOpen(row) {
 }
 
 export async function requirePhotoAccess(env, identity) {
-  if (!photoFeatureEnabled(env) || !codeSecret(env)) return unavailable();
+  if (!photoFeatureEnabled(env)) return featureDisabled();
+  if (!codeSecret(env)) return unavailable();
   const row = await getUserRow(env, identity?.uid);
   if (Number(row?.suspended) === 1) return errorJson(suspensionMessage(env), 403);
   if ((Number(row?.photo_strikes) || 0) >= strikeLimit()) return errorJson(strikeLimitMessage(env), 403);
@@ -313,7 +319,8 @@ async function clearUserFailures(env, uidSubject) {
 
 export async function handleRedeemPhotoAccess(request, env, identity, now = Date.now()) {
   try {
-    if (!photoFeatureEnabled(env) || !codeSecret(env)) return unavailable();
+    if (!photoFeatureEnabled(env)) return featureDisabled();
+    if (!codeSecret(env)) return unavailable();
     const uid = String(identity?.uid || '');
     if (!uid) return unavailable();
     const row = await getUserRow(env, uid);

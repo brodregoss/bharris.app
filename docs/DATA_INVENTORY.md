@@ -27,12 +27,13 @@ The live privacy policy in `src/lib/legal.js` does not yet name OpenAI and Googl
 - Notes: title, transcript, and terms. Not the photo.
 - Photo access codes as HMAC-SHA256 hashes only. The code itself is not stored and is not written to logs.
 - Moderation events: user id, time, provider, categories, severity, and a SHA-256 of the image bytes. Not the image.
-- Strike count and suspension flag on the account. Suspension does not delete the account.
+- Photo admin log: time, operator name, action, and user id. Written when an account is unsuspended. Not a code and not an image.
+- Strike count and suspension flag on the account. Suspension does not delete the account. Unsuspend sets the strike count back to 0.
 
 ## What this app does not store
 
 - Photo bytes.
-- The photo access code.
-- Image bytes in moderation logs or in the alert sent when a photo is flagged.
+- The photo access code. The generate command prints it once, then only the hash remains.
+- Image bytes, note text, or access codes in moderation logs, alert webhooks, worker error responses, or worker logs.
 
 The current Worker configuration does not bind a photo-storage bucket. Older delete functions still remove objects for an account if a bucket is bound later. This inventory does not delete anything that already exists.

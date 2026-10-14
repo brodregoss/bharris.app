@@ -267,7 +267,7 @@ async function ensureModerationTables(env) {
   return moderationTablesReady;
 }
 
-function alertBody(uid, result, time) {
+export function moderationAlertBody(uid, result, time) {
   const loud = result.severity === 'severe';
   const text = loud ? 'SEVERE moderation flag' : 'Moderation flag';
   return {
@@ -287,7 +287,7 @@ async function sendAlert(env, uid, result, time, fetchImpl, timeoutMs) {
     await fetchImpl(url, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(alertBody(uid, result, time)),
+      body: JSON.stringify(moderationAlertBody(uid, result, time)),
       signal: AbortSignal.timeout(timeoutMs),
     });
   } catch {

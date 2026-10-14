@@ -1,4 +1,5 @@
 import { runLlm } from './openaiLlm.js';
+import { publicErrorMessage } from '../worker/src/util.js';
 import { handleAccountAction, runLlmForAccount, setCors, tokenFromReq } from './accountHttp.js';
 
 function sendJson(res, status, payload) {
@@ -41,10 +42,11 @@ async function handleApi(req, res, kind) {
     const payload = await runLlmForAccount(runLlm, body, token);
     sendJson(res, 200, payload);
   } catch (error) {
-    const message = error instanceof Error ? error.message : 'Request failed';
-    const status = message.includes('missing OPENAI_API_KEY')
+    const raw = error instanceof Error ? error.message : 'Request failed';
+    const message = publicErrorMessage(raw, 'Request failed');
+    const status = raw.includes('missing OPENAI_API_KEY')
       ? 500
-      : /password|admin only|wrong email|budget|AI cap|AI limit/i.test(message)
+      : /password|admin only|wrong email|budget|AI cap|AI limit/i.test(raw)
         ? 403
         : 400;
     sendJson(res, status, { error: message });

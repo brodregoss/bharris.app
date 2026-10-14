@@ -1,4 +1,4 @@
-import { errorJson, json, readJson } from './util.js';
+import { errorJson, json, publicErrorMessage, readJson } from './util.js';
 import { assertQuota, incrementQuota } from './quota.js';
 import { toPublicUser } from './users.js';
 import { runLlm } from './llm.js';
@@ -61,6 +61,6 @@ export async function handleAi(request, env, identity, featureFromPath) {
       account: await toPublicUser(env, row),
     });
   } catch (err) {
-    return errorJson(err instanceof Error ? err.message : 'Study AI failed', 502);
+    return errorJson(publicErrorMessage(err, 'Study AI failed'), 502);
   }
 }
