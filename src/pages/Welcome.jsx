@@ -4,13 +4,10 @@ import { ArrowLeft, Upload, Loader2, Lock } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { makePhotoSource } from '@/lib/notesSource';
 import { copyFileList, fileToJpegDataUrl, stashPhotos, validateNotePhotos } from '@/lib/imageData';
-import { uploadNoteImages } from '@/lib/notesUpload';
 import { isOnboarded } from '@/lib/onboarding';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import {
-  clearNotesScanToken,
-  isScanLockError,
   notesScanUnlocked,
   refreshNotesScanUnlock,
   unlockNotesScan,
@@ -75,22 +72,8 @@ export default function Welcome() {
       const name = checked.files.length === 1
         ? checked.files[0].name
         : `${checked.files.length} photos`;
-      let noteId = '';
-      try {
-        const note = await uploadNoteImages(images, { title: 'Untitled' });
-        noteId = note?.id || '';
-      } catch (err) {
-        if (isScanLockError(err)) {
-          clearNotesScanToken();
-          setUnlocked(false);
-          setReadError(err instanceof Error ? err.message : 'Enter the notes password to upload.');
-          setReading(false);
-          return;
-        }
-        // Extract still runs from the in-memory photos; R2 persist can retry later.
-      }
       navigate('/highlight-notes', {
-        state: { source: { ...makePhotoSource({ name, title: '', noteId }), noteId } },
+        state: { source: makePhotoSource({ name, title: '' }) },
       });
     } catch {
       setReadError('Could not read that photo. Try another one.');
@@ -200,7 +183,7 @@ export default function Welcome() {
               <div>
                 <p className="text-base font-semibold">Notes are locked</p>
                 <p className="text-xs text-muted-foreground mt-1">
-                  Type the notes password to scan and upload photos.
+                  Type the notes password to scan photos.
                 </p>
               </div>
               <Input

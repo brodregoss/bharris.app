@@ -1,27 +1,7 @@
 import { errorJson, json, readJson } from './util.js';
 import { userStudyStub } from './users.js';
 import { denyPhoto } from './photoAccess.js';
-
-function padPage(index) {
-  return String(index + 1).padStart(3, '0');
-}
-
-function decodeImage(input) {
-  if (!input) return null;
-  if (typeof input === 'string' && input.startsWith('data:')) {
-    const comma = input.indexOf(',');
-    const header = input.slice(0, comma);
-    const b64 = input.slice(comma + 1);
-    const mime = /data:([^;]+)/.exec(header)?.[1] || 'image/jpeg';
-    const bytes = Uint8Array.from(atob(b64), (c) => c.charCodeAt(0));
-    return { bytes, contentType: mime };
-  }
-  if (typeof input === 'string') {
-    const bytes = Uint8Array.from(atob(input), (c) => c.charCodeAt(0));
-    return { bytes, contentType: 'image/jpeg' };
-  }
-  return null;
-}
+import { collectImages, inspectImagePayload } from './imageGuard.js';
 
 function hasNotesBucket(env) {
   return Boolean(env.NOTES);
@@ -30,45 +10,23 @@ function hasNotesBucket(env) {
 export async function handleCreateNote(request, env, identity) {
   const body = await readJson(request);
   const terms = Array.isArray(body.terms) ? body.terms : null;
-  const images = Array.isArray(body.images) ? body.images : body.image ? [body.image] : [];
-  const kind = body.kind || (images.length ? 'photo' : 'manual');
+  const images = collectImages(body);
+  const kind = body.kind === 'photo' ? 'manual' : (body.kind || 'manual');
   if (images.length) {
     const denied = await denyPhoto(env, identity);
     if (denied) return denied;
+    const inspected = inspectImagePayload(body);
+    if (!inspected.ok) return errorJson(inspected.message, inspected.status);
+    return errorJson('Photos are not stored.', 400);
   }
-  if (!images.length && kind !== 'manual' && !terms?.length && !body.transcript) {
-    return errorJson('Attach at least one photo', 400);
+  if (kind !== 'manual' && !terms?.length && !body.transcript) {
+    return errorJson('Add a title or some terms', 400);
   }
 
   const noteId = crypto.randomUUID();
   const pages = [];
-  let total = 0;
-  for (let i = 0; i < images.length; i += 1) {
-    if (!hasNotesBucket(env)) {
-      pages.push({
-        pageIndex: i,
-        r2Key: null,
-        contentType: 'image/jpeg',
-        sizeBytes: 0,
-      });
-      continue;
-    }
-    const decoded = decodeImage(typeof images[i] === 'string' ? images[i] : images[i]?.dataUrl || images[i]?.data);
-    if (!decoded) return errorJson('Each photo must be an image', 400);
-    const key = `notes/${identity.uid}/${noteId}/pages/${padPage(i)}.jpg`;
-    await env.NOTES.put(key, decoded.bytes, {
-      httpMetadata: { contentType: decoded.contentType },
-    });
-    total += decoded.bytes.byteLength;
-    pages.push({
-      pageIndex: i,
-      r2Key: key,
-      contentType: decoded.contentType,
-      sizeBytes: decoded.bytes.byteLength,
-    });
-  }
-
-  const originalKey = pages[0]?.r2Key;
+  const total = 0;
+  const originalKey = null;
   const transcript = body.transcript
     || (terms ? JSON.stringify({ terms }) : null);
   const { stub } = userStudyStub(env, identity.uid);
@@ -141,26 +99,13 @@ export async function handleGetNote(env, identity, noteId) {
   return json({ note });
 }
 
-export async function handleGetNotePage(env, identity, noteId, pageIndex) {
+export async function handleGetNotePage(env, identity) {
   const denied = await denyPhoto(env, identity);
   if (denied) return denied;
-  const { stub } = userStudyStub(env, identity.uid);
-  const note = await stub.getNote(noteId);
-  if (!note) return errorJson('Note not found', 404);
-  const page = (note.pages || []).find((p) => Number(p.page_index) === Number(pageIndex));
-  if (!hasNotesBucket(env) || !page?.r2_key || !String(page.r2_key).startsWith(`notes/${identity.uid}/`)) {
-    return errorJson('Page not found', 404);
-  }
-  const obj = await env.NOTES.get(page.r2_key);
-  if (!obj) return errorJson('File not found', 404);
-  return new Response(obj.body, {
-    headers: {
-      'Content-Type': page.content_type || obj.httpMetadata?.contentType || 'image/jpeg',
-      'Cache-Control': 'private, max-age=60',
-    },
-  });
+  return errorJson('Page not found', 404);
 }
 
+// Deletes one account's objects when that account is deleted. This is not a bucket purge.
 export async function deleteUserNotes(env, uid) {
   if (!hasNotesBucket(env)) return;
   const listed = await env.NOTES.list({ prefix: `notes/${uid}/` });

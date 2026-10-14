@@ -5,6 +5,12 @@
     "max_failures": 5,
     "lockout_ms": 900000
   },
+  "extract": {
+    "max_images": 2,
+    "max_image_chars": 5000000,
+    "window_ms": 3600000,
+    "max_per_window": 20
+  },
   "messages": {
     "rejected_image": "This image can't be processed. Try retaking or cropping it."
   },

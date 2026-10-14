@@ -52,10 +52,14 @@ export async function runLlm({ prompt, response_json_schema, image } = {}) {
       ]
     : prompt;
 
+  // store:false keeps this completion out of OpenAI's stored-completion history.
+  // It does not turn off abuse-monitoring retention. Confirm zero data retention
+  // in the OpenAI account settings before treating photo text as unretained.
   const body = {
     model: MODEL,
     messages: [{ role: 'user', content }],
     temperature: 0.4,
+    store: false,
   };
 
   if (response_json_schema) {

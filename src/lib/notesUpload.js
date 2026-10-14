@@ -1,6 +1,6 @@
 import { workerRequest } from '@/lib/workerClient';
+import { prepareStoredNotes } from '@/lib/noteRecord';
 import { userStorageKey } from '@/lib/userStorage';
-import { scanAuthHeaders } from '@/lib/notesScanLock';
 
 const LOCAL_NOTES = 'lms_note_sets_v1';
 
@@ -9,7 +9,9 @@ function loadLocalNotes() {
   if (!key) return [];
   try {
     const raw = JSON.parse(localStorage.getItem(key) || '[]');
-    return Array.isArray(raw) ? raw : [];
+    const { notes, changed } = prepareStoredNotes(raw);
+    if (changed) localStorage.setItem(key, JSON.stringify(notes));
+    return notes;
   } catch {
     return [];
   }
@@ -17,10 +19,11 @@ function loadLocalNotes() {
 
 function upsertLocalNote(note) {
   const key = userStorageKey(LOCAL_NOTES);
-  if (!key || !note?.id) return note;
-  const next = [note, ...loadLocalNotes().filter((item) => item.id !== note.id)];
+  const stored = prepareStoredNotes([note]).notes[0];
+  if (!key || !stored?.id) return stored;
+  const next = [stored, ...loadLocalNotes().filter((item) => item.id !== stored.id)];
   localStorage.setItem(key, JSON.stringify(next));
-  return note;
+  return stored;
 }
 
 function removeLocalNote(id) {
@@ -38,21 +41,6 @@ function localNoteRecord({ id, title, terms, kind = 'manual' }) {
     updated_at: new Date().toISOString(),
     created_at: new Date().toISOString(),
   };
-}
-
-export async function uploadNoteImages(images, { title, kind = 'photo' } = {}) {
-  const list = (Array.isArray(images) ? images : [images]).filter(Boolean);
-  if (!list.length) throw new Error('Attach at least one photo');
-  const scanHeaders = scanAuthHeaders();
-  if (!scanHeaders['X-Notes-Scan-Token']) {
-    throw new Error('Enter the notes password to upload.');
-  }
-  const data = await workerRequest('POST', '/v1/notes', {
-    title: title || 'Untitled',
-    kind,
-    images: list,
-  }, scanHeaders);
-  return upsertLocalNote(data.note);
 }
 
 export async function saveManualNote({ title, terms, noteId } = {}) {
@@ -145,8 +133,4 @@ export function parseNoteTerms(note) {
       })
       .filter((t) => t.term);
   }
-}
-
-export function notePageUrl(noteId, pageIndex) {
-  return `/v1/notes/${noteId}/pages/${pageIndex}`;
 }
