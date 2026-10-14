@@ -19,3 +19,16 @@ NOTES_SCAN_TOKEN_SECRET=
 # Dev tools code. Generate with: node scripts/notes-scan-secret.mjs --dev --write
 # Then: npx wrangler secret put DEV_TOOLS_CODE_HASH
 DEV_TOOLS_CODE_HASH=
+# Photo import stays off until PHOTO_FEATURE_ENABLED is the string true.
+# Set PHOTO_CODE_SECRET yourself (at least 32 random characters). Do not commit it.
+# npx wrangler secret put PHOTO_CODE_SECRET
+PHOTO_FEATURE_ENABLED=false
+PHOTO_CODE_SECRET=
+# Public contact address shown on suspension and strike-limit messages. Not a secret.
+SUPPORT_EMAIL=
+# Moderation. Set these yourself. Do not commit real values.
+# npx wrangler secret put GOOGLE_VISION_API_KEY
+# npx wrangler secret put MODERATION_ALERT_WEBHOOK
+# OPENAI_API_KEY above is also used for omni-moderation-latest.
+GOOGLE_VISION_API_KEY=
+MODERATION_ALERT_WEBHOOK=

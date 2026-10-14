@@ -6,7 +6,8 @@
     "REVENUECAT_ENTITLEMENT_ID": "Study Pro",
     "FREE_AI_QUOTA": "5",
     "PRO_AI_QUOTA": "30",
-    "FIREBASE_AUTH_HOST": "bharris-app.firebaseapp.com"
+    "FIREBASE_AUTH_HOST": "bharris-app.firebaseapp.com",
+    "PHOTO_FEATURE_ENABLED": "false"
   },
   "d1_databases": [
     {

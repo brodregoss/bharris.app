@@ -65,6 +65,9 @@ export function publicUser(row, { isAdmin = false, partnerCode = '', partnerLink
     unlimited,
     period: row.ai_quota_period || periodKey(),
     termsAccepted: !!row.terms_accepted_at,
+    suspended: Number(row.suspended) === 1,
+    photoStrikes: Number(row.photo_strikes) || 0,
+    photoUnlocked: !!row.photo_unlocked_at && !row.photo_revoked_at,
   };
 }
 

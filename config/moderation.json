@@ -1,0 +1,54 @@
+{
+  "strike_limit": 5,
+  "timeout_ms": 5000,
+  "access_code": {
+    "max_failures": 5,
+    "lockout_ms": 900000
+  },
+  "messages": {
+    "rejected_image": "This image can't be processed. Try retaking or cropping it."
+  },
+  "likelihoods": ["UNKNOWN", "VERY_UNLIKELY", "UNLIKELY", "POSSIBLE", "LIKELY", "VERY_LIKELY"],
+  "providers": {
+    "openai": true,
+    "safesearch": true,
+    "photodna": false,
+    "hive": false
+  },
+  "openai": {
+    "model": "omni-moderation-latest",
+    "severe_if_flagged": ["sexual/minors"],
+    "severe_min_score": {
+      "sexual/minors": 0.01,
+      "sexual": 0.9
+    },
+    "mild_if_flagged": [
+      "sexual",
+      "violence",
+      "violence/graphic",
+      "self-harm",
+      "self-harm/intent",
+      "self-harm/instructions",
+      "harassment",
+      "harassment/threatening",
+      "hate",
+      "hate/threatening",
+      "illicit",
+      "illicit/violent"
+    ]
+  },
+  "safesearch": {
+    "ignore": ["medical", "spoof"],
+    "severe_at": {
+      "adult": "VERY_LIKELY"
+    },
+    "mild_at": {
+      "adult": "LIKELY",
+      "racy": "VERY_LIKELY",
+      "violence": "VERY_LIKELY"
+    },
+    "log_at": {
+      "violence": "LIKELY"
+    }
+  }
+}

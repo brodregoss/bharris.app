@@ -43,6 +43,7 @@ import { UserStudyDO } from './user-do.js';
 import { isFirebaseAuthProxyPath, nativeGoogleHandoffResponse, proxyFirebaseAuth } from './firebaseAuthProxy.js';
 import { openAppPage, passwordResetRedirect } from './passwordReset.js';
 import { handleAccountStats } from './accountStats.js';
+import { enforceSuspension, handleRedeemPhotoAccess } from './photoAccess.js';
 
 export { UserStudyDO };
 
@@ -235,6 +236,8 @@ export default {
       const authed = await requireUser(request, env);
       if (authed.error) return withCors(authed.error, request, env);
       const { identity } = authed;
+      const standing = await enforceSuspension(env, identity, parts, request.method);
+      if (standing) return withCors(standing, request, env);
 
       let response;
 
@@ -281,6 +284,8 @@ export default {
         response = await handleDevUnlock(request, env, identity);
       } else if (parts[1] === 'dev-tools' && parts[2] === 'stats' && request.method === 'GET') {
         response = await handleAccountStats(request, env, identity);
+      } else if (parts[1] === 'notes' && parts[2] === 'photo-access' && request.method === 'POST') {
+        response = await handleRedeemPhotoAccess(request, env, identity);
       } else if (parts[1] === 'notes' && parts[2] === 'scan-unlock' && request.method === 'POST') {
         response = await handleScanUnlock(request, env, identity);
       } else if (parts[1] === 'notes' && parts[2] === 'scan-admin' && request.method === 'GET') {

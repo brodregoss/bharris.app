@@ -1,6 +1,6 @@
 import { errorJson, json, readJson } from './util.js';
 import { userStudyStub } from './users.js';
-import { requireScanToken } from './notesScanLock.js';
+import { denyPhoto } from './photoAccess.js';
 
 function padPage(index) {
   return String(index + 1).padStart(3, '0');
@@ -33,7 +33,7 @@ export async function handleCreateNote(request, env, identity) {
   const images = Array.isArray(body.images) ? body.images : body.image ? [body.image] : [];
   const kind = body.kind || (images.length ? 'photo' : 'manual');
   if (images.length) {
-    const denied = await requireScanToken(request, env, identity);
+    const denied = await denyPhoto(env, identity);
     if (denied) return denied;
   }
   if (!images.length && kind !== 'manual' && !terms?.length && !body.transcript) {
@@ -142,6 +142,8 @@ export async function handleGetNote(env, identity, noteId) {
 }
 
 export async function handleGetNotePage(env, identity, noteId, pageIndex) {
+  const denied = await denyPhoto(env, identity);
+  if (denied) return denied;
   const { stub } = userStudyStub(env, identity.uid);
   const note = await stub.getNote(noteId);
   if (!note) return errorJson('Note not found', 404);

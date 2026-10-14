@@ -19,6 +19,10 @@ const USER_EXTRA_COLUMNS = [
   ['billing_checked_at', 'TEXT'],
   ['last_seen_at', 'TEXT'],
   ['terms_accepted_at', 'TEXT'],
+  ['suspended', 'INTEGER NOT NULL DEFAULT 0'],
+  ['photo_strikes', 'INTEGER NOT NULL DEFAULT 0'],
+  ['photo_unlocked_at', 'TEXT'],
+  ['photo_revoked_at', 'TEXT'],
 ];
 
 export const ACTIVE_WINDOW_DAYS = 7;
@@ -139,6 +143,47 @@ export async function deleteUserRow(env, uid) {
   await db.prepare('DELETE FROM users WHERE firebase_uid = ?').bind(uid).run();
   await env.APP.prepare('DELETE FROM admins WHERE firebase_uid = ?').bind(uid).run();
   await env.APP.prepare('DELETE FROM bucket_overrides WHERE firebase_uid = ?').bind(uid).run();
+}
+
+export async function setUserSuspended(env, uid, suspended) {
+  const { binding, db } = await userShard(env, uid);
+  await ensureUserTable(binding, db);
+  const now = new Date().toISOString();
+  await db.prepare('UPDATE users SET suspended = ?, updated_at = ? WHERE firebase_uid = ?')
+    .bind(suspended ? 1 : 0, now, uid)
+    .run();
+  return getUserRow(env, uid);
+}
+
+export async function addPhotoStrike(env, uid) {
+  const { binding, db } = await userShard(env, uid);
+  await ensureUserTable(binding, db);
+  const now = new Date().toISOString();
+  await db.prepare(
+    'UPDATE users SET photo_strikes = COALESCE(photo_strikes, 0) + 1, updated_at = ? WHERE firebase_uid = ?',
+  ).bind(now, uid).run();
+  return getUserRow(env, uid);
+}
+
+export async function markPhotoUnlocked(env, uid) {
+  const { binding, db } = await userShard(env, uid);
+  await ensureUserTable(binding, db);
+  const now = new Date().toISOString();
+  await db.prepare(
+    `UPDATE users SET photo_unlocked_at = ?, updated_at = ?
+     WHERE firebase_uid = ? AND (photo_revoked_at IS NULL OR photo_revoked_at = '')`,
+  ).bind(now, now, uid).run();
+  return getUserRow(env, uid);
+}
+
+export async function setPhotoRevoked(env, uid, revoked) {
+  const { binding, db } = await userShard(env, uid);
+  await ensureUserTable(binding, db);
+  const now = new Date().toISOString();
+  await db.prepare('UPDATE users SET photo_revoked_at = ?, updated_at = ? WHERE firebase_uid = ?')
+    .bind(revoked ? now : '', now, uid)
+    .run();
+  return getUserRow(env, uid);
 }
 
 export async function acceptTerms(env, uid) {

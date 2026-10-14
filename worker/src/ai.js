@@ -2,7 +2,8 @@ import { errorJson, json, readJson } from './util.js';
 import { assertQuota, incrementQuota } from './quota.js';
 import { toPublicUser } from './users.js';
 import { runLlm } from './llm.js';
-import { requireScanToken } from './notesScanLock.js';
+import { denyPhoto } from './photoAccess.js';
+import { enforceImageModeration } from './moderation.js';
 
 const FEATURES = new Set([
   'extract',
@@ -22,9 +23,13 @@ export async function handleAi(request, env, identity, featureFromPath) {
     : FEATURES.has(body.feature)
       ? body.feature
       : 'complete';
-  if (body.image) {
-    const denied = await requireScanToken(request, env, identity);
+  if (feature === 'extract' || body.image) {
+    const denied = await denyPhoto(env, identity);
     if (denied) return denied;
+  }
+  if (body.image) {
+    const moderated = await enforceImageModeration(env, identity, body.image);
+    if (moderated) return moderated;
   }
   const consumed = await assertQuota(env, identity.uid);
   if (consumed.error) return consumed.error;
