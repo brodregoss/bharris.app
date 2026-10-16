@@ -47,16 +47,12 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
-import LegalSections, { LegalText } from '@/components/account/LegalSections';
+import LegalSections from '@/components/account/LegalSections';
 import {
   APP_NAME,
   APP_VERSION,
   ABOUT_SECTIONS,
   LEGAL_UPDATED,
-  PRIVACY_LEAD,
-  PRIVACY_SECTIONS,
-  TERMS_LEAD,
-  TERMS_SECTIONS,
 } from '@/lib/legal';
 import { devToolsUnlocked, lockDevTools, tryUnlockDevTools } from '@/lib/devToolsLock';
 import NotesScanLockCard from '@/components/account/NotesScanLockCard';
@@ -66,18 +62,6 @@ const DOCS = {
     title: 'About',
     description: `${APP_NAME} ${APP_VERSION}`,
     sections: ABOUT_SECTIONS,
-  },
-  privacy: {
-    title: 'Privacy Policy',
-    description: `Effective ${LEGAL_UPDATED}.`,
-    lead: PRIVACY_LEAD,
-    sections: PRIVACY_SECTIONS,
-  },
-  terms: {
-    title: 'Terms of Service',
-    description: `Effective ${LEGAL_UPDATED}.`,
-    lead: TERMS_LEAD,
-    sections: TERMS_SECTIONS,
   },
 };
 
@@ -486,8 +470,8 @@ export default function Settings() {
           <section className="rounded-2xl border border-border bg-card overflow-hidden divide-y divide-border">
             <Row label="Version" value={APP_VERSION} />
             <Row icon={Info} label="About" onClick={() => setDoc('about')} />
-            <Row icon={Shield} label="Privacy Policy" onClick={() => setDoc('privacy')} />
-            <Row icon={FileText} label="Terms of Service" onClick={() => setDoc('terms')} />
+            <Row icon={Shield} label="Privacy Policy" onClick={() => navigate('/privacy')} />
+            <Row icon={FileText} label="Terms of Service" onClick={() => navigate('/terms')} />
           </section>
 
           <button
@@ -593,11 +577,6 @@ export default function Settings() {
                 <SheetDescription>{open.description}</SheetDescription>
               </SheetHeader>
               <div className="space-y-4 pt-4 pb-6">
-                {open.lead?.map((line) => (
-                  <p key={line} className="text-sm text-muted-foreground leading-relaxed">
-                    <LegalText text={line} />
-                  </p>
-                ))}
                 <p className="text-xs text-muted-foreground">Last updated {LEGAL_UPDATED}</p>
                 <LegalSections sections={open.sections} />
               </div>

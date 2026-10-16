@@ -51,8 +51,8 @@ export const ABOUT_SECTIONS = [
 
 export const TERMS_LEAD = [
   'These Terms of Service ("Terms") govern your use of bharris.app, including the website at https://bharris.broderickharris11.workers.dev and the iPhone application (collectively, the "Service"). The Service is operated by an individual in the United States, not a corporation or other separate business entity.',
-  'By creating an account, accessing features that require an account, purchasing a subscription, or using the Service, you agree to these Terms. If you do not agree, do not use the Service.',
-  'For questions about these Terms, contact broderickharris11@gmail.com.',
+  'By creating an account, continuing with Apple or Google, accessing features that require an account, purchasing a subscription, or using the Service, you agree to these Terms and the Privacy Policy. If you do not agree, do not use the Service. Signing in to an existing account does not require a new agreement. Continued use after these Terms are updated is acceptance of the updated Terms, as described below.',
+  'For questions about these Terms, contact bharris.app@gmail.com.',
 ];
 
 export const TERMS_SECTIONS = [
@@ -81,6 +81,7 @@ export const TERMS_SECTIONS = [
       'Studying requires an account. The website and iPhone application use the same account.',
       '**You must be at least 18 years old to use the Service, or 13–17 with permission from a parent or legal guardian. Children under 13 may not use the Service.**',
       'A parent or legal guardian should review these Terms and the Privacy Policy with the teen before use.',
+      'Creating an account, including by continuing with Apple or Google, is your agreement to these Terms and the Privacy Policy. Signing in later does not ask for that agreement again.',
       'You may edit your display name, up to 80 characters.',
       'You are responsible for:',
     ],
@@ -275,6 +276,7 @@ export const TERMS_SECTIONS = [
 export const PRIVACY_LEAD = [
   'This Privacy Policy explains how bharris.app collects, uses, stores, and shares information when you use the website at https://bharris.broderickharris11.workers.dev or the iPhone application.',
   'bharris.app is operated by an individual in the United States, not a corporation or other separate business entity.',
+  'By creating an account, or by continuing with Apple or Google, you agree to this Privacy Policy. Signing in to an existing account does not require a new agreement.',
   'For privacy questions or requests, contact bharris.app@gmail.com.',
 ];
 
@@ -516,7 +518,7 @@ export const PRIVACY_SECTIONS = [
     title: '12. Your Privacy Rights',
     body: [
       'Depending on where you live, you may have legal rights concerning your personal information. These rights may include rights to request access to, correction of, deletion of, or information about the processing of your personal information.',
-      'Users in California, the European Union, the European Economic Area, and other jurisdictions with applicable privacy laws may submit privacy requests to broderickharris11@gmail.com. We will evaluate and respond to requests according to applicable law.',
+      'Users in California, the European Union, the European Economic Area, and other jurisdictions with applicable privacy laws may submit privacy requests to bharris.app@gmail.com. We will evaluate and respond to requests according to applicable law.',
       'Deleting your account in Settings is how the data we hold is removed, with the limits in Account Deletion. We do not sell personal information, and a privacy request does not change your price or your access.',
       'If you are in the EU or EEA, you can also complain to your local data protection authority.',
     ],
@@ -526,7 +528,7 @@ export const PRIVACY_SECTIONS = [
     body: [
       'If California privacy law applies to you, you may have rights concerning your personal information, including certain rights to know, delete, correct, or limit certain uses of information.',
       'The Service does not sell your personal information for money. The Service does not use your information to create advertising profiles.',
-      'To submit a California privacy request, contact broderickharris11@gmail.com. We may need to verify your identity before completing certain requests.',
+      'To submit a California privacy request, contact bharris.app@gmail.com. We may need to verify your identity before completing certain requests.',
     ],
   },
   {
@@ -557,11 +559,12 @@ export const PRIVACY_SECTIONS = [
       'This Privacy Policy may be updated as the Service changes.',
       'When changes are made, the updated effective date will be shown at the top of the Policy.',
       'If material changes are made, reasonable notice may be provided through the Service when appropriate.',
+      'Your continued use of the Service after an updated Privacy Policy becomes effective means you accept the updated Policy to the extent permitted by law.',
     ],
   },
   {
     title: '18. Contact',
-    body: 'For privacy questions, requests, or concerns, contact broderickharris11@gmail.com.',
+    body: 'For privacy questions, requests, or concerns, contact bharris.app@gmail.com.',
   },
 ];
 

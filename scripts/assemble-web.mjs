@@ -2000,7 +2000,7 @@ function siteFooter() {
         </div>
         <div class="footer-col">
           <h3>Contact</h3>
-          <a href="mailto:broderickharris11@gmail.com">broderickharris11@gmail.com</a>
+          <a href="mailto:bharris.app@gmail.com">bharris.app@gmail.com</a>
         </div>
         <div class="footer-col">
           <h3>Socials</h3>
@@ -2337,7 +2337,7 @@ function contactPage(firebaseConfig) {
   <main class="contact-page reveal">
     <div class="contact-head">
       <h1>Contact</h1>
-      <p class="contact-email"><a href="mailto:broderickharris11@gmail.com">broderickharris11@gmail.com</a></p>
+      <p class="contact-email"><a href="mailto:bharris.app@gmail.com">bharris.app@gmail.com</a></p>
       <p class="lede">Questions about the app, a plan, or your account.</p>
     </div>
     <section class="faq" aria-labelledby="faq-title">
