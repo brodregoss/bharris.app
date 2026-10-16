@@ -79,7 +79,7 @@ export const TERMS_SECTIONS = [
     title: '3. Your Account',
     body: [
       'Studying requires an account. The website and iPhone application use the same account.',
-      '**You must be at least 13 years old to create an account. Children under 13 may not use the Service.** Users aged 13–17 may use the Service only with permission from a parent or legal guardian.',
+      '**You must be at least 18 years old to use the Service, or 13–17 with permission from a parent or legal guardian. Children under 13 may not use the Service.**',
       'A parent or legal guardian should review these Terms and the Privacy Policy with the teen before use.',
       'You may edit your display name, up to 80 characters.',
       'You are responsible for:',
@@ -533,6 +533,7 @@ export const PRIVACY_SECTIONS = [
     title: '14. Children\'s Privacy',
     body: [
       'The Service is designed to support students, including high-school students. **The Service is not intended for children under 13, and children under 13 may not create an account or use the Service.**',
+      '**You must be 18 or older to use the Service, or 13–17 with permission from a parent or legal guardian.**',
       'If we learn that a child under 13 has provided personal information, we will take appropriate steps to stop the relevant processing and delete the information or account where required by law.',
       'Users aged 13–17 may use the Service only with permission from a parent or legal guardian. Parents or guardians should review this Privacy Policy with the teen and understand that study material, answers, and photos submitted for scanning may be processed by our service providers, including OpenAI.',
       'If you believe a child under 13 has provided personal information to the Service, contact bharris.app@gmail.com.',

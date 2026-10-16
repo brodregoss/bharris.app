@@ -59,8 +59,7 @@ export default function AiConsentModal({ open, onAccept, onDecline }) {
             <div>
               <p className="text-sm font-medium">Age and permission</p>
               <p className="text-xs text-muted-foreground">
-                You must be at least 13 to use the Service. If you are 13–17, you must have
-                permission from a parent or legal guardian.
+                You must be 18 or older, or 13–17 with permission from a parent or legal guardian.
               </p>
             </div>
           </div>
