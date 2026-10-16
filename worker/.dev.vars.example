@@ -25,7 +25,7 @@ DEV_TOOLS_CODE_HASH=
 PHOTO_FEATURE_ENABLED=false
 PHOTO_CODE_SECRET=
 # Public contact address shown on suspension and strike-limit messages. Not a secret.
-SUPPORT_EMAIL=
+SUPPORT_EMAIL=bharris.app@gmail.com
 # Moderation. Set these yourself. Do not commit real values.
 # npx wrangler secret put GOOGLE_VISION_API_KEY
 # npx wrangler secret put MODERATION_ALERT_WEBHOOK

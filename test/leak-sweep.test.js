@@ -36,8 +36,17 @@ test('stored moderation rows and access codes have no image, note text, or raw c
   assert.equal(/image_bytes|data_url|note_text|prompt/.test(moderation.slice(moderation.indexOf('INSERT INTO moderation_events'))), false);
   assert.match(access, /CREATE TABLE IF NOT EXISTS photo_access_codes/);
   assert.equal(access.includes('code TEXT'), false);
-  const webhook = moderation.slice(moderation.indexOf('export function moderationAlertBody'), moderation.indexOf('async function sendAlert'));
-  for (const key of ['image', 'hash', 'prompt', 'code']) {
+  const webhook = moderation.slice(
+    moderation.indexOf('export function moderationAlertText'),
+    moderation.indexOf('async function sendAlert'),
+  );
+  for (const key of ['image', 'hash', 'prompt', 'code', 'email']) {
     assert.equal(webhook.includes(`${key}:`), false);
+  }
+  const slack = readFileSync(path.join(root, 'worker', 'src', 'slackAlert.js'), 'utf8');
+  const bodyFn = slack.slice(slack.indexOf('export function slackAlertBody'), slack.indexOf('export async function postSlackAlert'));
+  assert.match(bodyFn, /return \{ text:/);
+  for (const key of ['image', 'hash', 'prompt', 'code', 'email', 'content']) {
+    assert.equal(bodyFn.includes(`${key}:`), false);
   }
 });

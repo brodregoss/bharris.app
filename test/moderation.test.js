@@ -229,10 +229,13 @@ test('a severe flag suspends, alerts, and does not call the model or delete data
   assert.equal(sqlite.prepare("SELECT body FROM sentinel WHERE id = 'keep'").get().body, 'leave-this-row');
   assert.equal(account.email, 'student@example.com');
   assert.equal(alerts.length, 1);
-  assert.equal(alerts[0].text, 'SEVERE moderation flag');
-  assert.equal(alerts[0].severity, 'severe');
-  assert.deepEqual(alerts[0].categories, ['sexual/minors']);
-  assert.equal(JSON.stringify(alerts[0]).includes('YQ=='), false);
+  assert.deepEqual(Object.keys(alerts[0]), ['text']);
+  assert.match(alerts[0].text, /SEVERE moderation flag/);
+  assert.match(alerts[0].text, new RegExp(`userId=${UID}`));
+  assert.match(alerts[0].text, /severity=severe/);
+  assert.match(alerts[0].text, /categories=sexual\/minors/);
+  assert.equal(alerts[0].text.includes('student@example.com'), false);
+  assert.equal(alerts[0].text.includes('YQ=='), false);
   assert.equal(Object.hasOwn(alerts[0], 'image'), false);
   const events = sqlite.prepare('SELECT * FROM moderation_events').all();
   assert.equal(events.length, 1);

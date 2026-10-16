@@ -1,6 +1,6 @@
 # Incident procedure
 
-Use this when a photo is flagged, an account is suspended, or an access code has to be pulled. These commands do not deploy the app and they do not delete account data.
+Use this when a photo is flagged, an account is suspended, or an access code has to be pulled. These commands do not deploy the app and they do not delete account data. For a cost or leaked-key incident, use `docs/COST_INCIDENT_RUNBOOK.md`.
 
 Every command stays on the local database unless you add `--allow-remote`. That flag uses the databases named in `worker/wrangler.jsonc`. Do not add it unless you mean to.
 
@@ -50,6 +50,6 @@ node scripts/photo-admin.mjs flags --uid <account id>
 
 A rejected photo already showed: "This image can't be processed. Try retaking or cropping it."
 
-A suspension shows: "This account is suspended." Add `SUPPORT_EMAIL` in the Worker settings if that message should include an address. Leave it empty until the address is real.
+A suspension shows: "This account is suspended. Contact bharris.app@gmail.com."
 
 Do not send the person the image, the hash, or the access code.

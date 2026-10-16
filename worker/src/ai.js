@@ -2,8 +2,9 @@ import { errorJson, json, publicErrorMessage, readJson } from './util.js';
 import { assertQuota, incrementQuota } from './quota.js';
 import { toPublicUser } from './users.js';
 import { runLlm } from './llm.js';
-import { denyPhoto } from './photoAccess.js';
+import { PHOTO_UNAVAILABLE, denyPhoto } from './photoAccess.js';
 import { enforceImageModeration } from './moderation.js';
+import { PHOTO_PAUSED, reservePhotoUsage } from './photoUsage.js';
 import { collectImages, inspectImagePayload, reserveExtract } from './imageGuard.js';
 
 const FEATURES = new Set([
@@ -17,7 +18,7 @@ const FEATURES = new Set([
   'complete',
 ]);
 
-export async function handleAi(request, env, identity, featureFromPath) {
+export async function handleAi(request, env, identity, featureFromPath, options = {}) {
   const body = await readJson(request);
   const feature = FEATURES.has(featureFromPath)
     ? featureFromPath
@@ -41,12 +42,19 @@ export async function handleAi(request, env, identity, featureFromPath) {
       return errorJson('Try again in a moment.', 503);
     }
     for (const image of inspected.images) {
-      const moderated = await enforceImageModeration(env, identity, image);
+      const moderated = await enforceImageModeration(env, identity, image, options);
       if (moderated) return moderated;
     }
   }
   const consumed = await assertQuota(env, identity.uid);
   if (consumed.error) return consumed.error;
+
+  if (typeof body.image === 'string' && body.image) {
+    const reserved = await reservePhotoUsage(env, identity.uid, 'vision', options);
+    if (!reserved.allowed) {
+      return errorJson(reserved.reason === 'cap' ? PHOTO_PAUSED : PHOTO_UNAVAILABLE, 403);
+    }
+  }
 
   try {
     const result = await runLlm(env, {

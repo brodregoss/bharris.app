@@ -27,7 +27,7 @@ PhotoDNA and Hive are off. Turning either one on without a real client fails clo
 
 `strike_limit` is 5. The next photo is then refused until someone unsuspends the account, which also sets the strike count back to 0. See `docs/INCIDENT_PROCEDURE.md`.
 
-The alert webhook receives the account id, categories, severity, and time. It does not receive the image, the hash, the provider name, or the note text. An alert failure does not change the block.
+The alert is a Slack message, `{"text":"..."}`, with the account id, categories, severity, and time. It does not receive the image, the hash, the provider name, the note text, or an email address. An alert failure does not change the block.
 
 The moderation log stores the same kind of row: account id, time, provider, categories, severity, and a SHA-256 of the image bytes.
 

@@ -1,7 +1,7 @@
 export const APP_NAME = 'bharris.app';
 export const APP_VERSION = '1.0.0';
 export const LEGAL_UPDATED = 'October 9, 2026';
-export const LEGAL_EMAIL = 'broderickharris11@gmail.com';
+export const LEGAL_EMAIL = 'bharris.app@gmail.com';
 
 function asParagraphs(value) {
   if (!value) return [];
@@ -19,7 +19,7 @@ export function legalCopy(section) {
 export function legalRuns(text) {
   const value = String(text || '');
   const runs = [];
-  const re = /\*\*([^*]+)\*\*|(broderickharris11@gmail\.com)|(https:\/\/[^\s<>"']+)/g;
+  const re = /\*\*([^*]+)\*\*|(bharris\.app@gmail\.com)|(https:\/\/[^\s<>"']+)/g;
   let last = 0;
   let match = re.exec(value);
   while (match) {
@@ -58,7 +58,7 @@ export const ABOUT_SECTIONS = [
 export const TERMS_LEAD = [
   'These Terms of Service ("Terms") govern your use of bharris.app, including the website at https://bharris.broderickharris11.workers.dev and the iPhone application (collectively, the "Service"). The Service is operated by an individual in the United States, not a corporation or other separate business entity.',
   'By creating an account, accessing features that require an account, purchasing a subscription, or using the Service, you agree to these Terms. If you do not agree, do not use the Service.',
-  'For questions about these Terms, contact broderickharris11@gmail.com.',
+  'For questions about these Terms, contact bharris.app@gmail.com.',
 ];
 
 export const TERMS_SECTIONS = [
@@ -283,14 +283,14 @@ export const TERMS_SECTIONS = [
   },
   {
     title: '22. Contact',
-    body: 'Questions about these Terms can be sent to broderickharris11@gmail.com.',
+    body: 'Questions about these Terms can be sent to bharris.app@gmail.com.',
   },
 ];
 
 export const PRIVACY_LEAD = [
   'This Privacy Policy explains how bharris.app collects, uses, stores, and shares information when you use the website at https://bharris.broderickharris11.workers.dev or the iPhone application.',
   'bharris.app is operated by an individual in the United States, not a corporation or other separate business entity.',
-  'For privacy questions or requests, contact broderickharris11@gmail.com.',
+  'For privacy questions or requests, contact bharris.app@gmail.com.',
 ];
 
 export const PRIVACY_SECTIONS = [
@@ -555,7 +555,7 @@ export const PRIVACY_SECTIONS = [
     title: '13. Your Privacy Rights',
     body: [
       'Depending on where you live, you may have legal rights concerning your personal information. These rights may include rights to request access to, correction of, deletion of, or information about the processing of your personal information.',
-      'Users in California, the European Union, the European Economic Area, and other jurisdictions with applicable privacy laws may submit privacy requests to broderickharris11@gmail.com. We will evaluate and respond to requests according to applicable law.',
+      'Users in California, the European Union, the European Economic Area, and other jurisdictions with applicable privacy laws may submit privacy requests to bharris.app@gmail.com. We will evaluate and respond to requests according to applicable law.',
       'Deleting your account in Settings is how the data we hold is removed, with the limits in Account Deletion. We do not sell personal information for money. A privacy request does not change your price or your access, and it does not delete information Google already received to serve an ad.',
       'If you are in the EU or EEA, you can also complain to your local data protection authority.',
     ],
@@ -566,14 +566,14 @@ export const PRIVACY_SECTIONS = [
       'If California privacy law applies to you, you may have rights concerning your personal information, including certain rights to know, delete, correct, or limit certain uses of information.',
       'The Service does not sell your personal information for money. We do not use your notes or account information to build an advertising profile.',
       'On the iPhone app, Google AdMob may use device and ad-interaction information to deliver ads, as described under Advertising. If California law treats that use as a sale or a share, you can limit it in iPhone Settings under Privacy & Security, and at https://adssettings.google.com. Study and Partner study do not show these ads.',
-      'To submit a California privacy request, contact broderickharris11@gmail.com. We may need to verify your identity before completing certain requests.',
+      'To submit a California privacy request, contact bharris.app@gmail.com. We may need to verify your identity before completing certain requests.',
     ],
   },
   {
     title: '15. Children\'s Privacy',
     body: [
       'The Service does not check a user\'s age. The Service is **not intended for children under 13**, and ads in the iPhone app are not directed to children under 13.',
-      'Do not create an account if you are under 13. If you believe a child under 13 has provided personal information to the Service, contact broderickharris11@gmail.com. We will delete that account.',
+      'Do not create an account if you are under 13. If you believe a child under 13 has provided personal information to the Service, contact bharris.app@gmail.com. We will delete that account.',
     ],
   },
   {
@@ -598,7 +598,7 @@ export const PRIVACY_SECTIONS = [
   },
   {
     title: '19. Contact',
-    body: 'For privacy questions, requests, or concerns, contact broderickharris11@gmail.com.',
+    body: 'For privacy questions, requests, or concerns, contact bharris.app@gmail.com.',
   },
 ];
 

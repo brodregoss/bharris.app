@@ -8,7 +8,8 @@
     "FREE_AI_QUOTA": "5",
     "PRO_AI_QUOTA": "30",
     "FIREBASE_AUTH_HOST": "bharris-app.firebaseapp.com",
-    "PHOTO_FEATURE_ENABLED": "false"
+    "PHOTO_FEATURE_ENABLED": "false",
+    "SUPPORT_EMAIL": "bharris.app@gmail.com"
   },
   "d1_databases": [
     {

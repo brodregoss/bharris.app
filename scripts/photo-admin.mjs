@@ -1,7 +1,13 @@
 import { spawnSync } from 'node:child_process';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import moderationConfig from '../config/moderation.json' with { type: 'json' };
 import { generateAccessCode, hashAccessCode } from '../worker/src/photoAccess.js';
+import {
+  formatUsageReport,
+  usageBucketKeys,
+  usageCaps,
+} from '../worker/src/photoUsage.js';
 import { uidToBucket } from '../worker/src/routing.js';
 
 // Local photo admin commands. They stay on the local D1 database unless
@@ -31,16 +37,22 @@ const UID_RE = /^[A-Za-z0-9:._-]{1,128}$/;
 const HASH_RE = /^[0-9a-f]{64}$/;
 const ISO_RE = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d{3})?Z$/;
 const OPERATOR_RE = /^[A-Za-z0-9 .@_-]{1,80}$/;
+const REASON_RE = /^[A-Za-z0-9 .,:'’_/-]{1,160}$/;
+const CODE_SHAPE = /\b[0-9A-HJKMNP-TV-Z]{4}(?:-[0-9A-HJKMNP-TV-Z]{4}){5}-[0-9A-HJKMNP-TV-Z]{2}\b/;
 
 const HELP = `Photo admin commands stay on the local database unless you pass --allow-remote.
 
   node scripts/photo-admin.mjs generate [--uses 1] [--expires <ISO time>]
   node scripts/photo-admin.mjs list
   node scripts/photo-admin.mjs revoke --hash <64 hex chars>
+  node scripts/photo-admin.mjs revoke-all-codes --operator <name>
+  node scripts/photo-admin.mjs usage
+  node scripts/photo-admin.mjs suspend --uid <id> --operator <name> --reason <note>
   node scripts/photo-admin.mjs unsuspend --uid <id> --operator <name>
   node scripts/photo-admin.mjs flags [--uid <id>]
 
 generate prints the access code once. list and revoke show the hash, not the code.
+usage prints counts. suspend and revoke-all-codes do not print a code or a key.
 Set PHOTO_CODE_SECRET in the environment before generate. Do not put it in this file.`;
 
 function flagValue(args, name) {
@@ -92,6 +104,22 @@ export function formatRows(rows, fields) {
   ));
 }
 
+const USAGE_TABLE_SQL = `CREATE TABLE IF NOT EXISTS photo_usage (
+  kind TEXT NOT NULL,
+  bucket TEXT NOT NULL,
+  count INTEGER NOT NULL DEFAULT 0,
+  PRIMARY KEY (kind, bucket)
+)`;
+
+const ADMIN_LOG_SQL = `CREATE TABLE IF NOT EXISTS photo_admin_log (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  created_at TEXT NOT NULL,
+  operator TEXT NOT NULL,
+  action TEXT NOT NULL,
+  firebase_uid TEXT NOT NULL,
+  reason TEXT
+)`;
+
 const MODERATION_TABLE_SQL = `CREATE TABLE IF NOT EXISTS moderation_events (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   firebase_uid TEXT NOT NULL,
@@ -114,13 +142,7 @@ function ensureCodeTablesSql() {
       redeemed_at TEXT,
       created_at TEXT NOT NULL
     )`,
-    `CREATE TABLE IF NOT EXISTS photo_admin_log (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
-      created_at TEXT NOT NULL,
-      operator TEXT NOT NULL,
-      action TEXT NOT NULL,
-      firebase_uid TEXT NOT NULL
-    )`,
+    ADMIN_LOG_SQL,
   ];
 }
 
@@ -143,7 +165,9 @@ export function planPhotoAdmin(argv) {
     return { ok: false, code: 1, message: 'Pass either nothing (local) or --allow-remote, not both.' };
   }
   if (!command || command === 'help') return { ok: false, code: 1, message: HELP };
-  const known = new Set(['generate', 'list', 'revoke', 'unsuspend', 'flags']);
+  const known = new Set([
+    'generate', 'list', 'revoke', 'revoke-all-codes', 'usage', 'suspend', 'unsuspend', 'flags',
+  ]);
   if (!known.has(command)) return { ok: false, code: 1, message: HELP };
   return {
     ok: true,
@@ -155,6 +179,7 @@ export function planPhotoAdmin(argv) {
     hash: flagValue(args, '--hash'),
     uid: flagValue(args, '--uid'),
     operator: flagValue(args, '--operator'),
+    reason: flagValue(args, '--reason'),
   };
 }
 
@@ -199,6 +224,9 @@ export async function runPhotoAdmin({
   if (plan.command === 'generate') return generateCode(plan, env, exec, write, writeError, now);
   if (plan.command === 'list') return listCodes(plan, exec, write, writeError);
   if (plan.command === 'revoke') return revokeCode(plan, exec, write, writeError, now);
+  if (plan.command === 'revoke-all-codes') return revokeAllCodes(plan, exec, write, writeError, now, env);
+  if (plan.command === 'usage') return showUsage(plan, exec, write, writeError, now);
+  if (plan.command === 'suspend') return suspendAccount(plan, exec, write, writeError, now, env);
   if (plan.command === 'unsuspend') return unsuspend(plan, exec, write, writeError, now, env);
   return listFlags(plan, exec, write, writeError);
 }
@@ -293,9 +321,74 @@ async function revokeCode(plan, exec, write, writeError, now) {
   return 0;
 }
 
-async function unsuspend(plan, exec, write, writeError, now, env) {
+function reasonAllowed(reason) {
+  if (!REASON_RE.test(reason)) return false;
+  if (/data:image|base64,/i.test(reason)) return false;
+  if (CODE_SHAPE.test(reason)) return false;
+  return true;
+}
+
+function operatorName(plan, env) {
+  return plan.operator || String(env.PHOTO_ADMIN_OPERATOR || '').trim();
+}
+
+async function ensureAdminLog(exec, locationFlag) {
+  const created = await execSql(exec, APP_DB, ADMIN_LOG_SQL, locationFlag);
+  if (!created.ok) return created;
+  const altered = await exec(
+    APP_DB,
+    'ALTER TABLE photo_admin_log ADD COLUMN reason TEXT',
+    locationFlag,
+  );
+  if (altered?.ok) return { ok: true };
+  if (/duplicate column/i.test(String(altered?.error || ''))) return { ok: true };
+  return { ok: false, error: safeDbError(altered?.error) };
+}
+
+async function accountDatabase(exec, locationFlag, uid) {
+  const override = await execSql(
+    exec,
+    APP_DB,
+    `SELECT shard_binding FROM bucket_overrides WHERE firebase_uid = ${sqlString(uid)}`,
+    locationFlag,
+  );
+  let database = '';
+  if (override.ok && override.results[0]?.shard_binding) {
+    database = databaseForBinding(String(override.results[0].shard_binding));
+  } else if (!override.ok && override.error !== 'That table is not on this database yet.') {
+    return { ok: false, error: override.error };
+  }
+  if (!database) database = databaseForBucket(await uidToBucket(uid));
+  if (!database) return { ok: false, error: 'Could not find that account database.' };
+  return { ok: true, database };
+}
+
+async function showUsage(plan, exec, write, writeError, now) {
+  const ready = await execSql(exec, APP_DB, USAGE_TABLE_SQL, plan.locationFlag);
+  if (!ready.ok) {
+    writeError(ready.error);
+    return 1;
+  }
+  const keys = usageBucketKeys(now);
+  const listed = await execSql(
+    exec,
+    APP_DB,
+    `SELECT kind, bucket, count FROM photo_usage WHERE bucket = ${sqlString(keys.dayBucket)} OR bucket = ${sqlString(keys.monthBucket)} OR bucket LIKE ${sqlString(`user:%:day:${keys.day}`)}`,
+    plan.locationFlag,
+  );
+  if (!listed.ok) {
+    writeError(listed.error);
+    return 1;
+  }
+  formatUsageReport(listed.results, usageCaps(moderationConfig), keys.day, keys.month)
+    .forEach((line) => write(line));
+  return 0;
+}
+
+async function suspendAccount(plan, exec, write, writeError, now, env) {
   const uid = plan.uid;
-  const operator = plan.operator || String(env.PHOTO_ADMIN_OPERATOR || '').trim();
+  const operator = operatorName(plan, env);
+  const reason = plan.reason;
   if (!UID_RE.test(uid)) {
     writeError('Pass --uid with the account id.');
     return 1;
@@ -304,27 +397,108 @@ async function unsuspend(plan, exec, write, writeError, now, env) {
     writeError('Pass --operator with your name, or set PHOTO_ADMIN_OPERATOR.');
     return 1;
   }
-  const override = await execSql(
-    exec,
-    APP_DB,
-    `SELECT shard_binding FROM bucket_overrides WHERE firebase_uid = ${sqlString(uid)}`,
-    plan.locationFlag,
-  );
-  let database = '';
-  if (override.ok && override.results[0]?.shard_binding) {
-    database = databaseForBinding(String(override.results[0].shard_binding));
-  } else if (!override.ok && override.error !== 'That table is not on this database yet.') {
-    writeError(override.error);
+  if (!reasonAllowed(reason)) {
+    writeError('Pass --reason as a short note.');
     return 1;
   }
-  if (!database) database = databaseForBucket(await uidToBucket(uid));
-  if (!database) {
-    writeError('Could not find that account database.');
+  const located = await accountDatabase(exec, plan.locationFlag, uid);
+  if (!located.ok) {
+    writeError(located.error);
     return 1;
   }
   const updated = await execSql(
     exec,
-    database,
+    located.database,
+    `UPDATE users SET suspended = 1, updated_at = ${sqlString(now)} WHERE firebase_uid = ${sqlString(uid)}; SELECT firebase_uid, suspended, photo_strikes FROM users WHERE firebase_uid = ${sqlString(uid)}`,
+    plan.locationFlag,
+  );
+  if (!updated.ok) {
+    writeError(updated.error);
+    return 1;
+  }
+  const account = updated.results.at(-1);
+  if (!account || Number(account.suspended) !== 1) {
+    write('No account with that id.');
+    return 1;
+  }
+  const logged = await ensureAdminLog(exec, plan.locationFlag);
+  if (!logged.ok) {
+    writeError(logged.error);
+    return 1;
+  }
+  const inserted = await execSql(
+    exec,
+    APP_DB,
+    `INSERT INTO photo_admin_log (created_at, operator, action, firebase_uid, reason) VALUES (${sqlString(now)}, ${sqlString(operator)}, 'suspend', ${sqlString(uid)}, ${sqlString(reason)})`,
+    plan.locationFlag,
+  );
+  if (!inserted.ok) {
+    writeError(inserted.error);
+    return 1;
+  }
+  write(`suspended uid=${uid} operator=${operator} time=${now}`);
+  return 0;
+}
+
+async function revokeAllCodes(plan, exec, write, writeError, now, env) {
+  const operator = operatorName(plan, env);
+  if (!OPERATOR_RE.test(operator)) {
+    writeError('Pass --operator with your name, or set PHOTO_ADMIN_OPERATOR.');
+    return 1;
+  }
+  const ready = await execSql(exec, APP_DB, ensureCodeTablesSql()[0], plan.locationFlag);
+  if (!ready.ok) {
+    writeError(ready.error);
+    return 1;
+  }
+  const updated = await execSql(
+    exec,
+    APP_DB,
+    `UPDATE photo_access_codes SET revoked_at = ${sqlString(now)} WHERE revoked_at IS NULL AND use_count = 0`,
+    plan.locationFlag,
+  );
+  if (!updated.ok) {
+    writeError(updated.error);
+    return 1;
+  }
+  const logged = await ensureAdminLog(exec, plan.locationFlag);
+  if (!logged.ok) {
+    writeError(logged.error);
+    return 1;
+  }
+  const inserted = await execSql(
+    exec,
+    APP_DB,
+    `INSERT INTO photo_admin_log (created_at, operator, action, firebase_uid, reason) VALUES (${sqlString(now)}, ${sqlString(operator)}, 'revoke-all-codes', '-', NULL)`,
+    plan.locationFlag,
+  );
+  if (!inserted.ok) {
+    writeError(inserted.error);
+    return 1;
+  }
+  write(`revoked count=${Number(updated.changes) || 0}`);
+  return 0;
+}
+
+async function unsuspend(plan, exec, write, writeError, now, env) {
+  const uid = plan.uid;
+  const operator = operatorName(plan, env);
+  if (!UID_RE.test(uid)) {
+    writeError('Pass --uid with the account id.');
+    return 1;
+  }
+  if (!OPERATOR_RE.test(operator)) {
+    writeError('Pass --operator with your name, or set PHOTO_ADMIN_OPERATOR.');
+    return 1;
+  }
+  const located = await accountDatabase(exec, plan.locationFlag, uid);
+  if (!located.ok) {
+    writeError(located.error);
+    return 1;
+  }
+  const updated = await execSql(
+    exec,
+    located.database,
     `UPDATE users SET suspended = 0, photo_strikes = 0, updated_at = ${sqlString(now)} WHERE firebase_uid = ${sqlString(uid)}; SELECT firebase_uid, suspended, photo_strikes FROM users WHERE firebase_uid = ${sqlString(uid)}`,
     plan.locationFlag,
   );
@@ -337,18 +511,7 @@ async function unsuspend(plan, exec, write, writeError, now, env) {
     write('No account with that id.');
     return 1;
   }
-  const logged = await execSql(
-    exec,
-    APP_DB,
-    `CREATE TABLE IF NOT EXISTS photo_admin_log (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
-      created_at TEXT NOT NULL,
-      operator TEXT NOT NULL,
-      action TEXT NOT NULL,
-      firebase_uid TEXT NOT NULL
-    )`,
-    plan.locationFlag,
-  );
+  const logged = await ensureAdminLog(exec, plan.locationFlag);
   if (!logged.ok) {
     writeError(logged.error);
     return 1;

@@ -2,6 +2,8 @@ import moderationConfig from '../../config/moderation.json' with { type: 'json' 
 import { errorJson } from './util.js';
 import { addPhotoStrike, setUserSuspended } from './users.js';
 import { PHOTO_UNAVAILABLE } from './photoAccess.js';
+import { PHOTO_PAUSED, reservePhotoUsage } from './photoUsage.js';
+import { postSlackAlert } from './slackAlert.js';
 
 const OPENAI_MODERATION_URL = 'https://api.openai.com/v1/moderations';
 const VISION_URL = 'https://vision.googleapis.com/v1/images:annotate';
@@ -267,32 +269,22 @@ async function ensureModerationTables(env) {
   return moderationTablesReady;
 }
 
-export function moderationAlertBody(uid, result, time) {
-  const loud = result.severity === 'severe';
-  const text = loud ? 'SEVERE moderation flag' : 'Moderation flag';
-  return {
-    text,
-    content: text,
-    userId: uid,
-    categories: result.categories || [],
-    severity: result.ok ? result.severity : 'error',
-    time,
-  };
+function alertUserId(uid) {
+  const id = String(uid ?? '');
+  if (!id || id.includes('@') || /data:image|base64,/i.test(id)) return 'unknown';
+  return id;
+}
+
+export function moderationAlertText(uid, result, time) {
+  const loud = result?.severity === 'severe';
+  const headline = loud ? 'SEVERE moderation flag' : 'Moderation flag';
+  const severity = result?.ok ? result.severity : 'error';
+  const categories = Array.isArray(result?.categories) ? result.categories.join(',') : '';
+  return `${headline} userId=${alertUserId(uid)} severity=${severity} categories=${categories} time=${time}`;
 }
 
 async function sendAlert(env, uid, result, time, fetchImpl, timeoutMs) {
-  const url = String(env?.MODERATION_ALERT_WEBHOOK || '').trim();
-  if (!url) return;
-  try {
-    await fetchImpl(url, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(moderationAlertBody(uid, result, time)),
-      signal: AbortSignal.timeout(timeoutMs),
-    });
-  } catch {
-    // The image is still blocked. The alert body is never logged.
-  }
+  await postSlackAlert(env, moderationAlertText(uid, result, time), fetchImpl, timeoutMs);
 }
 
 async function recordEvents(env, uid, imageHash, decision, time) {
@@ -319,10 +311,14 @@ export async function enforceImageModeration(env, identity, dataUrl, options = {
   try {
     const decoded = decodeImageDataUrl(dataUrl);
     if (!decoded) return errorJson(imageRejectedMessage(options.config), 400);
+    const uid = String(identity?.uid || '');
+    const reserved = await reservePhotoUsage(env, uid, 'check', options);
+    if (!reserved.allowed) {
+      return errorJson(reserved.reason === 'cap' ? PHOTO_PAUSED : PHOTO_UNAVAILABLE, 403);
+    }
     const decision = await moderateBytes(decoded.bytes, decoded.contentType, env, options);
     const imageHash = await sha256Hex(decoded.bytes);
     const time = new Date().toISOString();
-    const uid = String(identity?.uid || '');
     try {
       await recordEvents(env, uid, imageHash, decision, time);
     } catch {

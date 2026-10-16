@@ -10,7 +10,7 @@ Set these in the Worker settings, not in the repo:
 - [ ] `GOOGLE_VISION_API_KEY`
 - [ ] `PHOTO_CODE_SECRET` (at least 32 characters)
 
-`SUPPORT_EMAIL` is optional. Leave it empty until the address is real. The suspension message omits an address when it is empty.
+`SUPPORT_EMAIL` is `bharris.app@gmail.com` in the Worker vars. Suspension and strike-limit messages include that address.
 
 ## Sample images
 

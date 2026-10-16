@@ -1,6 +1,18 @@
 {
   "strike_limit": 5,
   "timeout_ms": 5000,
+  "caps": {
+    "check": {
+      "global_daily_cap": 300,
+      "per_user_daily_cap": 60,
+      "global_monthly_cap": 5000
+    },
+    "vision": {
+      "global_daily_cap": 300,
+      "per_user_daily_cap": 100,
+      "global_monthly_cap": 5000
+    }
+  },
   "access_code": {
     "max_failures": 5,
     "lockout_ms": 900000

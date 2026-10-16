@@ -27,13 +27,15 @@ The live privacy policy in `src/lib/legal.js` does not yet name OpenAI and Googl
 - Notes: title, transcript, and terms. Not the photo.
 - Photo access codes as HMAC-SHA256 hashes only. The code itself is not stored and is not written to logs.
 - Moderation events: user id, time, provider, categories, severity, and a SHA-256 of the image bytes. Not the image.
-- Photo admin log: time, operator name, action, and user id. Written when an account is unsuspended. Not a code and not an image.
+- Photo admin log: time, operator name, action, and user id. Written when an account is unsuspended, when an account is suspended, and when unused access codes are revoked. A suspension also stores the operator's reason. Not a code and not an image.
+- Photo usage counters: kind (`check` or `vision`), a UTC day bucket, a UTC month bucket, or an account id with a UTC day, and a count. Not the image.
+- Photo usage alert markers: kind, bucket, threshold (`80` or `100`), and time. These global alerts do not store an account id.
 - Strike count and suspension flag on the account. Suspension does not delete the account. Unsuspend sets the strike count back to 0.
 
 ## What this app does not store
 
 - Photo bytes.
 - The photo access code. The generate command prints it once, then only the hash remains.
-- Image bytes, note text, or access codes in moderation logs, alert webhooks, worker error responses, or worker logs.
+- Image bytes, note text, email addresses, or access codes in moderation logs, alert webhooks, worker error responses, or worker logs. A moderation alert names the account id. A usage alert is a Slack text message with the counts and the time only.
 
 The current Worker configuration does not bind a photo-storage bucket. Older delete functions still remove objects for an account if a bucket is bound later. This inventory does not delete anything that already exists.

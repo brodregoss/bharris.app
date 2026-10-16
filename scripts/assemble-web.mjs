@@ -2,7 +2,7 @@ import { existsSync, readFileSync } from 'node:fs';
 import { cp, mkdir, rm, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { LEGAL_UPDATED, PRIVACY_LEAD, PRIVACY_SECTIONS, RENEWAL_NOTICE, TERMS_LEAD, TERMS_SECTIONS, legalCopy, legalRuns } from '../src/lib/legal.js';
+import { LEGAL_EMAIL, LEGAL_UPDATED, PRIVACY_LEAD, PRIVACY_SECTIONS, RENEWAL_NOTICE, TERMS_LEAD, TERMS_SECTIONS, legalCopy, legalRuns } from '../src/lib/legal.js';
 import { assertNoDraftLegal } from './check-draft-legal.mjs';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
@@ -2006,7 +2006,7 @@ function siteFooter() {
         </div>
         <div class="footer-col">
           <h3>Contact</h3>
-          <a href="mailto:broderickharris11@gmail.com">broderickharris11@gmail.com</a>
+          <a href="mailto:${escapeHtml(LEGAL_EMAIL)}">${escapeHtml(LEGAL_EMAIL)}</a>
         </div>
         <div class="footer-col">
           <h3>Socials</h3>
@@ -2343,7 +2343,7 @@ function contactPage(firebaseConfig) {
   <main class="contact-page reveal">
     <div class="contact-head">
       <h1>Contact</h1>
-      <p class="contact-email"><a href="mailto:broderickharris11@gmail.com">broderickharris11@gmail.com</a></p>
+      <p class="contact-email"><a href="mailto:${escapeHtml(LEGAL_EMAIL)}">${escapeHtml(LEGAL_EMAIL)}</a></p>
       <p class="lede">Questions about the app, a plan, or your account.</p>
     </div>
     <section class="faq" aria-labelledby="faq-title">
