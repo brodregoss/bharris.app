@@ -7,6 +7,8 @@ import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
 import { cn } from '@/lib/utils';
 import { saveManualNote } from '@/lib/notesUpload';
+import { hasAiConsent, setAiConsent } from '@/lib/aiConsent';
+import AiConsentModal from '@/components/account/AiConsentModal';
 
 function blankTerm() {
   return { id: `m${Date.now()}-${Math.random().toString(36).slice(2, 7)}`, term: '', definition: '' };
@@ -48,6 +50,7 @@ export default function CreateNotes() {
       : ''
   ));
   const [saving, setSaving] = React.useState(false);
+  const [showAiConsent, setShowAiConsent] = React.useState(false);
   const [items, setItems] = React.useState(() => {
     if (incoming?.kind === 'manual' && incoming.items?.length) {
       return incoming.items.map((t, i) => ({
@@ -71,8 +74,7 @@ export default function CreateNotes() {
     setItems((prev) => (prev.length <= 1 ? prev : prev.filter((t) => t.id !== id)));
   };
 
-  const continueSetup = async () => {
-    if (!canContinue || saving) return;
+  const proceedToSetup = async () => {
     setSaving(true);
     const nextItems = filled.map((t, i) => ({
       id: t.id || `m${i}`,
@@ -103,8 +105,33 @@ export default function CreateNotes() {
     });
   };
 
+  const continueSetup = async () => {
+    if (!canContinue || saving) return;
+    if (!hasAiConsent()) {
+      setShowAiConsent(true);
+      return;
+    }
+    proceedToSetup();
+  };
+
+  const handleAiConsentAccept = () => {
+    setAiConsent(true);
+    setShowAiConsent(false);
+    proceedToSetup();
+  };
+
+  const handleAiConsentDecline = () => {
+    setAiConsent(false);
+    setShowAiConsent(false);
+  };
+
   return (
     <div className="min-h-[100dvh] bg-background text-foreground flex flex-col">
+      <AiConsentModal
+        open={showAiConsent}
+        onAccept={handleAiConsentAccept}
+        onDecline={handleAiConsentDecline}
+      />
       <header className="px-3 pt-safe pb-2 flex items-center gap-1">
         <button
           type="button"

@@ -1,4 +1,5 @@
 import { clearPhoto } from '@/lib/imageData';
+import { clearAiConsent } from '@/lib/aiConsent';
 
 const UID_KEY = 'lms_active_uid';
 const LEGACY_KEYS = [
@@ -12,6 +13,7 @@ const ACCOUNT_KEYS = [
   ...LEGACY_KEYS,
   'lms_greeting_name_v1',
   'lms_note_sets_v1',
+  'ai_consent_accepted',
 ];
 
 export function getActiveUid() {
@@ -59,6 +61,7 @@ export function clearAccountLocalData(uid) {
   localStorage.removeItem('lms_openai_api_key');
   localStorage.removeItem(UID_KEY);
   clearPhoto();
+  clearAiConsent();
 }
 
 export function userStorageKey(base) {

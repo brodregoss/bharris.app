@@ -15,6 +15,8 @@ import {
   refreshNotesScanUnlock,
   unlockNotesScan,
 } from '@/lib/notesScanLock';
+import { hasAiConsent, setAiConsent } from '@/lib/aiConsent';
+import AiConsentModal from '@/components/account/AiConsentModal';
 
 export default function Welcome() {
   const navigate = useNavigate();
@@ -24,6 +26,8 @@ export default function Welcome() {
   const [unlocked, setUnlocked] = React.useState(() => notesScanUnlocked());
   const [scanPassword, setScanPassword] = React.useState('');
   const [checkingPassword, setCheckingPassword] = React.useState(false);
+  const [showAiConsent, setShowAiConsent] = React.useState(false);
+  const [pendingFiles, setPendingFiles] = React.useState(null);
   const inputRef = React.useRef(null);
 
   React.useEffect(() => {
@@ -58,16 +62,16 @@ export default function Welcome() {
     }
   };
 
-  const takeFiles = async (fileList) => {
-    if (reading || !notesScanUnlocked()) return;
-    const checked = validateNotePhotos(fileList);
-    if (checked.error) {
-      setReadError(checked.error);
-      return;
-    }
+  const processFiles = async (fileList) => {
     setReadError('');
     setReading(true);
     try {
+      const checked = validateNotePhotos(fileList);
+      if (checked.error) {
+        setReadError(checked.error);
+        setReading(false);
+        return;
+      }
       const images = [];
       for (const file of checked.files) {
         images.push(await fileToJpegDataUrl(file));
@@ -88,7 +92,6 @@ export default function Welcome() {
           setReading(false);
           return;
         }
-        // Extract still runs from the in-memory photos; R2 persist can retry later.
       }
       navigate('/highlight-notes', {
         state: { source: { ...makePhotoSource({ name, title: '', noteId }), noteId } },
@@ -99,6 +102,37 @@ export default function Welcome() {
     }
   };
 
+  const takeFiles = async (fileList) => {
+    if (reading || !notesScanUnlocked()) return;
+    const checked = validateNotePhotos(fileList);
+    if (checked.error) {
+      setReadError(checked.error);
+      return;
+    }
+    if (!hasAiConsent()) {
+      setPendingFiles(fileList);
+      setShowAiConsent(true);
+      return;
+    }
+    processFiles(fileList);
+  };
+
+  const handleAiConsentAccept = () => {
+    setAiConsent(true);
+    setShowAiConsent(false);
+    if (pendingFiles) {
+      processFiles(pendingFiles);
+      setPendingFiles(null);
+    }
+  };
+
+  const handleAiConsentDecline = () => {
+    setAiConsent(false);
+    setShowAiConsent(false);
+    setPendingFiles(null);
+    setReadError('AI features are required to scan notes. You can create notes manually instead.');
+  };
+
   const onDrop = (e) => {
     e.preventDefault();
     setDragging(false);
@@ -107,6 +141,11 @@ export default function Welcome() {
 
   return (
     <div className="min-h-[100dvh] bg-background text-foreground flex flex-col">
+      <AiConsentModal
+        open={showAiConsent}
+        onAccept={handleAiConsentAccept}
+        onDecline={handleAiConsentDecline}
+      />
       <header className="px-5 pt-safe">
         {canGoBack ? (
           <button
