@@ -1,6 +1,6 @@
 export const APP_NAME = 'bharris.app';
 export const APP_VERSION = '1.0.0';
-export const LEGAL_UPDATED = 'October 8, 2026';
+export const LEGAL_UPDATED = 'October 16, 2026';
 export const LEGAL_EMAIL = 'broderickharris11@gmail.com';
 
 function asParagraphs(value) {
@@ -79,7 +79,7 @@ export const TERMS_SECTIONS = [
     title: '3. Your Account',
     body: [
       'Studying requires an account. The website and iPhone application use the same account.',
-      'You must be at least 13. Do not create an account if you are under 13. The Service does not check age at sign-up.',
+      'You must be at least 18 years old to use the Service, or between 13 and 17 with parental or guardian permission. Do not create an account if you are under 13. The Service does not check age at sign-up.',
       'You may edit your display name, up to 80 characters.',
       'You are responsible for:',
     ],
@@ -530,6 +530,7 @@ export const PRIVACY_SECTIONS = [
     title: '14. Children\'s Privacy',
     body: [
       'The Service does not check a user\'s age. The Service is **not intended for children under 13**.',
+      'Users must be at least 18 years old, or between 13 and 17 with parental or guardian permission.',
       'Do not create an account if you are under 13. If you believe a child under 13 has provided personal information to the Service, contact broderickharris11@gmail.com. We will delete that account.',
     ],
   },

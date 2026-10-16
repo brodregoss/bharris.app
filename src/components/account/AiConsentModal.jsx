@@ -54,7 +54,7 @@ export default function AiConsentModal({ open, onAccept, onDecline }) {
             <div>
               <p className="text-sm font-medium">Age requirement</p>
               <p className="text-xs text-muted-foreground">
-                You must be 13 or older to use this feature.
+                You must be 18 or older, or 13–17 with parental permission.
               </p>
             </div>
           </div>
