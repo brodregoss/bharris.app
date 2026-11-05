@@ -15,9 +15,12 @@ import {
   Pencil,
   Trash2,
   Loader2,
+  Moon,
+  Sun,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Progress } from '@/components/ui/progress';
+import { useTheme } from 'next-themes';
 import { useAuth } from '@/lib/AuthContext';
 import ChangePasswordSheet from '@/components/account/ChangePasswordSheet';
 import EditNameSheet from '@/components/account/EditNameSheet';
@@ -146,6 +149,8 @@ function UsageBlock({ heading, person, onUpgrade, loading = false }) {
 
 export default function Settings() {
   const navigate = useNavigate();
+  const { resolvedTheme, setTheme } = useTheme();
+  const light = resolvedTheme === 'light';
   const { user, firebaseUser, logout, deleteAccount } = useAuth();
   const { openPaywall } = usePaywall();
   const [doc, setDoc] = React.useState(null);
@@ -251,6 +256,34 @@ export default function Settings() {
                   <Pencil className="w-3.5 h-3.5" />
                 </button>
               </div>
+            </div>
+          </div>
+
+          <div className="mt-6">
+            <p className="px-1 text-sm font-medium text-muted-foreground">Appearance</p>
+            <div className="mt-2 grid grid-cols-2 gap-1 rounded-full bg-surface-2 p-1" role="group" aria-label="Appearance">
+              <button
+                type="button"
+                aria-pressed={!light}
+                onClick={() => setTheme('dark')}
+                className={`flex h-11 items-center justify-center gap-2 rounded-full text-sm font-semibold ${
+                  light ? 'text-muted-foreground' : 'bg-background text-foreground'
+                }`}
+              >
+                <Moon className="h-4 w-4" />
+                Dark
+              </button>
+              <button
+                type="button"
+                aria-pressed={light}
+                onClick={() => setTheme('light')}
+                className={`flex h-11 items-center justify-center gap-2 rounded-full text-sm font-semibold ${
+                  light ? 'bg-background text-foreground' : 'text-muted-foreground'
+                }`}
+              >
+                <Sun className="h-4 w-4" />
+                Light
+              </button>
             </div>
           </div>
 

@@ -14,6 +14,7 @@ import {
 } from '@/lib/notesScanLock';
 import { hasAiConsent, setAiConsent } from '@/lib/aiConsent';
 import AiConsentModal from '@/components/account/AiConsentModal';
+import AppLogo from '@/components/AppLogo';
 
 export default function Welcome() {
   const navigate = useNavigate();
@@ -156,8 +157,9 @@ export default function Welcome() {
         <div className="max-w-md mx-auto w-full flex-1 flex flex-col">
           <div className="pt-6 pb-8 text-center">
             <p className="text-label uppercase text-muted-foreground">Welcome To</p>
-            <h1 className="mt-3 text-display text-foreground">
+            <h1 className="mt-3 flex items-center justify-center gap-[0.22em] text-display text-foreground">
               bharris.app
+              <AppLogo className="h-[0.85em] w-auto" />
             </h1>
             <p className="mt-4 text-meta text-muted-foreground">Lets get moving</p>
           </div>

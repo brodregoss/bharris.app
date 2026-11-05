@@ -3,33 +3,32 @@
 @tailwind utilities;
 
 @layer base {
-  :root,
-  .dark {
-    --c-bg: 0 0 0;
-    --c-surface-1: 17 17 19;
-    --c-surface-2: 26 26 29;
-    --c-text: 245 245 247;
-    --c-text-2: 161 161 170;
-    --c-text-3: 110 110 120;
-    --c-accent: 185 220 251;
+  :root {
+    --c-bg: 255 255 255;
+    --c-surface-1: 244 244 245;
+    --c-surface-2: 228 228 231;
+    --c-text: 17 17 19;
+    --c-text-2: 82 82 91;
+    --c-text-3: 113 113 122;
+    --c-accent: 147 197 232;
     --c-accent-ink: 10 22 36;
-    --c-know: 74 222 128;
-    --c-shaky: 251 191 36;
-    --c-blank: 248 113 113;
-    --c-line: 255 255 255;
+    --c-know: 22 163 74;
+    --c-shaky: 180 83 9;
+    --c-blank: 220 38 38;
+    --c-line: 0 0 0;
 
-    --bg: #000000;
-    --surface-1: #111113;
-    --surface-2: #1A1A1D;
-    --border: rgba(255, 255, 255, 0.08);
-    --text-primary: #F5F5F7;
-    --text-secondary: #A1A1AA;
-    --text-tertiary: #6E6E78;
-    --accent: #B9DCFB;
+    --bg: #ffffff;
+    --surface-1: #f4f4f5;
+    --surface-2: #e4e4e7;
+    --border: rgba(0, 0, 0, 0.08);
+    --text-primary: #111113;
+    --text-secondary: #52525b;
+    --text-tertiary: #71717a;
+    --accent: #93C5E8;
     --accent-ink: #0A1624;
-    --know: #4ADE80;
-    --shaky: #FBBF24;
-    --blank: #F87171;
+    --know: #16a34a;
+    --shaky: #b45309;
+    --blank: #dc2626;
 
     --radius-card: 24px;
     --radius-input: 20px;
@@ -52,6 +51,34 @@
     --font-body: Inter, ui-sans-serif, system-ui, sans-serif;
     --font-display: Inter, ui-sans-serif, system-ui, sans-serif;
     --font-mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+  }
+
+  .dark {
+    --c-bg: 0 0 0;
+    --c-surface-1: 32 32 36;
+    --c-surface-2: 46 46 51;
+    --c-text: 245 245 247;
+    --c-text-2: 174 174 182;
+    --c-text-3: 132 132 142;
+    --c-accent: 185 220 251;
+    --c-accent-ink: 10 22 36;
+    --c-know: 74 222 128;
+    --c-shaky: 251 191 36;
+    --c-blank: 248 113 113;
+    --c-line: 255 255 255;
+
+    --bg: #000000;
+    --surface-1: #202024;
+    --surface-2: #2E2E33;
+    --border: rgba(255, 255, 255, 0.08);
+    --text-primary: #F5F5F7;
+    --text-secondary: #AEAEB6;
+    --text-tertiary: #84848E;
+    --accent: #B9DCFB;
+    --accent-ink: #0A1624;
+    --know: #4ADE80;
+    --shaky: #FBBF24;
+    --blank: #F87171;
   }
 }
 
@@ -87,7 +114,10 @@
     padding-right: env(safe-area-inset-right, 0px);
   }
 
-  html,
+  html {
+    color-scheme: light;
+  }
+
   html.dark {
     color-scheme: dark;
   }

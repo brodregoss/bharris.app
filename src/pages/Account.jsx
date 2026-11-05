@@ -8,6 +8,7 @@ import { beginSocialSignup, cancelSocialSignup, settleSocialSignup } from '@/lib
 import AppleSignInButton from '@/components/account/AppleSignInButton';
 import GoogleSignInButton from '@/components/account/GoogleSignInButton';
 import TermsNotice from '@/components/account/TermsNotice';
+import AppLogo from '@/components/AppLogo';
 
 export default function Account() {
   const navigate = useNavigate();
@@ -80,8 +81,9 @@ export default function Account() {
     <div className="min-h-[100dvh] bg-background text-foreground flex flex-col">
       <div className="flex-1 flex flex-col items-center justify-center px-6 pt-safe text-center">
         <p className="text-label uppercase text-muted-foreground">Welcome To</p>
-        <h1 className="mt-3 text-display text-foreground">
+        <h1 className="mt-3 flex items-center justify-center gap-[0.22em] text-display text-foreground">
           bharris.app
+          <AppLogo className="h-[0.85em] w-auto" />
         </h1>
         <p className="mt-4 text-meta text-muted-foreground">Create an account or sign back in</p>
         {(authError || socialError) && (

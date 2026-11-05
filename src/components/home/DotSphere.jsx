@@ -182,11 +182,11 @@ export default function DotSphere({ className = '' }) {
         motion.current.dragging = false;
       }}
     >
-      <canvas ref={canvasRef} className="h-full w-full text-white" aria-hidden="true" />
+      <canvas ref={canvasRef} className="h-full w-full text-foreground" aria-hidden="true" />
       <p
         ref={textRef}
         hidden
-        className="pointer-events-none absolute left-1/2 top-1/2 w-[38%] -translate-x-1/2 -translate-y-1/2 text-center font-normal leading-snug text-white"
+        className="pointer-events-none absolute left-1/2 top-1/2 w-[38%] -translate-x-1/2 -translate-y-1/2 text-center font-normal leading-snug text-foreground"
         style={{ opacity: 0, fontSize: 'clamp(12px, 4.2cqw, 20px)' }}
       >
         {PHRASE}

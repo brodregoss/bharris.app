@@ -19,11 +19,10 @@ import { continueStudyPath, normalizeStudyMode, STUDY_MODE, trueCramPracticeStat
 import { spacedContinueLabel } from '@/lib/spacedCram';
 import { useDebug } from '@/lib/DebugContext';
 import { useAuth } from '@/lib/AuthContext';
-import { applyNativeChrome } from '@/components/NativeChrome';
-import { useTheme } from 'next-themes';
 import { planForUser } from '@/lib/plans';
 import UsernameSheet from '@/components/account/UsernameSheet';
 import DotSphere from '@/components/home/DotSphere';
+import AppLogo from '@/components/AppLogo';
 import {
   formatCount,
   minutesCutTotal,
@@ -47,12 +46,7 @@ const STATS = [
 export default function Landing() {
   const navigate = useNavigate();
   const dbg = useDebug();
-  const { resolvedTheme } = useTheme();
   const { user, firebaseUser } = useAuth();
-  React.useEffect(() => {
-    applyNativeChrome(true);
-    return () => applyNativeChrome(resolvedTheme === 'dark');
-  }, [resolvedTheme]);
   const [now, setNow] = React.useState(() => new Date());
   const [confirmNew, setConfirmNew] = React.useState(false);
   const [usernameOpen, setUsernameOpen] = React.useState(false);
@@ -153,11 +147,12 @@ export default function Landing() {
   const box = 'h-14 rounded-full text-base font-semibold transition-[transform,background-color] duration-300 ease-[cubic-bezier(0.22,1,0.36,1)] hover:-translate-y-0.5 active:translate-y-0 active:duration-100';
 
   return (
-    <div className="dark min-h-[100dvh] bg-black text-white">
+    <div className="min-h-[100dvh] bg-background text-foreground">
       <div className="mx-auto flex min-h-[100dvh] w-full flex-col px-5 sm:px-10 xl:px-16">
-      <header className="flex items-start justify-between gap-3 pt-safe">
-        <h1 className="min-w-0 pt-1 text-[2.65rem] font-bold leading-none tracking-tight sm:text-5xl">
-          bharris.app
+      <header className="flex items-center justify-between gap-3 pt-safe">
+        <h1 className="flex min-w-0 items-center gap-[0.22em] pt-1 text-[clamp(1.7rem,7vw,2.65rem)] font-bold leading-none tracking-tight sm:text-5xl">
+          <span className="truncate">bharris.app</span>
+          <AppLogo className="h-[0.92em] w-auto shrink-0" />
         </h1>
         <div className="flex shrink-0 items-center">
           <button
@@ -221,8 +216,8 @@ export default function Landing() {
                   onClick={() => showStat(index)}
                   className={
                     index === statIndex
-                      ? 'text-left text-sm font-semibold text-white'
-                      : 'text-left text-sm text-white/40 hover:text-white/70'
+                      ? 'text-left text-sm font-semibold text-foreground'
+                      : 'text-left text-sm text-muted-foreground hover:text-foreground'
                   }
                 >
                   {item.label}
@@ -231,7 +226,7 @@ export default function Landing() {
             </div>
             {pace ? (
               <p className="mt-4 flex flex-wrap items-baseline gap-x-3" aria-label={pace.text}>
-                <span className="text-base font-medium tracking-tight text-white lg:text-lg">{pace.target}</span>
+                <span className="text-base font-medium tracking-tight text-foreground lg:text-lg">{pace.target}</span>
                 <span
                   className={
                     pace.tone === 'behind'
@@ -243,7 +238,7 @@ export default function Landing() {
                 </span>
               </p>
             ) : (
-              <p className="mt-4 text-sm font-medium text-white/50">Pace shows once you start.</p>
+              <p className="mt-4 text-sm font-medium text-muted-foreground">Pace shows once you start.</p>
             )}
             <p className="mt-4 max-w-sm text-base font-bold leading-snug text-muted-foreground lg:mt-5 lg:text-lg">
               {quote}
@@ -321,10 +316,9 @@ export default function Landing() {
         open={usernameOpen}
         onOpenChange={setUsernameOpen}
         username={username}
-        className="dark"
       />
       <AlertDialog open={confirmNew} onOpenChange={setConfirmNew}>
-        <AlertDialogContent className="dark rounded-card max-w-sm">
+        <AlertDialogContent className="rounded-card max-w-sm">
           <AlertDialogHeader>
             <AlertDialogTitle>Start a new cram?</AlertDialogTitle>
             <AlertDialogDescription>

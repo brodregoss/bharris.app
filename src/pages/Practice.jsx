@@ -16,6 +16,7 @@ import PracticeTest from '@/components/study/PracticeTest';
 import PracticeFlashcards from '@/components/practice/PracticeFlashcards';
 import SmartDefMode from '@/components/practice/SmartDefMode';
 import ExplainIt from '@/components/practice/ExplainIt';
+import AppLogo from '@/components/AppLogo';
 import { loadPracticeSource, savePracticeTerms } from '@/lib/sessionStore';
 import {
   withInferredMastery,
@@ -438,9 +439,14 @@ export default function Practice() {
     return (
       <div className="min-h-[100dvh] bg-background text-foreground flex flex-col">
         <header className="px-5 pt-safe">
-          <Button variant="ghost" size="icon" onClick={() => navigate('/')} aria-label="Back" className="-ml-2">
-            <ArrowLeft className="w-5 h-5" />
-          </Button>
+          <button
+            type="button"
+            onClick={() => navigate('/')}
+            aria-label="Home"
+            className="-ml-1 flex h-11 items-center"
+          >
+            <AppLogo className="h-8 w-auto" />
+          </button>
           <h1 className="mt-2 text-[2.5rem] font-bold leading-none tracking-tight">Practice</h1>
         </header>
         <div className="flex-1 flex flex-col items-center justify-center px-8 text-center">
@@ -455,15 +461,26 @@ export default function Practice() {
 
   const renderHeader = (which) => (
     <header className="px-5 pt-safe">
-      <Button
-        variant="ghost"
-        size="icon"
-        onClick={() => (which === 'hub' ? navigate('/') : setMode('hub'))}
-        aria-label="Back"
-        className="-ml-2"
-      >
-        <ArrowLeft className="w-5 h-5" />
-      </Button>
+      {which === 'hub' ? (
+        <button
+          type="button"
+          onClick={() => navigate('/')}
+          aria-label="Home"
+          className="-ml-1 flex h-11 items-center"
+        >
+          <AppLogo className="h-8 w-auto" />
+        </button>
+      ) : (
+        <Button
+          variant="ghost"
+          size="icon"
+          onClick={() => setMode('hub')}
+          aria-label="Back"
+          className="-ml-2"
+        >
+          <ArrowLeft className="w-5 h-5" />
+        </Button>
+      )}
     </header>
   );
 

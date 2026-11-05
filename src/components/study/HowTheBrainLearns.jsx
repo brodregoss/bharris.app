@@ -421,7 +421,7 @@ function EffortGauge({ value }) {
   const color = effortColor(value);
 
   return (
-    <div className="text-white">
+    <div className="text-foreground">
       <svg viewBox="0 0 160 108" className="block h-auto w-full" aria-hidden="true">
         <path d={arcPath(cx, cy, r, 180, 112)} stroke="#3cba6f" strokeWidth="11" fill="none" strokeLinecap="butt" />
         <path d={arcPath(cx, cy, r, 112, 52)} stroke="#e0b03a" strokeWidth="11" fill="none" />
@@ -449,7 +449,7 @@ function EffortGauge({ value }) {
         <text x="122" y="102" fill="#a8a29e" fontSize="8" fontFamily="ui-monospace, monospace">
           HIGH
         </text>
-        <polygon points={needlePoints(cx, cy, angle, 48, 3.2)} fill="#f5f5f4" />
+        <polygon points={needlePoints(cx, cy, angle, 48, 3.2)} fill="currentColor" />
         <polygon points={needlePoints(cx, cy, angle, 16, 2)} fill={color} />
         <circle cx={cx} cy={cy} r="6" fill="#e7e5e4" />
         <circle cx={cx} cy={cy} r="2.2" fill="#111113" />

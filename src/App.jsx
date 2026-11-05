@@ -104,7 +104,7 @@ function AppRoutes({ location }) {
 
 function App() {
   return (
-    <ThemeProvider attribute="class" forcedTheme="dark" enableSystem={false} storageKey="bharris-theme">
+    <ThemeProvider attribute="class" defaultTheme="dark" enableSystem={false} storageKey="bharris-theme">
       <NativeChrome />
       <AuthProvider>
         <QueryClientProvider client={queryClientInstance}>
