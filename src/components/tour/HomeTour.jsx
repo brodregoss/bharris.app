@@ -390,7 +390,7 @@ export default function HomeTour() {
         <DialogContent className="max-w-sm rounded-card">
           <DialogHeader>
             <DialogTitle>Want a quick look around?</DialogTitle>
-            <DialogDescription>A few seconds on where things are.</DialogDescription>
+            <DialogDescription>Less than 1 min on where things are.</DialogDescription>
           </DialogHeader>
           <div className="flex flex-col gap-2">
             <Button type="button" className="h-12 rounded-full" onClick={start}>

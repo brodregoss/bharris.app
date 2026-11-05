@@ -185,6 +185,11 @@ export default function PastSessions() {
   }, [cap]);
 
   const openSession = (session) => {
+    if (session.current && session.currentKind === 'notes') {
+      const notes = loadPracticeSource();
+      navigate('/practice', notes?.session ? { state: { session: notes.session, kind: 'notes' } } : undefined);
+      return;
+    }
     if (session.current && session.currentKind !== 'finished') {
       navigate(continueStudyPath(loadSession()?.setup || session.setup));
       return;

@@ -1,4 +1,4 @@
-import { parseUsername } from '../../src/lib/username.js';
+import { parseUsername, usernameChangeReadyAt } from '../../src/lib/username.js';
 
 const ATTEMPT_WINDOW_MS = 60 * 60 * 1000;
 export const USERNAME_ATTEMPT_LIMIT = 8;
@@ -11,9 +11,16 @@ async function migrateUsernameTables(env) {
       username TEXT PRIMARY KEY,
       firebase_uid TEXT NOT NULL UNIQUE,
       created_at TEXT NOT NULL,
-      updated_at TEXT NOT NULL
+      updated_at TEXT NOT NULL,
+      renamed_at TEXT
     )`,
   ).run();
+  try {
+    await env.APP.prepare('ALTER TABLE usernames ADD COLUMN renamed_at TEXT').run();
+  } catch (err) {
+    const message = String(err?.message || err?.cause?.message || '');
+    if (!/duplicate column/i.test(message)) throw err;
+  }
   await env.APP.prepare(
     `CREATE TABLE IF NOT EXISTS username_attempts (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -64,13 +71,34 @@ async function noteAttempt(env, uid) {
   ]);
 }
 
-export async function usernameFor(env, uid) {
-  if (!uid) return '';
+const USERNAME_ROW_SQL = 'SELECT username, created_at, updated_at, renamed_at FROM usernames WHERE firebase_uid = ?';
+
+export async function usernameRecord(env, uid) {
+  if (!uid) return { username: '', changedAt: '' };
   await ensureUsernameTables(env);
-  const row = await env.APP.prepare('SELECT username FROM usernames WHERE firebase_uid = ?')
-    .bind(uid)
+  const row = await env.APP.prepare(USERNAME_ROW_SQL).bind(uid).first();
+  return {
+    username: row?.username || '',
+    changedAt: row?.renamed_at || '',
+  };
+}
+
+export async function usernameFor(env, uid) {
+  const record = await usernameRecord(env, uid);
+  return record.username;
+}
+
+export async function usernameAvailability(env, raw, uid = '') {
+  const parsed = parseUsername(raw);
+  if (parsed.error) return { error: parsed.error };
+  await ensureUsernameTables(env);
+  const row = await env.APP.prepare(
+    'SELECT firebase_uid FROM usernames WHERE username = ?',
+  )
+    .bind(parsed.username)
     .first();
-  return row?.username || '';
+  const taken = !!row?.firebase_uid && row.firebase_uid !== uid;
+  return { username: parsed.username, available: !taken };
 }
 
 export async function releaseUsername(env, uid) {
@@ -84,12 +112,11 @@ export async function claimUsername(env, uid, raw) {
   const parsed = parseUsername(raw);
   if (parsed.error) return { error: { message: parsed.error, status: 400 } };
   await ensureUsernameTables(env);
-  const current = await env.APP.prepare(
-    'SELECT username, created_at FROM usernames WHERE firebase_uid = ?',
-  )
-    .bind(uid)
-    .first();
+  const current = await env.APP.prepare(USERNAME_ROW_SQL).bind(uid).first();
   if (current?.username === parsed.username) return { username: parsed.username };
+  if (current?.username && usernameChangeReadyAt(current.renamed_at)) {
+    return { error: { message: 'You can change your username once a day.', status: 429 } };
+  }
   if (await tooManyAttempts(env, uid)) {
     return { error: { message: 'Too many tries. Wait an hour and try again.', status: 429 } };
   }
@@ -98,9 +125,9 @@ export async function claimUsername(env, uid, raw) {
   try {
     if (current?.username) {
       await env.APP.prepare(
-        'UPDATE usernames SET username = ?, updated_at = ? WHERE firebase_uid = ?',
+        'UPDATE usernames SET username = ?, updated_at = ?, renamed_at = ? WHERE firebase_uid = ?',
       )
-        .bind(parsed.username, now, uid)
+        .bind(parsed.username, now, now, uid)
         .run();
     } else {
       await env.APP.prepare(

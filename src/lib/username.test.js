@@ -1,10 +1,19 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { parseUsername, typedUsername } from './username.js';
-import { USERNAME_ATTEMPT_LIMIT, claimUsername, releaseUsername, usernameFor } from '../../worker/src/usernames.js';
+import { parseUsername, typedUsername, usernameChangeReadyAt } from './username.js';
+import { USERNAME_ATTEMPT_LIMIT, claimUsername, releaseUsername, usernameAvailability, usernameFor } from '../../worker/src/usernames.js';
 
 test('typing keeps only the characters a username can use', () => {
   assert.equal(typedUsername(' @Ada Lovelace! '), 'adalovelace');
+});
+
+test('a username change waits a day after the last change', () => {
+  const changed = '2026-11-05T12:00:00.000Z';
+  const during = Date.parse('2026-11-05T18:00:00.000Z');
+  const after = Date.parse('2026-11-06T12:00:00.000Z');
+  assert.ok(usernameChangeReadyAt(changed, during) > during);
+  assert.equal(usernameChangeReadyAt(changed, after), 0);
+  assert.equal(usernameChangeReadyAt('', during), 0);
 });
 
 test('a username is lowercase, letter-first, and not reserved', () => {
@@ -16,6 +25,27 @@ test('a username is lowercase, letter-first, and not reserved', () => {
   assert.equal(parseUsername('admin').error, 'Choose a different username.');
   assert.equal(parseUsername('ADMIN').error, 'Choose a different username.');
   assert.equal(parseUsername('ada lovelace').error, 'Start with a letter. Then use letters, numbers, and single underscores.');
+});
+
+test('usernames cannot pose as bharris.app', () => {
+  for (const name of [
+    'bharris',
+    'bharrisapp',
+    'bharrissupport',
+    'bharrissuppport',
+    'bharris_app',
+    'bharris_support',
+    'the_bharris',
+    'realbharris',
+    'b_harris',
+    'bharr1s',
+    'bh4rrisapp',
+    'bhharris',
+  ]) {
+    assert.equal(parseUsername(name).error, 'Choose a different username.', name);
+  }
+  assert.equal(parseUsername('harris').username, 'harris');
+  assert.equal(parseUsername('ada_app').username, 'ada_app');
 });
 
 function createApp() {
@@ -33,18 +63,18 @@ function createApp() {
 
   function exec(sql, args) {
     const text = sql.replace(/\s+/g, ' ').trim();
-    if (text.startsWith('CREATE')) return {};
+    if (text.startsWith('CREATE') || text.startsWith('ALTER')) return {};
     if (text.startsWith('SELECT COUNT(*) AS n FROM username_attempts')) {
       const [uid, since] = args;
       const n = attempts.filter((row) => row.firebase_uid === uid && row.attempted_at > since).length;
       return { first: { n } };
     }
-    if (text.startsWith('SELECT username, created_at FROM usernames')) {
-      return { first: names.find((row) => row.firebase_uid === args[0]) || null };
+    if (text.startsWith('SELECT firebase_uid FROM usernames WHERE username')) {
+      const row = names.find((item) => item.username === args[0]);
+      return { first: row ? { firebase_uid: row.firebase_uid } : null };
     }
-    if (text.startsWith('SELECT username FROM usernames')) {
-      const row = names.find((item) => item.firebase_uid === args[0]);
-      return { first: row ? { username: row.username } : null };
+    if (text.startsWith('SELECT username, created_at, updated_at, renamed_at FROM usernames')) {
+      return { first: names.find((row) => row.firebase_uid === args[0]) || null };
     }
     if (text.startsWith('DELETE FROM username_attempts WHERE attempted_at')) {
       const since = args[0];
@@ -65,7 +95,7 @@ function createApp() {
       return {};
     }
     if (text.startsWith('UPDATE usernames SET username')) {
-      const [username, updated_at, firebase_uid] = args;
+      const [username, updated_at, renamed_at, firebase_uid] = args;
       if (names.some((row) => row.username === username && row.firebase_uid !== firebase_uid)) {
         throw new Error('UNIQUE constraint failed: usernames.username');
       }
@@ -73,6 +103,7 @@ function createApp() {
       if (!row) return {};
       row.username = username;
       row.updated_at = updated_at;
+      row.renamed_at = renamed_at;
       return {};
     }
     if (text.startsWith('DELETE FROM usernames')) {
@@ -161,6 +192,35 @@ test('repeated claims stop for an hour', async () => {
   const limited = await claimUsername(env, 'hunter', 'freshname');
   assert.equal(limited.error.status, 429);
   assert.equal(await usernameFor(env, 'hunter'), '');
+});
+
+test('a username check says when a name is already taken', async () => {
+  const env = { APP: createApp() };
+  await claimUsername(env, 'uid-a', 'ada');
+  const open = await usernameAvailability(env, 'grace');
+  assert.equal(open.available, true);
+  const taken = await usernameAvailability(env, '@Ada');
+  assert.equal(taken.available, false);
+  const mine = await usernameAvailability(env, 'ada', 'uid-a');
+  assert.equal(mine.available, true);
+  assert.equal((await usernameAvailability(env, 'ab')).error, 'Use at least 3 characters.');
+});
+
+test('a username can change once a day', async () => {
+  const env = { APP: createApp() };
+  await claimUsername(env, 'uid-a', 'alpha');
+  const first = await claimUsername(env, 'uid-a', 'beta');
+  assert.equal(first.username, 'beta');
+  const blocked = await claimUsername(env, 'uid-a', 'gamma');
+  assert.equal(blocked.error.status, 429);
+  assert.equal(blocked.error.message, 'You can change your username once a day.');
+  assert.equal(await usernameFor(env, 'uid-a'), 'beta');
+  const same = await claimUsername(env, 'uid-a', 'beta');
+  assert.equal(same.username, 'beta');
+  const row = env.APP.names.find((item) => item.firebase_uid === 'uid-a');
+  row.renamed_at = new Date(Date.now() - 25 * 60 * 60 * 1000).toISOString();
+  const again = await claimUsername(env, 'uid-a', 'gamma');
+  assert.equal(again.username, 'gamma');
 });
 
 test('deleting an account frees the username', async () => {

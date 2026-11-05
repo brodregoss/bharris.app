@@ -1,14 +1,15 @@
 import React from 'react';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
-import { ArrowRight, Loader2 } from 'lucide-react';
+import { ArrowRight } from 'lucide-react';
 import { invokeLlm } from '@/api/invokeLlm';
+import AiWait from '@/components/AiWait';
 import { parseExplainGrade, MASTERY, MASTERY_LEVELS, localExplainLevel } from '@/lib/mastery';
 import UnderstandingPyramid from './UnderstandingPyramid';
 import TermPicker from '@/components/practice/TermPicker';
 import StudyScreenShell from '@/components/study/StudyScreenShell';
 
-const MAX_EXPLAIN_CHARS = 200;
+const MAX_EXPLAIN_CHARS = 800;
 
 function clampChars(text, max) {
   return String(text).slice(0, max);
@@ -218,9 +219,7 @@ export default function ExplainIt({ terms, onUpdateTerm, onDone, onBack, rankMod
       className="w-full"
     >
       {grading ? (
-        <>
-          <Loader2 className="h-4 w-4 animate-spin" /> Grading…
-        </>
+        <AiWait compact label="Grading" estimateMs={8000} />
       ) : (
         'Grade my explanation'
       )}

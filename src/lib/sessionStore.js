@@ -3,6 +3,7 @@ import { getActiveUid, userStorageKey } from '@/lib/userStorage';
 
 const KEY = 'lms_session_v1';
 const FINISHED_KEY = 'lms_finished_v1';
+const NOTES_PRACTICE_KEY = 'lms_practice_notes_v1';
 
 function newId() {
   if (typeof crypto !== 'undefined' && crypto.randomUUID) return crypto.randomUUID();
@@ -157,6 +158,10 @@ export function loadPracticeSource() {
   const active = loadSession();
   if (active?.terms?.length) return { kind: 'active', session: active };
   const finished = loadFinishedSession();
+  const notes = loadPracticeNotes();
+  const notesAt = notes?.savedAt || 0;
+  const finishedAt = finished?.savedAt || finished?.finishedAt || 0;
+  if (notes?.terms?.length && notesAt >= finishedAt) return { kind: 'notes', session: notes };
   if (finished?.terms?.length) return { kind: 'finished', session: finished };
   return null;
 }
@@ -165,10 +170,35 @@ export function loadLatestCram() {
   return loadPracticeSource()?.session || null;
 }
 
+export function loadPracticeNotes() {
+  return readJson(NOTES_PRACTICE_KEY);
+}
+
+export function savePracticeNotes(data) {
+  const uid = getActiveUid();
+  if (!uid || !data?.terms?.length) return null;
+  const next = withId({
+    ...data,
+    status: 'notes',
+    savedAt: Date.now(),
+    ownerUid: uid,
+  });
+  try {
+    writeJson(NOTES_PRACTICE_KEY, next);
+  } catch {
+    // ignore quota / serialization errors
+  }
+  return next;
+}
+
 export function savePracticeTerms(source, terms) {
   if (!source?.session) return;
   if (source.kind === 'active') {
     saveSession({ ...source.session, terms });
+    return;
+  }
+  if (source.kind === 'notes') {
+    savePracticeNotes({ ...source.session, terms });
     return;
   }
   if (source.kind === 'history') {

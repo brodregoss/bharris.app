@@ -12,7 +12,7 @@ import {
   userStudyStub,
 } from './users.js';
 import { deleteAccountTelemetry, handleRecordEvent } from './events.js';
-import { claimUsername, releaseUsername } from './usernames.js';
+import { claimUsername, releaseUsername, usernameAvailability } from './usernames.js';
 import { handleAi } from './ai.js';
 import {
   handleCreateNote,
@@ -233,6 +233,18 @@ export default {
       if (parts[0] !== 'v1') {
         if (env.ASSETS) return env.ASSETS.fetch(request);
         return withCors(errorJson('Not found', 404), request, env);
+      }
+
+      if (parts[1] === 'usernames' && parts[2] === 'available' && request.method === 'GET') {
+        let uid = '';
+        if (/^Bearer\s+\S+/i.test(request.headers.get('Authorization') || '')) {
+          const authed = await requireUser(request, env);
+          if (authed.error) return withCors(authed.error, request, env);
+          uid = authed.identity.uid;
+        }
+        const result = await usernameAvailability(env, url.searchParams.get('name') || '', uid);
+        if (result.error) return withCors(errorJson(result.error, 400), request, env);
+        return withCors(json({ available: result.available }), request, env);
       }
 
       const authed = await requireUser(request, env);

@@ -1,5 +1,6 @@
 import React from 'react';
 import { useNavigate } from 'react-router-dom';
+import { Capacitor } from '@capacitor/core';
 import {
   ArrowLeft,
   User,
@@ -17,6 +18,7 @@ import {
   Loader2,
   Moon,
   Sun,
+  Globe,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Progress } from '@/components/ui/progress';
@@ -28,6 +30,7 @@ import UsernameSheet from '@/components/account/UsernameSheet';
 import { getCurrentUser, getUsage, removePartner, resetPartnerCode } from '@/lib/accountStore';
 import { formatPersonName } from '@/lib/personName';
 import { usePaywall } from '@/lib/PaywallContext';
+import { APP_CONFIG } from '@/lib/appConfig';
 import { planLabel, planValue } from '@/lib/plans';
 import { trialRemainingLabel } from '../../scripts/account-plan.js';
 import {
@@ -56,6 +59,29 @@ import {
 import { devToolsUnlocked, lockDevTools, tryUnlockDevTools } from '@/lib/devToolsLock';
 import { requestHomeTourReplay } from '@/lib/appTour';
 import NotesScanLockCard from '@/components/account/NotesScanLockCard';
+function siteHomeUrl() {
+  if (typeof window === 'undefined') return 'https://bharris.app/';
+  if (Capacitor.isNativePlatform()) return 'https://bharris.app/';
+  const { origin, pathname, hostname, port } = window.location;
+  if (pathname === '/app' || pathname.startsWith('/app/')) return `${origin}/`;
+  if ((hostname === 'localhost' || hostname === '127.0.0.1') && port === '5173') {
+    return `http://${hostname}:8787/`;
+  }
+  const worker = APP_CONFIG.workerUrl;
+  if (worker) return `${worker}/`;
+  return 'https://bharris.app/';
+}
+
+async function openSiteHome() {
+  const url = siteHomeUrl();
+  if (Capacitor.isNativePlatform()) {
+    const { Browser } = await import('@capacitor/browser');
+    await Browser.open({ url });
+    return;
+  }
+  window.location.assign(url);
+}
+
 const DOCS = {
   about: {
     title: 'About',
@@ -115,7 +141,7 @@ function UsageBlock({ heading, person, onUpgrade, loading = false }) {
   const used = person?.aiQuotaUsed || 0;
   const limit = person?.aiQuotaLimit || 0;
   return (
-    <div className="py-4">
+    <div className="bg-surface-1 px-4 py-4">
       <div className="flex items-center gap-2">
         <p className="text-sm font-medium text-muted-foreground">{heading}</p>
         {loading && <Loader2 className="w-3.5 h-3.5 animate-spin text-muted-foreground" aria-label="Loading usage" />}
@@ -196,6 +222,7 @@ export default function Settings() {
   const displayName = me?.displayName || user?.displayName || firebaseUser?.displayName || profile?.displayName || '';
   const email = me?.email || user?.email || firebaseUser?.email || profile?.email || '';
   const username = String(me?.username || user?.username || profile?.username || '').trim();
+  const usernameChangedAt = me?.usernameChangedAt || user?.usernameChangedAt || profile?.usernameChangedAt || '';
 
   const runPartner = async (action, key) => {
     setPartnerBusy(key);
@@ -442,6 +469,7 @@ export default function Settings() {
 
           <section className="mt-6 overflow-hidden rounded-card border border-border">
             <Row label="Version" value={APP_VERSION} />
+            <Row icon={Globe} label="Website" onClick={openSiteHome} />
             <Row
               icon={Compass}
               label="Show me around"
@@ -538,6 +566,7 @@ export default function Settings() {
         open={usernameOpen}
         onOpenChange={setUsernameOpen}
         username={username}
+        changedAt={usernameChangedAt}
         onSaved={(nextUser) => {
           if (nextUser) setUsage((current) => ({ ...(current || {}), me: nextUser, user: nextUser }));
         }}

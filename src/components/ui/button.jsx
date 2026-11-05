@@ -12,11 +12,11 @@ const buttonVariants = cva(
         default:
           "bg-primary text-primary-foreground hover:bg-primary/90",
         destructive:
-          "bg-blank/12 text-blank hover:bg-blank/20",
+          "bg-blank/20 text-blank hover:bg-blank/20",
         shaky:
           "bg-shaky/12 text-shaky hover:bg-shaky/20",
         success:
-          "bg-know/12 text-know hover:bg-know/20",
+          "bg-know/20 text-know hover:bg-know/20",
         outline:
           "border border-border bg-transparent text-foreground hover:bg-surface-2",
         secondary:

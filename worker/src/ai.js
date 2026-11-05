@@ -14,6 +14,7 @@ const FEATURES = new Set([
   'explain',
   'panic',
   'distractors',
+  'practice',
   'complete',
 ]);
 

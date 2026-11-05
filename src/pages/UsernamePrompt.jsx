@@ -6,6 +6,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import AuthShell from '@/components/AuthShell';
 import { useAuth } from '@/lib/AuthContext';
+import { UsernameAvailability, useUsernameAvailability } from '@/components/account/UsernameAvailability';
 import { updateUsername } from '@/lib/accountStore';
 import { clearUsernamePrompt } from '@/lib/signupProfile';
 import { parseUsername, typedUsername } from '@/lib/username';
@@ -17,9 +18,11 @@ export default function UsernamePrompt() {
   const [error, setError] = React.useState('');
   const [loading, setLoading] = React.useState(false);
   const [signingOut, setSigningOut] = React.useState(false);
+  const availability = useUsernameAvailability(username);
 
   const submit = async (event) => {
     event.preventDefault();
+    if (availability.status === 'taken' || availability.status === 'checking') return;
     const parsed = parseUsername(username);
     if (parsed.error) {
       setError(parsed.error);
@@ -92,8 +95,13 @@ export default function UsernamePrompt() {
           <p className="text-xs text-muted-foreground">
             Start with a letter. Letters, numbers, and underscores.
           </p>
+          <UsernameAvailability status={availability.status} note={availability.note} />
         </div>
-        <Button type="submit" className="w-full h-14 rounded-full text-base font-semibold" disabled={loading}>
+        <Button
+          type="submit"
+          className="w-full h-14 rounded-full text-base font-semibold"
+          disabled={loading || availability.status === 'taken' || availability.status === 'checking' || availability.status === 'invalid'}
+        >
           {loading ? (
             <>
               <Loader2 className="w-4 h-4 mr-2 animate-spin" />

@@ -3,10 +3,13 @@ import assert from 'node:assert/strict';
 import {
   STUDY_MODE,
   buildCramPlan,
+  continueStudyPath,
   firstLookAtTerms,
+  normalizeStudyMode,
   rankModeSkimHint,
   recallTermCap,
   redoDeckPlan,
+  sessionBudgetMs,
   RANK_MODE,
 } from './studyUtils.js';
 
@@ -24,6 +27,14 @@ test('write-your-own-def stays hidden until a term has been seen', () => {
   assert.equal(firstLookAtTerms([{ id: 'a', seen: true }]), false);
   assert.equal(firstLookAtTerms([{ id: 'a', recallHistory: [{ result: 'missed' }] }]), false);
   assert.equal(firstLookAtTerms([{ id: 'a', ownDefinition: 'in my words' }]), false);
+});
+
+test('self practice continues on the practice page', () => {
+  assert.equal(normalizeStudyMode(STUDY_MODE.SELF_PRACTICE), STUDY_MODE.SELF_PRACTICE);
+  assert.equal(continueStudyPath({ studyMode: STUDY_MODE.SELF_PRACTICE }), '/practice');
+  assert.equal(continueStudyPath({ studyMode: STUDY_MODE.ASSISTED }), '/study');
+  assert.equal(continueStudyPath({ studyMode: STUDY_MODE.TRUE_CRAM }), '/true-cram');
+  assert.equal(continueStudyPath({ studyMode: STUDY_MODE.SPACED_CRAM, examTiming: 'tomorrow' }), '/spaced-cram');
 });
 
 test('assisted plan names how many terms actually get reps', () => {
@@ -82,6 +93,13 @@ test('spaced plan is short sittings until the exam', () => {
   assert.match(plan.lines.join(' '), /Short sittings/);
   assert.match(plan.lines.join(' '), /10 minutes/);
   assert.match(plan.lines.join(' '), /grade the written answers yourself/);
+});
+
+test('a short cram counts down the time they set', () => {
+  assert.equal(sessionBudgetMs(5 / 60), 5 * 60 * 1000);
+  assert.equal(sessionBudgetMs(2), 2 * 3600 * 1000);
+  assert.equal(sessionBudgetMs(0), 3600 * 1000);
+  assert.equal(sessionBudgetMs(undefined), 3600 * 1000);
 });
 
 test('a short hard-term redo asks for enough extras to avoid a tiny loop', () => {

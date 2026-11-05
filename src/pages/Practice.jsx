@@ -3,6 +3,7 @@ import { useLocation, useNavigate } from 'react-router-dom';
 import { DragDropContext, Draggable, Droppable } from '@hello-pangea/dnd';
 import { ArrowLeft, ChevronDown, ClipboardCheck, GripVertical, Layers, PenLine, Pyramid } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { Slider } from '@/components/ui/slider';
 import {
   Dialog,
   DialogContent,
@@ -30,6 +31,7 @@ import {
   clampMastery,
 } from '@/lib/mastery';
 import { cn } from '@/lib/utils';
+import { challengeLabel } from '@/lib/practiceQuestions';
 import { sessionRankMode, flashcardDef, trueCramPracticeState, priority } from '@/lib/studyUtils';
 import { userStorageKey } from '@/lib/userStorage';
 
@@ -298,6 +300,10 @@ export default function Practice() {
   });
   const [prompt, setPrompt] = React.useState(null);
   const [pendingMode, setPendingMode] = React.useState('');
+  const [testKind, setTestKind] = React.useState('standard');
+  const [challenge, setChallenge] = React.useState(3);
+  const [launchedTest, setLaunchedTest] = React.useState({ kind: 'standard', challenge: 3 });
+  const keepPrompt = React.useRef(false);
   const [noneNote, setNoneNote] = React.useState(false);
   const [practiceAll, setPracticeAll] = React.useState(() => {
     const hasWork = boot.terms.some((t) => clampMastery(t.mastery) < MASTERY.SOLID);
@@ -386,16 +392,36 @@ export default function Practice() {
 
   const launchMode = (id) => {
     if (!id) return;
+    if (id === 'test') {
+      setLaunchedTest({ kind: testKind, challenge });
+    }
     setMode(id);
   };
 
   const beginMode = (id) => {
+    if (id === 'test') {
+      setPendingMode('test');
+      setNoneNote(false);
+      setPrompt('test');
+      return;
+    }
     if (!chooserSeen) {
       setPendingMode(id);
       setNoneNote(false);
       setPrompt('choose');
       return;
     }
+    launchMode(id);
+  };
+
+  const confirmTest = () => {
+    if (!chooserSeen) {
+      keepPrompt.current = true;
+      setPrompt('choose');
+      return;
+    }
+    const id = pendingMode || 'test';
+    closePrompt();
     launchMode(id);
   };
 
@@ -496,6 +522,8 @@ export default function Practice() {
         rankMode={rankMode}
         examType={sourceRef.current?.session?.setup?.examType || 'mixed'}
         budgetMs={12 * 60 * 1000}
+        questionSource={launchedTest.kind === 'ai' ? 'ai' : 'local'}
+        challenge={launchedTest.challenge}
         priorMissed={focusTerms.map((t) => t.id)}
         onDone={({ missedIds, questionIds }) => {
           const miss = new Set(missedIds);
@@ -614,6 +642,78 @@ export default function Practice() {
       </main>
   );
 
+  const testDialog = (
+    <Dialog open={prompt === 'test'} onOpenChange={(open) => {
+      if (open) return;
+      if (keepPrompt.current) {
+        keepPrompt.current = false;
+        return;
+      }
+      closePrompt();
+    }}>
+      <DialogContent className="rounded-3xl">
+        <DialogHeader className="text-left">
+          <DialogTitle>Which practice test?</DialogTitle>
+          <DialogDescription>
+            A standard test uses your terms. An AI test writes harder questions and uses 1 AI call.
+          </DialogDescription>
+        </DialogHeader>
+        <div className="grid gap-2.5">
+          <button
+            type="button"
+            onClick={() => setTestKind('standard')}
+            className={cn(
+              'rounded-3xl px-4 py-3 text-left',
+              testKind === 'standard' ? 'bg-primary text-primary-foreground' : 'bg-secondary'
+            )}
+          >
+            <p className="text-sm font-semibold">Standard test</p>
+            <p className={cn('mt-0.5 text-xs', testKind === 'standard' ? 'text-primary-foreground/80' : 'text-muted-foreground')}>
+              As many as you want. Questions come from your terms and definitions.
+            </p>
+          </button>
+          <button
+            type="button"
+            onClick={() => setTestKind('ai')}
+            className={cn(
+              'rounded-3xl px-4 py-3 text-left',
+              testKind === 'ai' ? 'bg-primary text-primary-foreground' : 'bg-secondary'
+            )}
+          >
+            <p className="text-sm font-semibold">AI test</p>
+            <p className={cn('mt-0.5 text-xs', testKind === 'ai' ? 'text-primary-foreground/80' : 'text-muted-foreground')}>
+              Harder than matching a definition. Uses 1 AI call.
+            </p>
+          </button>
+          {testKind === 'ai' && (
+            <div className="rounded-3xl bg-secondary px-4 py-3">
+              <div className="flex items-center justify-between gap-3">
+                <p className="text-sm font-semibold">Challenge</p>
+                <p className="text-xs font-semibold text-muted-foreground">{challengeLabel(challenge)}</p>
+              </div>
+              <Slider
+                className="mt-3"
+                min={1}
+                max={5}
+                step={1}
+                value={[challenge]}
+                onValueChange={(value) => setChallenge(value[0] || 3)}
+                aria-label="Challenge"
+              />
+              <div className="mt-2 flex justify-between text-[11px] text-muted-foreground">
+                <span>Familiar</span>
+                <span>Hard</span>
+              </div>
+            </div>
+          )}
+        </div>
+        <Button type="button" className="rounded-full" onClick={confirmTest}>
+          Start
+        </Button>
+      </DialogContent>
+    </Dialog>
+  );
+
   const chooserDialog = (
     <Dialog open={prompt === 'choose'} onOpenChange={(open) => { if (!open) closePrompt(); }}>
       <DialogContent className="rounded-3xl">
@@ -697,8 +797,9 @@ export default function Practice() {
     <div className="flex h-[100dvh] flex-col overflow-hidden bg-background text-foreground">
       {renderHeader('hub')}
       {hub}
-      {chooserDialog}
-      {noneDialog}
+        {testDialog}
+        {chooserDialog}
+        {noneDialog}
     </div>
   );
 }

@@ -1,10 +1,11 @@
 import React from 'react';
 import { useNavigate } from 'react-router-dom';
-import { FileText, RefreshCw, Loader2, ALargeSmall } from 'lucide-react';
+import { FileText, RefreshCw, ALargeSmall } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 import { invokeLlm } from '@/api/invokeLlm';
 import { Button } from '@/components/ui/button';
 import StudyScreenShell from '@/components/study/StudyScreenShell';
+import AiWait from '@/components/AiWait';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Slider } from '@/components/ui/slider';
 import { loadLatestCram } from '@/lib/sessionStore';
@@ -199,8 +200,7 @@ export default function PanicReview() {
 
           {generating && (
             <div className="flex flex-col items-center justify-center py-16">
-              <Loader2 className="w-7 h-7 text-muted-foreground animate-spin mb-3" />
-              <p className="text-sm text-muted-foreground">Writing your notes…</p>
+              <AiWait label="Writing your notes…" estimateMs={20000} />
             </div>
           )}
 

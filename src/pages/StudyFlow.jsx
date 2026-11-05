@@ -23,6 +23,7 @@ import {
   WIND_DOWN_BUDGET_MS,
   BLOCK_BUDGET_RATIO,
   planRecallQueues,
+  sessionBudgetMs,
   sessionRankMode,
   tierLabelsFor,
   RANK_MODE,
@@ -126,7 +127,7 @@ function StudyFlow() {
 
   const setup = init?.setup || null;
   const [terms, setTerms] = React.useState(() => (init ? init.terms : []));
-  const totalMs = Math.max(15 * 60 * 1000, (setup?.hours || 1) * 3600 * 1000);
+  const totalMs = sessionBudgetMs(setup?.hours);
   const [sessionStart] = React.useState(() => (init ? init.sessionStart : Date.now()));
   const [phase, setPhase] = React.useState(() => (init ? init.phase : 'critical'));
   const [blockStats, setBlockStats] = React.useState(() => (init ? init.blockStats : {}));

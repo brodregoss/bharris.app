@@ -2,7 +2,7 @@ import { periodKey, publicUser, quotaLimit } from './util.js';
 import { userShard } from './routing.js';
 import { accountAge, assessAge, normalizeReferral } from '../../src/lib/age.js';
 import { recordEvent } from './events.js';
-import { usernameFor } from './usernames.js';
+import { usernameRecord } from './usernames.js';
 
 const userTablesReady = new Map();
 const adminCache = new Map();
@@ -265,13 +265,14 @@ export async function toPublicUser(env, row) {
     partnerLinked = share.linked;
   }
   const age = accountAge(fresh);
-  const username = await usernameFor(env, fresh.firebase_uid);
+  const name = await usernameRecord(env, fresh.firebase_uid);
   return {
     ...publicUser(fresh, {
       isAdmin: admin,
       partnerCode,
       partnerLinked,
-      username,
+      username: name.username,
+      usernameChangedAt: name.changedAt,
     }),
     ageStatus: age.status,
     ageBand: age.band,

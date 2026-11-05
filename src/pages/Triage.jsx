@@ -1,7 +1,8 @@
 import React from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { tierFromDifficulty, confidenceFromTriage, normalizeExamType, inferRankMode, RANK_MODE, normalizeStudyMode, continueStudyPath, STUDY_MODE } from '@/lib/studyUtils';
-import { Moon, Loader2, Check } from 'lucide-react';
+import { Moon, Check } from 'lucide-react';
+import AiWait from '@/components/AiWait';
 import { invokeLlm } from '@/api/invokeLlm';
 import { Button } from '@/components/ui/button';
 import TriageCard from '@/components/triage/TriageCard';
@@ -11,8 +12,8 @@ import { logProductEvent } from '@/lib/productEvents';
 import { cn } from '@/lib/utils';
 
 const TIERS = [
-  { id: 'blank', label: 'Blank', tone: 'text-blank bg-blank/12' },
-  { id: 'shaky', label: 'Shaky', tone: 'text-shaky bg-shaky/12' },
+  { id: 'blank', label: "Don't know it", tone: 'text-blank bg-blank/12' },
+  { id: 'shaky', label: 'Kinda know it', tone: 'text-shaky bg-shaky/12' },
   { id: 'know_it', label: 'Know it', tone: 'text-know bg-know/12' },
 ];
 
@@ -133,9 +134,16 @@ async function rankUserTerms(terms, onProgress, meta = {}) {
   const allNames = terms.map((t) => t.term).filter(Boolean);
   const out = [];
   let forcedRanking = null;
-  for (let i = 0; i < terms.length; i += RANK_BATCH) {
+  const batches = Math.max(1, Math.ceil(terms.length / RANK_BATCH));
+  let step = 0;
+  for (let i = 0; i < terms.length; i += RANK_BATCH, step += 1) {
     const chunk = terms.slice(i, i + RANK_BATCH);
-    onProgress?.(`Ranking your terms… ${Math.min(i + chunk.length, terms.length)}/${terms.length}`);
+    const end = Math.min(i + chunk.length, terms.length);
+    onProgress?.(`Ranking your terms… ${end}/${terms.length}`, {
+      floor: Math.round((i / terms.length) * 95),
+      ceiling: Math.round((end / terms.length) * 95),
+      estimateMs: (batches - step) * 12000,
+    });
     const { items, ranking } = await rankChunk(chunk, allNames, forcedRanking);
     if (!forcedRanking && (ranking === RANK_MODE.DIFFICULTY || ranking === RANK_MODE.IMPORTANCE)) {
       forcedRanking = ranking;
@@ -176,6 +184,7 @@ function Triage() {
   });
   const [loading, setLoading] = React.useState(() => ranked.length === 0);
   const [loadingHint, setLoadingHint] = React.useState('Loading your terms…');
+  const [aiWait, setAiWait] = React.useState({ floor: 0, ceiling: 95, estimateMs: 12000 });
   const [loadError, setLoadError] = React.useState(false);
   const [retryTick, setRetryTick] = React.useState(0);
   const [dragOver, setDragOver] = React.useState(null);
@@ -279,7 +288,10 @@ function Triage() {
       if (incoming.length && needsPriorityRank(source, incoming)) {
         setLoadingHint('Ranking your terms…');
         try {
-          const rankedResult = await rankUserTerms(prepareItems(incoming), setLoadingHint, {
+          const rankedResult = await rankUserTerms(prepareItems(incoming), (message, meta) => {
+            setLoadingHint(message);
+            if (meta) setAiWait(meta);
+          }, {
             title: source?.title || source?.name,
             id: source?.id,
             rankMode: source?.rankMode,
@@ -339,9 +351,8 @@ function Triage() {
       </header>
 
       {loading ? (
-        <div className="flex-1 flex flex-col items-center justify-center gap-3 text-center px-8">
-          <Loader2 className="w-8 h-8 text-muted-foreground animate-spin" />
-          <p className="text-sm font-medium">{loadingHint}</p>
+        <div className="flex flex-1 items-center justify-center px-8">
+          <AiWait label={loadingHint} {...aiWait} />
         </div>
       ) : loadError ? (
         <div className="flex-1 flex flex-col items-center justify-center gap-3 text-center px-8">
@@ -355,6 +366,7 @@ function Triage() {
               setLoadError(false);
               setLoading(true);
               setLoadingHint('Loading your terms…');
+              setAiWait({ floor: 0, ceiling: 95, estimateMs: 12000 });
               setRetryTick((n) => n + 1);
             }}
             className="mt-2"
@@ -384,7 +396,7 @@ function Triage() {
                   )}
                 >
                   <div className="flex items-center justify-between gap-1 px-3 pb-3 pt-4">
-                    <span className="text-label uppercase">{tier.label}</span>
+                    <span className="min-w-0 text-label leading-tight">{tier.label}</span>
                     <span className="text-meta tabular-nums text-muted-foreground">{items.length}</span>
                   </div>
                   <div

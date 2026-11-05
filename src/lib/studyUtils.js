@@ -214,6 +214,7 @@ export const STUDY_MODE = {
   ASSISTED: 'assisted',
   TRUE_CRAM: 'true_cram',
   SPACED_CRAM: 'spaced_cram',
+  SELF_PRACTICE: 'self_practice',
 };
 
 export const STUDY_MODE_META = {
@@ -241,12 +242,13 @@ export function spacedCramAvailable(examTiming) {
 }
 
 export function normalizeStudyMode(mode) {
-  if (mode === STUDY_MODE.TRUE_CRAM || mode === STUDY_MODE.SPACED_CRAM) return mode;
+  if (mode === STUDY_MODE.TRUE_CRAM || mode === STUDY_MODE.SPACED_CRAM || mode === STUDY_MODE.SELF_PRACTICE) return mode;
   return STUDY_MODE.ASSISTED;
 }
 
 export function continueStudyPath(setup) {
   const mode = normalizeStudyMode(setup?.studyMode);
+  if (mode === STUDY_MODE.SELF_PRACTICE) return '/practice';
   if (mode === STUDY_MODE.TRUE_CRAM) return '/true-cram';
   if (mode === STUDY_MODE.SPACED_CRAM) {
     return spacedCramAvailable(setup?.examTiming) ? '/spaced-cram' : '/';
@@ -335,7 +337,7 @@ export function buildCramPlan(options = {}) {
       subject,
       facts,
       lines: [
-        'First, sort each term: blank, shaky, or know it.',
+        "First, sort each term: don't know it, kinda know it, or know it.",
         pace,
         'Misses get a second pass. This sitting covers the set.',
       ],
@@ -348,7 +350,7 @@ export function buildCramPlan(options = {}) {
       subject,
       facts,
       lines: [
-        'First, sort each term: blank, shaky, or know it. Then set when you sleep.',
+        "First, sort each term: don't know it, kinda know it, or know it. Then set when you sleep.",
         `Short sittings from now until ${when}. Learn a chunk, then those terms come back. Shaky ones get more time.`,
         `Come back for each sitting. About 10 minutes.${writtenGrade}`,
       ],
@@ -368,7 +370,7 @@ export function buildCramPlan(options = {}) {
     subject,
     facts,
     lines: [
-      'First, sort each term: blank, shaky, or know it.',
+      "First, sort each term: don't know it, kinda know it, or know it.",
       reps,
       typeLabel === 'short answer'
         ? 'The ones that matter most stay until you get them twice. Then a short written test. You grade it yourself.'
@@ -504,6 +506,13 @@ export const WIND_DOWN_BUDGET_MS = 12 * 60 * 1000;
 export function flashcardDef(term) {
   const own = String(term?.ownDefinition || '').trim();
   return own || String(term?.definition || '');
+}
+
+// Countdown budget for a cram. A real short time stays short. Missing time falls back to 1 hour.
+export function sessionBudgetMs(hours) {
+  const h = Number(hours);
+  const used = Number.isFinite(h) && h > 0 ? h : 1;
+  return used * 3600 * 1000;
 }
 
 export function fmtTime(ms) {

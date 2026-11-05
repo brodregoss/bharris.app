@@ -5,6 +5,7 @@ import { Textarea } from '@/components/ui/textarea';
 import StudyScreenShell from '@/components/study/StudyScreenShell';
 import { invokeLlm } from '@/api/invokeLlm';
 import { cn } from '@/lib/utils';
+import AiWait from '@/components/AiWait';
 
 export const STUCK_AFTER_ROTATIONS = 3;
 
@@ -499,7 +500,9 @@ export default function WriteOwnDef({
                 disabled={!!helping}
                 className="text-meta text-primary underline-offset-4 hover:underline disabled:text-tertiary"
               >
-                {helping === 'explain' ? 'Explaining…' : 'Explain the term'}
+                {helping === 'explain' ? (
+                  <AiWait compact label="Explaining" estimateMs={8000} />
+                ) : 'Explain the term'}
               </button>
             )}
             {!helps[current.id]?.example && (
@@ -509,7 +512,9 @@ export default function WriteOwnDef({
                 disabled={!!helping}
                 className="text-meta text-primary underline-offset-4 hover:underline disabled:text-tertiary"
               >
-                {helping === 'example' ? 'Thinking…' : 'Give an example'}
+                {helping === 'example' ? (
+                  <AiWait compact label="Thinking" estimateMs={8000} />
+                ) : 'Give an example'}
               </button>
             )}
           </div>

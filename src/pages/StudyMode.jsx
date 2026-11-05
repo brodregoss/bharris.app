@@ -4,6 +4,7 @@ import { ArrowRight, ArrowLeft } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import { termCount } from '@/lib/notesSource';
+import { beginSession, loadPracticeNotes, loadSession, savePracticeNotes, saveSession } from '@/lib/sessionStore';
 import {
   STUDY_MODE,
   STUDY_MODE_META,
@@ -31,11 +32,26 @@ const PICKER_COPY = {
   },
 };
 
+function notesTerms(source) {
+  return (source?.items || [])
+    .filter((item) => item?.term && item?.definition)
+    .map((item, index) => ({
+      id: item.id || `t${index}`,
+      term: item.term,
+      definition: item.definition,
+      difficulty: item.difficulty,
+      tier: item.tier,
+      confidence: item.confidence,
+    }));
+}
+
 function pickSafeMode(mode, suggested, examTiming) {
-  const next = normalizeStudyMode(mode || suggested);
+  const requested = mode === STUDY_MODE.SELF_PRACTICE ? suggested : mode;
+  const next = normalizeStudyMode(requested || suggested);
   if (next === STUDY_MODE.SPACED_CRAM && !spacedCramAvailable(examTiming)) {
     return suggested === STUDY_MODE.SPACED_CRAM ? STUDY_MODE.ASSISTED : normalizeStudyMode(suggested);
   }
+  if (next === STUDY_MODE.SELF_PRACTICE) return STUDY_MODE.ASSISTED;
   return next;
 }
 
@@ -72,9 +88,53 @@ export default function StudyMode() {
 
   const perTermLabel = formatMinutesPerTerm(setup.hours, count);
   const suggestedMeta = STUDY_MODE_META[suggested];
-  const suggestionLine = perTermLabel
-    ? `Based on having ~${perTermLabel} per term, ${suggestedMeta.title} might work best.`
-    : `${suggestedMeta.title} might work best for this exam timing.`;
+  const minutesAvailable = Number(setup.hours) * 60;
+  const suggestSelf = Number.isFinite(minutesAvailable) && minutesAvailable > 0 && minutesAvailable <= 5;
+  const suggestionLine = suggestSelf
+    ? 'With 5 minutes or less, Self practice might work best.'
+    : perTermLabel
+      ? `Based on having ~${perTermLabel} per term, ${suggestedMeta.title} might work best.`
+      : `${suggestedMeta.title} might work best for this exam timing.`;
+
+  const openSelfPractice = () => {
+    const items = notesTerms(source);
+    if (!items.length) {
+      navigate('/practice');
+      return;
+    }
+    const sourceId = source.id || source.noteId || source.title || source.name || 'notes';
+    const setupNext = {
+      ...setup,
+      studyMode: STUDY_MODE.SELF_PRACTICE,
+      sourceId,
+      title: source.title || source.name || setup?.title,
+    };
+    const active = loadSession();
+    const notes = loadPracticeNotes();
+    const sameSet = (row) => row?.terms?.length && (
+      row.sourceId === sourceId
+      || row.setup?.sourceId === sourceId
+      || (source.noteId && row.noteId === source.noteId)
+    );
+    const prior = (sameSet(active) && active.setup?.studyMode === STUDY_MODE.SELF_PRACTICE)
+      ? active
+      : (sameSet(notes) ? notes : null);
+    const draft = {
+      ...(prior?.id ? { id: prior.id } : {}),
+      sourceId,
+      terms: prior?.terms?.length ? prior.terms : items,
+      setup: setupNext,
+      title: source.title || source.name || prior?.title || 'Practice',
+      status: 'active',
+      noteId: source.noteId || prior?.noteId || null,
+    };
+    const started = prior && active?.id && active.id === prior.id
+      ? saveSession(draft)
+      : beginSession(draft);
+    const session = started || draft;
+    savePracticeNotes({ ...session, sourceId, setup: setupNext });
+    navigate('/practice', { state: { session, kind: started ? 'active' : 'notes' } });
+  };
 
   const goBack = () => {
     if (showPlan) {
@@ -154,7 +214,7 @@ export default function StudyMode() {
               const meta = PICKER_COPY[id];
               const locked = id === STUDY_MODE.SPACED_CRAM && !spacedOk;
               const isSelected = selected === id && !locked;
-              const isSuggested = suggested === id && !locked;
+              const isSuggested = !suggestSelf && suggested === id && !locked;
               return (
                 <button
                   key={id}
@@ -189,6 +249,26 @@ export default function StudyMode() {
                 </button>
               );
             })}
+            <button
+              type="button"
+              onClick={openSelfPractice}
+              className={cn(
+                'press flex w-full flex-col items-center rounded-card border px-6 py-4 text-center transition',
+                suggestSelf ? 'border-primary bg-surface-1 text-foreground' : 'border-border bg-surface-1 text-foreground'
+              )}
+            >
+              {suggestSelf && (
+                <span className="mb-1 text-label uppercase text-primary">
+                  Suggested
+                </span>
+              )}
+              <p className="text-center text-lg font-semibold leading-tight tracking-tight">
+                Self practice
+              </p>
+              <p className="mt-1 text-center text-meta text-muted-foreground">
+                Flashcards and a practice test on your own.
+              </p>
+            </button>
           </div>
         </div>
         )}

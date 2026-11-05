@@ -35,7 +35,13 @@ export function sessionHistoryLimit(tier) {
   return tier === 'pro' ? 30 : 10;
 }
 
-export function publicUser(row, { isAdmin = false, partnerCode = '', partnerLinked = false, username = '' } = {}) {
+export function publicUser(row, {
+  isAdmin = false,
+  partnerCode = '',
+  partnerLinked = false,
+  username = '',
+  usernameChangedAt = '',
+} = {}) {
   const used = Number(row.ai_quota_used) || 0;
   const limit = Number(row.ai_quota_limit) || 0;
   const remaining = Math.max(0, limit - used);
@@ -46,6 +52,7 @@ export function publicUser(row, { isAdmin = false, partnerCode = '', partnerLink
     email: row.email || '',
     displayName: row.display_name || '',
     username: String(username || ''),
+    usernameChangedAt: String(usernameChangedAt || ''),
     isAdmin,
     subscriptionTier: row.subscription_tier || 'free',
     billingPlan,

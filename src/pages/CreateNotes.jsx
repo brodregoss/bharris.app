@@ -6,9 +6,11 @@ import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
 import { cn } from '@/lib/utils';
+import { regenerateDefinition } from '@/lib/extractNotes';
 import { saveManualNote } from '@/lib/notesUpload';
 import { hasAiConsent, setAiConsent } from '@/lib/aiConsent';
 import AiConsentModal from '@/components/account/AiConsentModal';
+import AiWait from '@/components/AiWait';
 
 function blankTerm() {
   return { id: `m${Date.now()}-${Math.random().toString(36).slice(2, 7)}`, term: '', definition: '' };
@@ -51,6 +53,10 @@ export default function CreateNotes() {
   ));
   const [saving, setSaving] = React.useState(false);
   const [showAiConsent, setShowAiConsent] = React.useState(false);
+  const [generatingId, setGeneratingId] = React.useState('');
+  const [generateErrorId, setGenerateErrorId] = React.useState('');
+  const consentIntent = React.useRef('continue');
+  const pendingGenerate = React.useRef(null);
   const [items, setItems] = React.useState(() => {
     if (incoming?.kind === 'manual' && incoming.items?.length) {
       return incoming.items.map((t, i) => ({
@@ -105,9 +111,38 @@ export default function CreateNotes() {
     });
   };
 
+  const writeDefinition = async ({ id, term, definition }) => {
+    if (!term || generatingId) return;
+    setGeneratingId(id);
+    setGenerateErrorId('');
+    try {
+      const next = await regenerateDefinition({ term, definition });
+      update(id, { definition: next });
+    } catch {
+      setGenerateErrorId(id);
+    } finally {
+      setGeneratingId('');
+    }
+  };
+
+  const generate = (item) => {
+    const term = item.term.trim();
+    if (!term || generatingId) return;
+    const request = { id: item.id, term, definition: item.definition.trim() };
+    if (!hasAiConsent()) {
+      consentIntent.current = 'generate';
+      pendingGenerate.current = request;
+      setShowAiConsent(true);
+      return;
+    }
+    writeDefinition(request);
+  };
+
   const continueSetup = async () => {
     if (!canContinue || saving) return;
     if (!hasAiConsent()) {
+      consentIntent.current = 'continue';
+      pendingGenerate.current = null;
       setShowAiConsent(true);
       return;
     }
@@ -117,12 +152,20 @@ export default function CreateNotes() {
   const handleAiConsentAccept = () => {
     setAiConsent(true);
     setShowAiConsent(false);
+    if (consentIntent.current === 'generate' && pendingGenerate.current) {
+      const request = pendingGenerate.current;
+      pendingGenerate.current = null;
+      writeDefinition(request);
+      return;
+    }
     proceedToSetup();
   };
 
   const handleAiConsentDecline = () => {
     setAiConsent(false);
     setShowAiConsent(false);
+    pendingGenerate.current = null;
+    consentIntent.current = 'continue';
   };
 
   return (
@@ -179,6 +222,25 @@ export default function CreateNotes() {
                 placeholder="Term"
                 className="h-11 rounded-full"
               />
+              {item.term.trim() && (
+                <div className="flex items-center justify-between gap-3">
+                  <Button
+                    type="button"
+                    variant="secondary"
+                    size="sm"
+                    className="rounded-full"
+                    disabled={!!generatingId}
+                    onClick={() => generate(item)}
+                  >
+                    {generatingId === item.id ? (
+                      <AiWait compact label="Generating" estimateMs={8000} />
+                    ) : 'Generate'}
+                  </Button>
+                  {generateErrorId === item.id && (
+                    <p className="text-xs text-blank">Couldn't write a definition. Try again.</p>
+                  )}
+                </div>
+              )}
               <DefinitionBox
                 value={item.definition}
                 onChange={(e) => update(item.id, { definition: e.target.value })}

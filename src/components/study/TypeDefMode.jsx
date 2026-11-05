@@ -14,8 +14,8 @@ import { cardProgressCaption } from '@/components/study/CardProgress';
 import useFillBelow from '@/components/study/useFillBelow';
 
 const COLUMNS = [
-  { id: 'blank', label: 'Blank', sub: "Don't know" },
-  { id: 'shaky', label: 'Shaky', sub: 'Kind of know' },
+  { id: 'blank', label: "Don't know it", sub: "Don't know it" },
+  { id: 'shaky', label: 'Kinda know it', sub: 'Kinda know it' },
   { id: 'know', label: 'Know it', sub: 'Know it' },
 ];
 
@@ -90,7 +90,7 @@ function Picker({ terms, selected, setSelected, onStart, onBack, startLabel }) {
                   allOn ? 'border-foreground bg-card' : 'option-surface',
                 )}
               >
-                <p className="text-sm font-semibold">{col.label}</p>
+                <p className="text-sm font-semibold leading-tight">{col.label}</p>
                 <p className="text-[11px] text-muted-foreground mt-0.5">{ids.length}</p>
               </button>
             );

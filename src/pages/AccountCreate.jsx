@@ -14,6 +14,7 @@ import { afterAuthPath, leaveForAuthReturn, rememberAuthReturn } from '@/lib/onb
 import { signupBlockReason } from '@/lib/age';
 import { ensureCloudUser } from '@/lib/accountStore';
 import { beginSocialSignup, cancelSocialSignup, clearSignupProfile, settleSocialSignup, stageSignupProfile } from '@/lib/signupProfile';
+import { UsernameAvailability, useUsernameAvailability } from '@/components/account/UsernameAvailability';
 import { parseUsername, typedUsername } from '@/lib/username';
 
 export default function AccountCreate() {
@@ -32,12 +33,18 @@ export default function AccountCreate() {
   const [loading, setLoading] = React.useState(false);
   const [appleLoading, setAppleLoading] = React.useState(false);
   const [googleLoading, setGoogleLoading] = React.useState(false);
+  const availability = useUsernameAvailability(username);
 
   React.useEffect(() => {
     rememberAuthReturn();
   }, []);
 
   const chosenUsername = () => {
+    if (availability.status === 'taken') {
+      setError('That username is taken.');
+      return '';
+    }
+    if (availability.status === 'checking') return '';
     const parsed = parseUsername(username);
     if (parsed.error) {
       setError(parsed.error);
@@ -218,6 +225,7 @@ export default function AccountCreate() {
           <p className="text-xs text-muted-foreground">
             This is the name on your home screen. Only your account can have it.
           </p>
+          <UsernameAvailability status={availability.status} note={availability.note} />
         </div>
         <div className="space-y-2">
           <Label htmlFor="name">Name</Label>
@@ -287,7 +295,11 @@ export default function AccountCreate() {
           </div>
         </div>
         <TermsNotice action="creating an account" />
-        <Button type="submit" className="w-full h-14 rounded-full text-base font-semibold" disabled={loading || googleLoading || appleLoading}>
+        <Button
+          type="submit"
+          className="w-full h-14 rounded-full text-base font-semibold"
+          disabled={loading || googleLoading || appleLoading || availability.status === 'taken' || availability.status === 'checking' || availability.status === 'invalid'}
+        >
           {loading ? (
             <>
               <Loader2 className="w-4 h-4 mr-2 animate-spin" />

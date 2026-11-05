@@ -21,22 +21,26 @@ export function PageEnter({ className, children }) {
   );
 }
 
-/** Fades in when the view key changes. The first paint stays still so a route enter is not doubled. */
+/** Fades in when the view key changes. The first paint stays still so a route enter is not doubled.
+ *  The wrapper stays the same element while the key is unchanged, so a later update (a grade,
+ *  a saved term) cannot remount the screen and wipe what the user is looking at. */
 export default function ScreenSwap({ viewKey, className, children }) {
-  const seen = React.useRef(false);
-  const animate = seen.current;
+  const skip = React.useRef(true);
+  const [playing, setPlaying] = React.useState(false);
 
   React.useEffect(() => {
-    seen.current = true;
-  });
-
-  if (!animate) {
-    return <div className={className}>{children}</div>;
-  }
+    if (skip.current) {
+      skip.current = false;
+      return undefined;
+    }
+    setPlaying(true);
+    const id = window.setTimeout(() => setPlaying(false), ENTER_MS);
+    return () => window.clearTimeout(id);
+  }, [viewKey]);
 
   return (
-    <PageEnter key={viewKey} className={className}>
+    <div key={viewKey} data-page-motion={playing ? 'playing' : 'settled'} className={cn(playing && 'page-in', className)}>
       {children}
-    </PageEnter>
+    </div>
   );
 }

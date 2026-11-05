@@ -4,21 +4,35 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import {
-  Sheet,
-  SheetContent,
-  SheetDescription,
-  SheetHeader,
-  SheetTitle,
-} from '@/components/ui/sheet';
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
+import { UsernameAvailability, useUsernameAvailability } from '@/components/account/UsernameAvailability';
 import { updateUsername } from '@/lib/accountStore';
-import { parseUsername, typedUsername } from '@/lib/username';
+import { parseUsername, typedUsername, usernameChangeReadyAt } from '@/lib/username';
 import { cn } from '@/lib/utils';
 
-export default function UsernameSheet({ open, onOpenChange, username, onSaved, className }) {
+function readyLabel(changedAt) {
+  const ready = usernameChangeReadyAt(changedAt);
+  if (!ready) return '';
+  return new Date(ready).toLocaleString(undefined, {
+    month: 'short',
+    day: 'numeric',
+    hour: 'numeric',
+    minute: '2-digit',
+  });
+}
+
+export default function UsernameSheet({ open, onOpenChange, username, changedAt, onSaved, className }) {
   const [value, setValue] = React.useState('');
   const [error, setError] = React.useState('');
   const [saving, setSaving] = React.useState(false);
   const wasOpen = React.useRef(false);
+  const lockedUntil = readyLabel(changedAt);
+  const availability = useUsernameAvailability(value, username);
 
   React.useEffect(() => {
     if (open && !wasOpen.current) {
@@ -31,6 +45,7 @@ export default function UsernameSheet({ open, onOpenChange, username, onSaved, c
 
   const handleSave = async (event) => {
     event.preventDefault();
+    if (lockedUntil || availability.status === 'taken' || availability.status === 'checking') return;
     setError('');
     const parsed = parseUsername(value);
     if (parsed.error) {
@@ -54,59 +69,75 @@ export default function UsernameSheet({ open, onOpenChange, username, onSaved, c
   };
 
   return (
-    <Sheet open={open} onOpenChange={(next) => { if (!saving) onOpenChange(next); }}>
-      <SheetContent side="bottom" className={cn('rounded-t-3xl max-h-[85dvh] overflow-y-auto', className)}>
-        <SheetHeader className="text-left pr-10">
-          <SheetTitle>{username ? 'Edit username' : 'Choose a username'}</SheetTitle>
-          <SheetDescription>
-            This name shows on your home screen. Only your account can have it.
-          </SheetDescription>
-        </SheetHeader>
+    <Dialog open={open} onOpenChange={(next) => { if (!saving) onOpenChange(next); }}>
+      <DialogContent className={cn('max-w-sm', className)}>
+        <DialogHeader className="pr-8 text-left">
+          <DialogTitle>{username ? 'Edit username' : 'Choose a username'}</DialogTitle>
+          <DialogDescription>
+            {lockedUntil
+              ? `You can change it again on ${lockedUntil}.`
+              : 'This name shows on your home screen. You can change it once a day.'}
+          </DialogDescription>
+        </DialogHeader>
 
-        <form onSubmit={handleSave} className="space-y-4 pt-4 pb-6">
-          {error && (
-            <div className="p-3 rounded-card bg-destructive/10 text-destructive text-sm">
-              {error}
-            </div>
-          )}
-          <div className="space-y-2">
-            <Label htmlFor="username">Username</Label>
-            <div className="relative">
-              <span className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-base text-muted-foreground">
-                @
-              </span>
-              <Input
-                id="username"
-                type="text"
-                autoCapitalize="none"
-                autoCorrect="off"
-                spellCheck={false}
-                autoComplete="username"
-                autoFocus
-                placeholder="yourname"
-                value={value}
-                onChange={(event) => setValue(typedUsername(event.target.value))}
-                className="h-12 rounded-full pl-8"
-                maxLength={20}
-                required
-              />
-            </div>
-            <p className="text-sm text-muted-foreground">
-              3 to 20 characters. Start with a letter. Letters, numbers, and underscores.
-            </p>
-          </div>
-          <Button type="submit" className="w-full h-12 rounded-full" disabled={saving}>
-            {saving ? (
-              <>
-                <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                Saving…
-              </>
-            ) : (
-              'Save'
-            )}
+        {lockedUntil ? (
+          <Button type="button" className="h-12 w-full rounded-full" onClick={() => onOpenChange(false)}>
+            OK
           </Button>
-        </form>
-      </SheetContent>
-    </Sheet>
+        ) : (
+          <form onSubmit={handleSave} className="space-y-4">
+            {error && (
+              <div className="rounded-card bg-destructive/10 p-3 text-sm text-destructive">
+                {error}
+              </div>
+            )}
+            <div className="space-y-2">
+              <Label htmlFor="username">Username</Label>
+              <div className="relative">
+                <span className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-base text-muted-foreground">
+                  @
+                </span>
+                <Input
+                  id="username"
+                  type="text"
+                  autoCapitalize="none"
+                  autoCorrect="off"
+                  spellCheck={false}
+                  autoComplete="username"
+                  autoFocus
+                  placeholder="yourname"
+                  value={value}
+                  onChange={(event) => {
+                    setValue(typedUsername(event.target.value));
+                    setError('');
+                  }}
+                  className="h-12 rounded-full pl-8"
+                  maxLength={20}
+                  required
+                />
+              </div>
+              <p className="text-sm text-muted-foreground">
+                3 to 20 characters. Start with a letter. Letters, numbers, and underscores.
+              </p>
+              <UsernameAvailability status={availability.status} note={availability.note} />
+            </div>
+            <Button
+              type="submit"
+              className="h-12 w-full rounded-full"
+              disabled={saving || availability.status === 'taken' || availability.status === 'checking' || availability.status === 'invalid'}
+            >
+              {saving ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Saving…
+                </>
+              ) : (
+                'Save'
+              )}
+            </Button>
+          </form>
+        )}
+      </DialogContent>
+    </Dialog>
   );
 }
