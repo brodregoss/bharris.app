@@ -246,7 +246,7 @@ export default function ReviewNotes() {
                   ranExtract.current = true;
                   runExtract();
                 }}
-                className="mt-2 rounded-2xl"
+                className="mt-2"
               >
                 Try again
               </Button>
@@ -270,13 +270,13 @@ export default function ReviewNotes() {
             </div>
           ) : (
             <>
-              <div className="rounded-2xl border border-border bg-card p-4 space-y-2 shadow-sm">
+              <div className="rounded-card border border-border bg-card p-4 space-y-2 shadow-sm">
                 <p className="text-xs font-medium text-muted-foreground">Title</p>
                 <Input
                   value={title}
                   onChange={(e) => setTitle(e.target.value)}
                   placeholder="e.g. Bio lecture 3"
-                  className="h-11 rounded-xl font-semibold"
+                  className="h-11 rounded-full font-semibold"
                   autoComplete="off"
                 />
               </div>
@@ -288,14 +288,14 @@ export default function ReviewNotes() {
               {items.map((item, i) => (
                 <div
                   key={item.id}
-                  className="rounded-2xl border border-border bg-card p-4 space-y-3 shadow-sm"
+                  className="rounded-card border border-border bg-card p-4 space-y-3 shadow-sm"
                 >
                   <p className="text-xs font-medium text-muted-foreground">Term {i + 1}</p>
                   <Input
                     value={item.term}
                     onChange={(e) => update(item.id, { term: e.target.value })}
                     placeholder="Term"
-                    className="h-11 rounded-xl font-semibold"
+                    className="h-11 rounded-full font-semibold"
                   />
                   <Textarea
                     value={item.definition}
@@ -340,7 +340,7 @@ export default function ReviewNotes() {
             size="lg"
             disabled={!filled.length || !trimmedTitle || extracting || saving}
             onClick={continueSetup}
-            className="w-full h-14 rounded-2xl text-base font-semibold shadow-lg"
+            className="w-full h-14 rounded-full text-base font-semibold shadow-lg"
           >
             <Check className="w-5 h-5 mr-2" />
             {saving ? 'Saving…' : 'Looks good'}

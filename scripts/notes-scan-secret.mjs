@@ -24,17 +24,16 @@ function upsert(text, key, value) {
   return `${base}${base ? '\n' : ''}${line}\n`;
 }
 
-const phrase = password();
 const devOnly = process.argv.includes('--dev');
-const hash = await formatScanPasswordHash(phrase);
-if (!await verifyNotesScanPassword(hash, phrase)) {
-  throw new Error('Generated code did not match its hash.');
-}
-
 const path = new URL('../worker/.dev.vars', import.meta.url);
 const write = process.argv.includes('--write');
 
 if (devOnly) {
+  const phrase = password();
+  const hash = await formatScanPasswordHash(phrase);
+  if (!await verifyNotesScanPassword(hash, phrase)) {
+    throw new Error('Generated code did not match its hash.');
+  }
   if (write) {
     const current = existsSync(path) ? readFileSync(path, 'utf8') : '';
     const next = upsert(current, 'DEV_TOOLS_CODE_HASH', hash);
@@ -47,10 +46,9 @@ if (devOnly) {
   const secret = tokenSecret();
   if (write) {
     const current = existsSync(path) ? readFileSync(path, 'utf8') : '';
-    const next = upsert(upsert(current, 'NOTES_SCAN_PASSWORD_HASH', hash), 'NOTES_SCAN_TOKEN_SECRET', secret);
+    const next = upsert(current, 'NOTES_SCAN_TOKEN_SECRET', secret);
     writeFileSync(path, next.endsWith('\n') ? next : `${next}\n`);
-    console.log('Saved the notes-scan hash and token secret in worker/.dev.vars');
+    console.log('Saved the token secret in worker/.dev.vars');
   }
-  console.log(`Notes scan password: ${phrase}`);
-  console.log('Set NOTES_SCAN_PASSWORD_HASH and NOTES_SCAN_TOKEN_SECRET with wrangler secret put before deploying.');
+  console.log('Set NOTES_SCAN_TOKEN_SECRET with wrangler secret put before deploying.');
 }

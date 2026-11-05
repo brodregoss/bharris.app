@@ -559,7 +559,7 @@ function CardSim({ step }) {
           </div>
         ) : (
           <>
-            <div className="mx-2 mt-1 flex min-h-[92px] flex-col items-center justify-center rounded-2xl border border-border bg-card px-2 py-2 text-center">
+            <div className="mx-2 mt-1 flex min-h-[92px] flex-col items-center justify-center rounded-card border border-border bg-card px-2 py-2 text-center">
               <p className="text-[8px] uppercase tracking-wide text-muted-foreground">Term</p>
               <p className="mt-0.5 text-[15px] font-bold leading-tight tracking-tight">{card.term}</p>
               {step.revealed ? (
@@ -585,7 +585,7 @@ function CardSim({ step }) {
                     </div>
                   </Tap>
                   <Tap on={step.target === 'got'} press={step.press}>
-                    <div className="flex h-7 items-center justify-center gap-1 rounded-xl bg-emerald-600 text-[10px] font-semibold text-white">
+                    <div className="flex h-8 items-center justify-center gap-1 rounded-pill bg-know/12 text-label text-know">
                       <Check className="h-3 w-3" /> Got it
                     </div>
                   </Tap>
@@ -655,7 +655,7 @@ export default function HowTheBrainLearns() {
           A card you already know is a quick flip. The gauge stays on low effort, because that answer came easily.
         </p>
         <div
-          className="mt-3 flex items-stretch gap-1.5 overflow-hidden rounded-2xl bg-[#07080c] p-1.5 ring-1 ring-white/10"
+          className="mt-3 flex items-stretch gap-2 overflow-hidden rounded-card border border-border bg-background p-2"
           data-kind={step.kind}
           data-phase={step.phase || ''}
           data-effort={step.effort}

@@ -2,8 +2,8 @@ import React from 'react';
 import { useTheme } from 'next-themes';
 import { Capacitor, SystemBars, SystemBarsStyle } from '@capacitor/core';
 
-function applyNativeChrome(dark) {
-  const color = dark ? '#1e1c1a' : '#f8fafc';
+export function applyNativeChrome(dark) {
+  const color = dark ? '#000000' : '#f8fafc';
   const meta = document.querySelector('meta[name="theme-color"]');
   if (meta) meta.setAttribute('content', color);
   const status = document.querySelector('meta[name="apple-mobile-web-app-status-bar-style"]');

@@ -31,7 +31,7 @@ function PreviewHome({ onStart }) {
       </header>
 
       <div className="flex-1 flex flex-col items-center justify-center px-6 text-center">
-        <div className="flex items-center justify-center w-12 h-12 rounded-2xl bg-primary text-primary-foreground mb-4">
+        <div className="flex items-center justify-center w-12 h-12 rounded-full bg-primary text-primary-foreground mb-4">
           <Timer className="w-6 h-6" />
         </div>
         <p className="text-3xl font-bold tracking-tight leading-tight">Good Evening, Smith</p>
@@ -42,7 +42,7 @@ function PreviewHome({ onStart }) {
 
       <footer className="px-5 pb-safe pt-2">
         <div className="max-w-md mx-auto w-full flex flex-col items-stretch gap-3 pb-4">
-          <Button onClick={onStart} className="h-14 rounded-xl text-lg font-semibold">
+          <Button onClick={onStart} className="h-14 rounded-full text-lg font-semibold">
             Start next session
           </Button>
         </div>

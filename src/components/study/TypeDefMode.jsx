@@ -11,6 +11,7 @@ import WriteOwnDef, {
 import { ShortcutKey, useFlashcardShortcuts, useIsComputer } from '@/components/study/flashcardKeys';
 import FlashCardStage from '@/components/study/FlashCardStage';
 import { cardProgressCaption } from '@/components/study/CardProgress';
+import useFillBelow from '@/components/study/useFillBelow';
 
 const COLUMNS = [
   { id: 'blank', label: 'Blank', sub: "Don't know" },
@@ -25,25 +26,27 @@ function termsInColumn(terms, column) {
 function TypeGuide({ definition, value, onChange, inputRef }) {
   const guide = definition || ' ';
   return (
-    <div className="relative rounded-2xl border border-border bg-card">
-      <p className="invisible whitespace-pre-wrap break-words px-4 py-3 text-base leading-relaxed">
-        {guide}
-      </p>
-      <div
-        aria-hidden
-        className="pointer-events-none absolute inset-0 whitespace-pre-wrap break-words px-4 py-3 text-base leading-relaxed text-muted-foreground/35"
-      >
-        {guide}
+    <div className="min-h-0 shrink overflow-y-auto overscroll-contain">
+      <div className="relative min-h-[9rem]">
+        <p className="invisible whitespace-pre-wrap break-words px-1 py-1 text-base leading-relaxed">
+          {guide}
+        </p>
+        <div
+          aria-hidden
+          className="pointer-events-none absolute inset-0 whitespace-pre-wrap break-words px-1 py-1 text-base leading-relaxed text-muted-foreground/40"
+        >
+          {guide}
+        </div>
+        <textarea
+          ref={inputRef}
+          value={value}
+          onChange={(e) => onChange(e.target.value)}
+          spellCheck={false}
+          autoCapitalize="off"
+          autoCorrect="off"
+          className="absolute inset-0 resize-none overflow-hidden bg-transparent px-1 py-1 text-base leading-relaxed text-foreground caret-foreground outline-none"
+        />
       </div>
-      <textarea
-        ref={inputRef}
-        value={value}
-        onChange={(e) => onChange(e.target.value)}
-        spellCheck={false}
-        autoCapitalize="off"
-        autoCorrect="off"
-        className="absolute inset-0 resize-none overflow-hidden bg-transparent px-4 py-3 text-base leading-relaxed text-foreground caret-foreground outline-none"
-      />
     </div>
   );
 }
@@ -83,8 +86,8 @@ function Picker({ terms, selected, setSelected, onStart, onBack, startLabel }) {
                 disabled={!ids.length}
                 onClick={() => setSelected(new Set(ids))}
                 className={cn(
-                  'rounded-xl border px-2 py-3 text-center transition disabled:opacity-40',
-                  allOn ? 'border-foreground bg-card' : 'border-border bg-muted/40',
+                  'press rounded-card border px-2 py-3 text-center transition-colors duration-150 ease-out disabled:bg-surface-2 disabled:text-tertiary',
+                  allOn ? 'border-foreground bg-card' : 'option-surface',
                 )}
               >
                 <p className="text-sm font-semibold">{col.label}</p>
@@ -102,8 +105,8 @@ function Picker({ terms, selected, setSelected, onStart, onBack, startLabel }) {
                 type="button"
                 onClick={() => toggle(t.id)}
                 className={cn(
-                  'w-full text-left rounded-xl border p-3 transition',
-                  on ? 'border-foreground bg-card' : 'border-border bg-muted/30',
+                  'press w-full rounded-card border p-4 text-left transition-colors duration-150 ease-out',
+                  on ? 'border-foreground bg-card' : 'option-surface',
                 )}
               >
                 <p className="text-sm font-semibold">{t.term}</p>
@@ -115,7 +118,7 @@ function Picker({ terms, selected, setSelected, onStart, onBack, startLabel }) {
         <Button
           disabled={!selected.size}
           onClick={onStart}
-          className="w-full h-12 rounded-2xl font-semibold"
+          className="w-full h-12 rounded-full font-semibold"
         >
           {startLabel} · {selected.size}
           <ArrowRight className="w-4 h-4 ml-2" />
@@ -316,7 +319,7 @@ function FlashRound({ queue, byId, allTerms, onUpdateTerm, onDone, onBack }) {
           <h2 className="text-2xl font-bold tracking-tight mb-2">Flash cards done</h2>
           <p className="text-sm text-muted-foreground mb-6">Back to skim, or lock in the ones that kept cycling.</p>
           {defModeButton}
-          <Button onClick={onDone} className="w-full h-12 rounded-2xl font-semibold mt-4">
+          <Button onClick={onDone} className="w-full h-12 rounded-full font-semibold mt-4">
             Back to skim
             <ArrowRight className="w-4 h-4 ml-2" />
           </Button>
@@ -379,6 +382,7 @@ export default function TypeDefMode({ terms, onUpdateTerm, onClose, startIn = 't
   };
 
   const current = byId[queue[pos]];
+  const fit = useFillBelow(stage === 'type' && !!current);
 
   React.useEffect(() => {
     if (stage !== 'type') return;
@@ -445,43 +449,55 @@ export default function TypeDefMode({ terms, onUpdateTerm, onClose, startIn = 't
   };
 
   return (
-    <div className="flex-1 flex flex-col px-5 pt-4">
-      <div className="max-w-md mx-auto w-full flex-1 flex flex-col">
-        <div className="flex items-center justify-between mb-3">
-          <button
-            type="button"
-            onClick={() => {
-              setQueue(queue.slice(pos));
-              setPos(0);
-              setStage('flash');
-            }}
-            className="text-sm font-medium text-foreground underline-offset-4 hover:underline"
-          >
-            Flash cards
-          </button>
-          <p className="text-xs text-muted-foreground">{pos + 1}/{queue.length}</p>
-        </div>
-        <p className="text-[11px] uppercase tracking-wide text-muted-foreground mb-1">Term</p>
-        <h2 className="text-2xl font-bold tracking-tight mb-2">{current.term}</h2>
-        <p className="text-xs text-muted-foreground mb-3">
-          Type the definition over the grey guide, then go next.
-        </p>
-        <TypeGuide
-          definition={current.definition}
-          value={typed}
-          onChange={setTyped}
-          inputRef={inputRef}
-        />
-        <div className={cn('mt-4', pos > 0 && 'grid grid-cols-2 gap-3')}>
-          {pos > 0 && (
-            <Button variant="outline" onClick={goPrev} className="h-12 rounded-2xl font-semibold">
-              <ArrowLeft className="w-4 h-4 mr-2" /> Back
+    <div
+      ref={fit.ref}
+      style={fit.style}
+      className="flex w-full flex-1 flex-col overflow-hidden px-3 pb-safe"
+    >
+      <div className="flex shrink-0 items-center justify-between pb-1 text-xs font-medium text-muted-foreground">
+        <button
+          type="button"
+          onClick={() => {
+            setQueue(queue.slice(pos));
+            setPos(0);
+            setStage('flash');
+          }}
+          className="font-medium text-foreground underline-offset-4 hover:underline"
+        >
+          Flash cards
+        </button>
+      </div>
+      <div className="flex min-h-0 w-full flex-1 flex-col">
+        <div className="mx-auto flex min-h-0 w-full max-w-xl flex-1 flex-col justify-start gap-4 pb-2 sm:-translate-y-8 sm:justify-center sm:py-6">
+          <div className="flex max-h-full min-h-0 flex-col rounded-card border border-border bg-surface-1 p-6 sm:p-8">
+            <div className="flex shrink-0 items-center justify-between gap-3">
+              <p className="text-label uppercase text-muted-foreground">Term</p>
+              <span className="text-meta tabular-nums text-muted-foreground">
+                {pos + 1} of {queue.length}
+              </span>
+            </div>
+            <p className="mt-6 shrink-0 break-words text-display text-foreground">
+              {current.term}
+            </p>
+            <p className="mb-3 mt-8 shrink-0 text-label uppercase text-muted-foreground">Type the definition</p>
+            <TypeGuide
+              definition={current.definition}
+              value={typed}
+              onChange={setTyped}
+              inputRef={inputRef}
+            />
+          </div>
+          <div className={cn('shrink-0', pos > 0 && 'grid grid-cols-2 gap-3')}>
+            {pos > 0 && (
+              <Button variant="outline" onClick={goPrev} className="h-12 rounded-full font-semibold">
+                <ArrowLeft className="w-4 h-4 mr-2" /> Back
+              </Button>
+            )}
+            <Button onClick={goNext} className="h-12 w-full rounded-full font-semibold">
+              {last ? 'Done' : 'Next'}
+              <ArrowRight className="w-4 h-4 ml-2" />
             </Button>
-          )}
-          <Button onClick={goNext} className="w-full h-12 rounded-2xl font-semibold">
-            {last ? 'Done' : 'Next'}
-            <ArrowRight className="w-4 h-4 ml-2" />
-          </Button>
+          </div>
         </div>
       </div>
     </div>

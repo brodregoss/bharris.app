@@ -2,10 +2,10 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
   formatScanPasswordHash,
+  handleScanEnable,
   handleScanKill,
   handleDevUnlock,
-  handleScanPassword,
-  handleScanUnlock,
+  handleScanStatus,
   nextScanFailure,
   parseStoredScanHash,
   requireScanToken,
@@ -25,11 +25,8 @@ test('notes scan password matches only the stored hash', async () => {
   assert.equal(await verifyNotesScanPassword(stored, ''), false);
   assert.equal(await verifyNotesScanPassword(stored, PASSWORD + ' '), false);
   assert.equal(parseStoredScanHash('pbkdf2-sha256$1000$aa$bb'), null);
-  assert.equal(scanLockConfigured({
-    NOTES_SCAN_PASSWORD_HASH: stored,
-    NOTES_SCAN_TOKEN_SECRET: SECRET,
-  }), true);
-  assert.equal(scanLockConfigured({ NOTES_SCAN_PASSWORD_HASH: stored }), false);
+  assert.equal(scanLockConfigured({ NOTES_SCAN_TOKEN_SECRET: SECRET }), true);
+  assert.equal(scanLockConfigured({ NOTES_SCAN_TOKEN_SECRET: 'short' }), false);
 });
 
 test('notes scan token is bound to one account and expires', async () => {
@@ -109,30 +106,14 @@ function lockEnv(hash) {
   };
 }
 
-test('photo upload stays closed until the password checks out', async () => {
-  const password = 'scan-password-ok';
-  const hash = await formatScanPasswordHash(password, { iterations: 100_000 });
-  const env = lockEnv(hash);
+test('photo upload is open without a password until it is killed', async () => {
+  const env = { ...lockEnv(''), APP: memoryApp() };
   const identity = { uid: 'user-a' };
 
-  assert.equal((await handleScanUnlock(jsonRequest({}), env, identity)).status, 401);
-  const opened = await handleScanUnlock(jsonRequest({ password }), env, identity);
-  assert.equal(opened.status, 200);
-  const { token } = await opened.json();
-  const missing = await requireScanToken(new Request('https://app.test/v1/notes'), env, identity);
-  assert.equal(missing.status, 401);
-  const allowed = await requireScanToken(new Request('https://app.test/v1/notes', {
-    headers: { 'X-Notes-Scan-Token': token },
-  }), env, identity);
-  assert.equal(allowed, null);
-  const otherAccount = await requireScanToken(new Request('https://app.test/v1/notes', {
-    headers: { 'X-Notes-Scan-Token': token },
-  }), env, { uid: 'user-b' });
-  assert.equal(otherAccount.status, 401);
-
-  const bare = lockEnv(hash);
-  delete bare.NOTES_SCAN_PASSWORD_HASH;
-  assert.equal((await handleScanUnlock(jsonRequest({ password }), bare, identity)).status, 503);
+  assert.equal(await requireScanToken(new Request('https://app.test/v1/notes'), env, identity), null);
+  const open = await handleScanStatus(env);
+  assert.equal(open.status, 200);
+  assert.equal((await open.json()).active, true);
 });
 
 function memoryApp() {
@@ -163,52 +144,35 @@ function memoryApp() {
   };
 }
 
-test('killing the notes code stops old passwords and tokens', async () => {
-  const password = 'scan-password-ok';
-  const hash = await formatScanPasswordHash(password, { iterations: 100_000 });
+test('killing photo upload closes it until it is turned back on', async () => {
   const env = {
-    ...lockEnv(hash),
+    ...lockEnv(''),
     ADMIN_EMAIL: 'owner@example.com',
     APP: memoryApp(),
   };
   const owner = { uid: 'owner-kill', email: 'owner@example.com' };
   const student = { uid: 'student-kill', email: 'student@example.com' };
-  const opened = await handleScanUnlock(jsonRequest({ password }), env, student);
-  assert.equal(opened.status, 200);
-  const { token } = await opened.json();
 
+  assert.equal(await requireScanToken(new Request('https://app.test/v1/notes'), env, student), null);
   assert.equal((await handleScanKill(new Request('https://app.test/kill'), env, student)).status, 403);
   const killed = await handleScanKill(new Request('https://app.test/kill'), env, owner);
   assert.equal(killed.status, 200);
   assert.equal((await killed.json()).killed, true);
+  assert.equal((await requireScanToken(new Request('https://app.test/v1/notes'), env, student)).status, 403);
+  assert.equal((await handleScanStatus(env)).status, 200);
+  assert.equal((await (await handleScanStatus(env)).json()).active, false);
 
-  assert.equal((await handleScanUnlock(jsonRequest({ password }), env, student)).status, 401);
-  assert.equal((await requireScanToken(new Request('https://app.test/v1/notes', {
-    headers: { 'X-Notes-Scan-Token': token },
-  }), env, student)).status, 401);
-
-  assert.equal((await handleScanPassword(jsonRequest({ password: 'short' }), env, student)).status, 403);
-  assert.equal((await handleScanPassword(jsonRequest({ password: 'short' }), env, owner)).status, 400);
-  const nextCode = 'fresh-notes-code';
-  const saved = await handleScanPassword(jsonRequest({ password: nextCode }), env, owner);
-  assert.equal(saved.status, 200);
-  assert.equal((await handleScanUnlock(jsonRequest({ password }), env, student)).status, 401);
-  const again = await handleScanUnlock(jsonRequest({ password: nextCode }), env, student);
-  assert.equal(again.status, 200);
-  const { token: nextToken } = await again.json();
-  assert.equal((await requireScanToken(new Request('https://app.test/v1/notes', {
-    headers: { 'X-Notes-Scan-Token': token },
-  }), env, student)).status, 401);
-  assert.equal(await requireScanToken(new Request('https://app.test/v1/notes', {
-    headers: { 'X-Notes-Scan-Token': nextToken },
-  }), env, student), null);
+  assert.equal((await handleScanEnable(new Request('https://app.test/enable'), env, student)).status, 403);
+  const enabled = await handleScanEnable(new Request('https://app.test/enable'), env, owner);
+  assert.equal(enabled.status, 200);
+  assert.equal((await enabled.json()).active, true);
+  assert.equal(await requireScanToken(new Request('https://app.test/v1/notes'), env, student), null);
 });
 
-test('dev code opens the kill switch and the old pin does not', async () => {
+test('dev code opens the kill switch and a scan token does not', async () => {
   const devCode = 'river-candle-moonlight';
-  const notesPassword = 'scan-password-ok';
   const env = {
-    ...lockEnv(await formatScanPasswordHash(notesPassword, { iterations: 100_000 })),
+    ...lockEnv(''),
     DEV_TOOLS_CODE_HASH: await formatScanPasswordHash(devCode, { iterations: 100_000 }),
     APP: memoryApp(),
   };
@@ -223,14 +187,19 @@ test('dev code opens the kill switch and the old pin does not', async () => {
   }), env, user);
   assert.equal(killed.status, 200);
   assert.equal((await killed.json()).killed, true);
+  const enabled = await handleScanEnable(new Request('https://app.test/enable', {
+    headers: { 'X-Dev-Tools-Token': token },
+  }), env, user);
+  assert.equal(enabled.status, 200);
+  assert.equal((await enabled.json()).active, true);
 
   const fresh = {
-    ...lockEnv(await formatScanPasswordHash(notesPassword, { iterations: 100_000 })),
+    ...lockEnv(''),
+    NOTES_SCAN_TOKEN_SECRET: env.NOTES_SCAN_TOKEN_SECRET,
     DEV_TOOLS_CODE_HASH: env.DEV_TOOLS_CODE_HASH,
     APP: memoryApp(),
   };
-  const scan = await handleScanUnlock(jsonRequest({ password: notesPassword }), fresh, user);
-  const { token: scanToken } = await scan.json();
+  const scanToken = await signScanToken(env.NOTES_SCAN_TOKEN_SECRET, user.uid, Date.now() + 60_000);
   assert.equal((await handleScanKill(new Request('https://app.test/kill', {
     headers: { 'X-Dev-Tools-Token': scanToken },
   }), fresh, user)).status, 403);

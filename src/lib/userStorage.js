@@ -9,11 +9,14 @@ const LEGACY_KEYS = [
   'lms_panic_summary_v1',
 ];
 
+export const HOME_TOUR_FLAG = 'lms_home_tour_v1';
+
 const ACCOUNT_KEYS = [
   ...LEGACY_KEYS,
   'lms_greeting_name_v1',
   'lms_note_sets_v1',
   'ai_consent_accepted',
+  HOME_TOUR_FLAG,
 ];
 
 export function getActiveUid() {

@@ -1,6 +1,6 @@
 import React from 'react';
 import { useNavigate, useLocation, Navigate } from 'react-router-dom';
-import { Timer, Clock, GraduationCap, CalendarClock, ArrowRight, ArrowLeft, BookOpen } from 'lucide-react';
+import { Clock, GraduationCap, CalendarClock, ArrowRight, ArrowLeft, BookOpen } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 import {
@@ -10,7 +10,6 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { cn } from '@/lib/utils';
 import { termCount, setupReturnPath } from '@/lib/notesSource';
 import { markOnboarded } from '@/lib/onboarding';
 
@@ -36,106 +35,228 @@ function wheelUnit(label, n) {
   return 'min';
 }
 
+function indexOfValue(options, value) {
+  const index = options.indexOf(value);
+  return index < 0 ? 0 : index;
+}
+
+function snapOffset(offset, count) {
+  const max = Math.max(0, (count - 1) * WHEEL_ITEM);
+  const clamped = Math.max(0, Math.min(max, offset));
+  return Math.round(clamped / WHEEL_ITEM) * WHEEL_ITEM;
+}
+
 function Wheel({ label, options, value, onChange }) {
-  const scroller = React.useRef(null);
-  const settleTimer = React.useRef(null);
-  const skipScroll = React.useRef(false);
+  const rootRef = React.useRef(null);
+  const startIndex = indexOfValue(options, value);
+  const offsetRef = React.useRef(startIndex * WHEEL_ITEM);
+  const indexRef = React.useRef(startIndex);
+  const committedRef = React.useRef(startIndex);
+  const optionsRef = React.useRef(options);
   const valueRef = React.useRef(value);
-  const [active, setActive] = React.useState(value);
+  const onChangeRef = React.useRef(onChange);
+  const dragRef = React.useRef(null);
+  const animRef = React.useRef(0);
+  const snapTimer = React.useRef(null);
+  const movedRef = React.useRef(false);
+  const [offset, setOffset] = React.useState(startIndex * WHEEL_ITEM);
+  const [active, setActive] = React.useState(startIndex);
+  optionsRef.current = options;
   valueRef.current = value;
+  onChangeRef.current = onChange;
 
-  const indexFor = React.useCallback((next) => {
-    const index = options.indexOf(next);
-    return index < 0 ? 0 : index;
-  }, [options]);
+  const applyOffset = React.useCallback((next) => {
+    const list = optionsRef.current;
+    const max = Math.max(0, (list.length - 1) * WHEEL_ITEM);
+    const clamped = Math.max(0, Math.min(max, next));
+    offsetRef.current = clamped;
+    setOffset(clamped);
+    const index = Math.max(0, Math.min(list.length - 1, Math.round(clamped / WHEEL_ITEM)));
+    if (index !== indexRef.current) {
+      indexRef.current = index;
+      setActive(index);
+    }
+  }, []);
 
-  const scrollTo = React.useCallback((next, behavior) => {
-    const el = scroller.current;
-    if (!el) return;
-    el.scrollTo({ top: indexFor(next) * WHEEL_ITEM, behavior });
-  }, [indexFor]);
+  const commitIndex = React.useCallback((index) => {
+    const list = optionsRef.current;
+    const safe = Math.max(0, Math.min(list.length - 1, index));
+    committedRef.current = safe;
+    const next = list[safe];
+    if (next !== valueRef.current) onChangeRef.current(next);
+  }, []);
+
+  const animateTo = React.useCallback((target) => {
+    window.clearTimeout(snapTimer.current);
+    window.cancelAnimationFrame(animRef.current);
+    const dest = snapOffset(target, optionsRef.current.length);
+    const from = offsetRef.current;
+    const distance = dest - from;
+    const reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    if (Math.abs(distance) < 0.5 || reduce) {
+      applyOffset(dest);
+      commitIndex(Math.round(dest / WHEEL_ITEM));
+      return;
+    }
+    const duration = Math.min(520, Math.max(220, Math.abs(distance) * 2.6));
+    const start = performance.now();
+    const tick = (now) => {
+      const t = Math.min(1, (now - start) / duration);
+      const eased = 1 - (1 - t) ** 3;
+      applyOffset(from + distance * eased);
+      if (t < 1) {
+        animRef.current = window.requestAnimationFrame(tick);
+        return;
+      }
+      applyOffset(dest);
+      commitIndex(Math.round(dest / WHEEL_ITEM));
+    };
+    animRef.current = window.requestAnimationFrame(tick);
+  }, [applyOffset, commitIndex]);
+
+  const scheduleSnap = React.useCallback(() => {
+    window.clearTimeout(snapTimer.current);
+    snapTimer.current = window.setTimeout(() => {
+      animateTo(offsetRef.current);
+    }, 80);
+  }, [animateTo]);
 
   React.useLayoutEffect(() => {
-    setActive(value);
-    if (skipScroll.current) {
-      skipScroll.current = false;
-      return;
-    }
-    scrollTo(value, 'auto');
-  }, [value, scrollTo]);
+    const index = indexOfValue(options, value);
+    if (dragRef.current) return;
+    if (committedRef.current === index) return;
+    animateTo(index * WHEEL_ITEM);
+  }, [value, options, animateTo]);
 
-  const settle = React.useCallback(() => {
-    const el = scroller.current;
-    if (!el) return;
-    const index = Math.max(0, Math.min(options.length - 1, Math.round(el.scrollTop / WHEEL_ITEM)));
-    const next = options[index];
-    if (next !== valueRef.current) {
-      skipScroll.current = true;
-      onChange(next);
-      return;
-    }
-    if (Math.abs(el.scrollTop - index * WHEEL_ITEM) > 1) {
-      el.scrollTo({ top: index * WHEEL_ITEM, behavior: 'smooth' });
-    }
-  }, [onChange, options]);
+  React.useEffect(() => {
+    const el = rootRef.current;
+    if (!el) return undefined;
+    const onWheel = (event) => {
+      event.preventDefault();
+      let dy = event.deltaY;
+      if (event.deltaMode === 1) dy *= 16;
+      if (event.deltaMode === 2) dy *= WHEEL_ITEM;
+      window.cancelAnimationFrame(animRef.current);
+      applyOffset(offsetRef.current + dy);
+      scheduleSnap();
+    };
+    el.addEventListener('wheel', onWheel, { passive: false });
+    return () => el.removeEventListener('wheel', onWheel);
+  }, [applyOffset, scheduleSnap]);
 
-  const onScroll = () => {
-    const el = scroller.current;
-    if (el) {
-      const index = Math.max(0, Math.min(options.length - 1, Math.round(el.scrollTop / WHEEL_ITEM)));
-      setActive(options[index]);
-    }
-    window.clearTimeout(settleTimer.current);
-    settleTimer.current = window.setTimeout(settle, 80);
-  };
-
-  React.useEffect(() => () => window.clearTimeout(settleTimer.current), []);
+  React.useEffect(() => () => {
+    window.cancelAnimationFrame(animRef.current);
+    window.clearTimeout(snapTimer.current);
+  }, []);
 
   const move = (dir) => {
-    const index = indexFor(value);
-    const next = options[Math.max(0, Math.min(options.length - 1, index + dir))];
-    if (next !== value) onChange(next);
+    const list = optionsRef.current;
+    const index = Math.max(0, Math.min(list.length - 1, indexRef.current + dir));
+    animateTo(index * WHEEL_ITEM);
   };
 
   return (
     <div
-      ref={scroller}
+      ref={rootRef}
       role="listbox"
       aria-label={label}
       tabIndex={0}
-      onScroll={onScroll}
-      onKeyDown={(e) => {
-        if (e.key === 'ArrowDown') {
-          e.preventDefault();
+      onKeyDown={(event) => {
+        if (event.key === 'ArrowDown') {
+          event.preventDefault();
           move(1);
-        } else if (e.key === 'ArrowUp') {
-          e.preventDefault();
+        } else if (event.key === 'ArrowUp') {
+          event.preventDefault();
           move(-1);
         }
       }}
-      className="relative z-10 h-full overflow-y-auto overscroll-y-contain snap-y snap-mandatory [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden"
+      onPointerDown={(event) => {
+        if (event.button !== 0) return;
+        window.clearTimeout(snapTimer.current);
+        window.cancelAnimationFrame(animRef.current);
+        dragRef.current = {
+          id: event.pointerId,
+          y: event.clientY,
+          origin: offsetRef.current,
+          lastY: event.clientY,
+          lastT: performance.now(),
+          velocity: 0,
+          moved: false,
+        };
+        movedRef.current = false;
+        try {
+          event.currentTarget.setPointerCapture(event.pointerId);
+        } catch {
+          // Pointer capture needs a real pointer. Drag still follows the events.
+        }
+      }}
+      onPointerMove={(event) => {
+        const drag = dragRef.current;
+        if (!drag || drag.id !== event.pointerId) return;
+        const dy = event.clientY - drag.y;
+        if (Math.abs(dy) > 3) {
+          drag.moved = true;
+          movedRef.current = true;
+        }
+        const now = performance.now();
+        const dt = now - drag.lastT;
+        if (dt >= 8) {
+          const instant = (drag.lastY - event.clientY) / dt;
+          drag.velocity = drag.velocity * 0.6 + instant * 0.4;
+          drag.lastY = event.clientY;
+          drag.lastT = now;
+        }
+        applyOffset(drag.origin - dy);
+      }}
+      onPointerUp={(event) => {
+        const drag = dragRef.current;
+        if (!drag || drag.id !== event.pointerId) return;
+        dragRef.current = null;
+        if (event.currentTarget.hasPointerCapture(event.pointerId)) {
+          event.currentTarget.releasePointerCapture(event.pointerId);
+        }
+        if (!drag.moved) return;
+        const stale = performance.now() - drag.lastT > 70;
+        const coast = stale ? 0 : Math.max(-WHEEL_ITEM * 3, Math.min(WHEEL_ITEM * 3, drag.velocity * 110));
+        animateTo(offsetRef.current + coast);
+      }}
+      onPointerCancel={() => {
+        if (!dragRef.current) return;
+        dragRef.current = null;
+        animateTo(offsetRef.current);
+      }}
+      className="relative z-10 h-full cursor-grab touch-none select-none overflow-hidden active:cursor-grabbing"
     >
-      <div style={{ height: WHEEL_PAD }} />
-      {options.map((opt) => {
-        const selected = opt === active;
-        return (
-          <div
-            key={opt}
-            role="option"
-            aria-selected={opt === value}
-            onClick={() => onChange(opt)}
-            className={`snap-center flex h-10 w-full items-center justify-center text-lg tabular-nums ${
-              selected ? 'font-semibold text-foreground' : 'font-medium text-muted-foreground/70'
-            }`}
-          >
-            <span className="inline-flex items-baseline gap-1.5">
-              <span className="w-6 text-right">{opt}</span>
-              <span className="w-11 text-left text-sm">{wheelUnit(label, opt)}</span>
-            </span>
-          </div>
-        );
-      })}
-      <div style={{ height: WHEEL_PAD }} />
+      <div style={{ transform: `translate3d(0, ${-offset}px, 0)` }}>
+        <div style={{ height: WHEEL_PAD }} />
+        {options.map((opt, index) => {
+          const selected = index === active;
+          return (
+            <div
+              key={opt}
+              role="option"
+              aria-selected={opt === value}
+              onClick={() => {
+                if (movedRef.current) {
+                  movedRef.current = false;
+                  return;
+                }
+                animateTo(index * WHEEL_ITEM);
+              }}
+              className={`flex w-full items-center justify-center text-lg tabular-nums ${
+                selected ? 'font-semibold text-foreground' : 'font-medium text-muted-foreground/70'
+              }`}
+              style={{ height: WHEEL_ITEM }}
+            >
+              <span className="inline-flex items-baseline gap-1.5">
+                <span className="w-6 text-right">{opt}</span>
+                <span className="w-11 text-left text-sm">{wheelUnit(label, opt)}</span>
+              </span>
+            </div>
+          );
+        })}
+        <div style={{ height: WHEEL_PAD }} />
+      </div>
     </div>
   );
 }
@@ -200,52 +321,43 @@ export default function Home() {
 
   return (
     <div className="min-h-[100dvh] bg-background text-foreground flex flex-col">
-      <header className="px-3 pt-safe pb-2 flex items-center gap-1">
+      <header className="px-5 pt-safe">
         <button
           type="button"
           onClick={goBack}
           aria-label={source.returnTo === '/history' ? 'Back' : 'Back to notes'}
-          className="w-11 h-11 rounded-full flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-accent transition"
+          className="flex h-11 w-11 -ml-2 items-center justify-center rounded-full text-muted-foreground transition hover:bg-accent hover:text-foreground"
         >
           <ArrowLeft className="w-5 h-5" />
         </button>
-        <div className="flex items-center justify-center w-9 h-9 rounded-xl bg-primary text-primary-foreground">
-          <Timer className="w-5 h-5" />
-        </div>
-        <div className="min-w-0">
-          <h1 className="text-base font-bold tracking-tight leading-none truncate">bharris.app</h1>
-          <p className="text-[11px] text-muted-foreground leading-none mt-1 truncate">How much time do you have?</p>
-        </div>
       </header>
 
-      <main className="flex-1 px-6 pt-4 flex flex-col">
-        <div className="max-w-md mx-auto w-full flex-1 flex flex-col">
-          <h2 className="text-2xl font-bold tracking-tight mb-1">How much time do you have?</h2>
-          <p className="text-sm text-muted-foreground mb-5">
+      <main className="flex flex-1 flex-col px-5 pt-2">
+        <div className="mx-auto flex w-full max-w-md flex-1 flex-col">
+          <h1 className="text-display text-foreground">How much time?</h1>
+          <p className="mb-6 mt-3 text-body text-muted-foreground">
             Tell us the clock and the test — we'll build a plan that fits.
           </p>
 
-          <div className="mb-5 rounded-2xl border border-border bg-card p-4 shadow-sm">
-            <div className="flex items-start gap-3">
-              <div className="flex items-center justify-center w-9 h-9 rounded-xl bg-muted text-muted-foreground shrink-0">
-                <BookOpen className="w-4 h-4" />
-              </div>
-              <div className="flex-1 min-w-0">
-                <p className="text-sm font-semibold leading-tight truncate">{notesLabel}</p>
-                <p className="text-xs text-muted-foreground leading-tight mt-0.5">
-                  {count > 0
-                    ? `${count} term${count === 1 ? '' : 's'} ready`
-                    : 'Terms will be extracted from your notes'}
-                </p>
-              </div>
-              <button
-                type="button"
-                onClick={lookOver}
-                className="text-xs font-medium text-foreground underline underline-offset-4 hover:text-muted-foreground shrink-0"
-              >
-                Look over notes
-              </button>
+          <div className="option-surface mb-6 flex items-center gap-3 rounded-card px-4 py-4">
+            <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-background text-foreground">
+              <BookOpen className="h-4 w-4" />
             </div>
+            <div className="min-w-0 flex-1">
+              <p className="truncate text-[15px] font-semibold leading-tight">{notesLabel}</p>
+              <p className="mt-0.5 text-sm text-muted-foreground">
+                {count > 0
+                  ? `${count} term${count === 1 ? '' : 's'} ready`
+                  : 'Terms will be extracted from your notes'}
+              </p>
+            </div>
+            <button
+              type="button"
+              onClick={lookOver}
+              className="shrink-0 text-sm font-semibold text-foreground"
+            >
+              Look
+            </button>
           </div>
 
           <div className="space-y-5">
@@ -254,9 +366,10 @@ export default function Home() {
               label="Time available"
               hint={hoursHint}
             >
+              <p className="mb-2 text-center text-sm text-muted-foreground">Scroll to change the time</p>
               <div className="relative h-[200px]">
                 <div
-                  className="pointer-events-none absolute inset-x-0 top-1/2 z-0 h-10 -translate-y-1/2 rounded-xl bg-muted"
+                  className="pointer-events-none absolute inset-x-0 top-1/2 z-0 h-10 -translate-y-1/2 rounded-full bg-muted"
                   aria-hidden
                 />
                 <div className="grid h-full grid-cols-2">
@@ -283,7 +396,7 @@ export default function Home() {
               label="What kind of test is it?"
             >
               <Select value={examType} onValueChange={setExamType}>
-                <SelectTrigger className="h-14 rounded-2xl text-base">
+                <SelectTrigger className="h-14 rounded-full text-base">
                   <SelectValue placeholder="Select exam type" />
                 </SelectTrigger>
                 <SelectContent>
@@ -300,7 +413,7 @@ export default function Home() {
               hint="Sleep-protection is tailored to how soon you test."
             >
               <Select value={examTiming} onValueChange={setExamTiming}>
-                <SelectTrigger className="h-14 rounded-2xl text-base">
+                <SelectTrigger className="h-14 rounded-full text-base">
                   <SelectValue placeholder="When is the exam?" />
                 </SelectTrigger>
                 <SelectContent>
@@ -314,8 +427,8 @@ export default function Home() {
         </div>
       </main>
 
-      <footer className="px-6 pt-2 pb-safe">
-        <div className="max-w-md mx-auto w-full">
+      <footer className="px-5 pt-2 pb-safe">
+        <div className="mx-auto w-full max-w-md">
           <Button
             size="lg"
             disabled={!canStart}
@@ -334,12 +447,7 @@ export default function Home() {
                 },
               });
             }}
-            className={cn(
-              'w-full h-14 rounded-2xl text-base font-semibold transition-all',
-              canStart
-                ? 'shadow-lg'
-                : 'bg-muted text-muted-foreground'
-            )}
+            className="h-action w-full"
           >
             Continue
             <ArrowRight className="w-5 h-5 ml-2" />

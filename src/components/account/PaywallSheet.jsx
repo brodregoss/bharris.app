@@ -46,8 +46,8 @@ function formatPlanDate(iso) {
 function PlanCard({ plan, current, highlight, action, busy }) {
   return (
     <div className={cn(
-      'rounded-2xl border p-4 text-left w-full',
-      highlight ? 'border-foreground bg-card' : 'border-border bg-muted/40',
+      'w-full rounded-card border p-6 text-left',
+      highlight ? 'border-foreground bg-card' : 'option-surface',
     )}
     >
       <div className="flex items-baseline justify-between gap-3">
@@ -76,14 +76,14 @@ function PlanCard({ plan, current, highlight, action, busy }) {
       {action ? (
         <Button
           type="button"
-          className="w-full h-11 rounded-2xl mt-4 font-semibold"
+          className="w-full h-11 rounded-full mt-4 font-semibold"
           disabled={busy}
           onClick={action.onClick}
         >
           {busy ? <Loader2 className="w-4 h-4 animate-spin" /> : action.label}
         </Button>
       ) : current && plan.monthlyPrice ? (
-        <div className="w-full h-11 rounded-2xl mt-4 font-semibold bg-primary text-primary-foreground flex items-center justify-center">
+        <div className="w-full h-11 rounded-full mt-4 font-semibold bg-primary text-primary-foreground flex items-center justify-center">
           Current
         </div>
       ) : null}
@@ -259,7 +259,7 @@ export default function PaywallSheet({ open, onOpenChange }) {
                   spellCheck={false}
                   placeholder="Optional"
                   onChange={(event) => setCode(event.target.value)}
-                  className="h-11 rounded-2xl"
+                  className="h-11 rounded-full"
                 />
               </div>
             )}
@@ -268,7 +268,7 @@ export default function PaywallSheet({ open, onOpenChange }) {
               <Button
                 type="button"
                 variant="outline"
-                className="w-full h-11 rounded-2xl"
+                className="w-full h-11 rounded-full"
                 disabled={!!busy}
                 onClick={() => {
                   setError('');
@@ -282,7 +282,7 @@ export default function PaywallSheet({ open, onOpenChange }) {
               <Button
                 type="button"
                 variant="outline"
-                className="w-full h-11 rounded-2xl"
+                className="w-full h-11 rounded-full"
                 disabled={!!busy}
                 onClick={manageBilling}
               >
@@ -291,7 +291,7 @@ export default function PaywallSheet({ open, onOpenChange }) {
             )}
 
             {!billingPlan && (
-              <form onSubmit={redeem} className="rounded-2xl border border-border p-4 space-y-3">
+              <form onSubmit={redeem} className="rounded-card border border-border p-4 space-y-3">
                 <p className="text-sm font-bold tracking-tight">Redeem partner code</p>
                 <p className="text-xs text-muted-foreground">
                   Get a code from someone on partner study. It works for one friend.
@@ -303,9 +303,9 @@ export default function PaywallSheet({ open, onOpenChange }) {
                   placeholder="Partner code"
                   aria-label="Partner code"
                   onChange={(event) => setRedeemCode(event.target.value)}
-                  className="h-11 rounded-2xl"
+                  className="h-11 rounded-full"
                 />
-                <Button type="submit" className="w-full h-11 rounded-2xl font-semibold" disabled={!!busy}>
+                <Button type="submit" className="w-full h-11 rounded-full font-semibold" disabled={!!busy}>
                   {busy === 'redeem' ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Redeem'}
                 </Button>
               </form>

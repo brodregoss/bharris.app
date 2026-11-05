@@ -1,6 +1,6 @@
 import React from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ArrowLeft, History, Loader2, Trash2 } from 'lucide-react';
+import { ArrowLeft, BookOpen, History, Loader2, Trash2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
   AlertDialog,
@@ -272,16 +272,18 @@ export default function PastSessions() {
 
   return (
     <div className="min-h-[100dvh] bg-background text-foreground flex flex-col">
-      <header className="flex items-center gap-1 px-3 pt-safe pb-2">
-        <Button variant="ghost" size="icon" onClick={() => navigate('/')} aria-label="Back">
-          <ArrowLeft className="w-5 h-5" />
-        </Button>
-        <h1 className="min-w-0 truncate text-base font-bold tracking-tight">Past sessions</h1>
-        {loading && (
-          <Loader2 className="w-4 h-4 animate-spin text-muted-foreground" aria-label="Loading sessions" />
-        )}
+      <header className="px-5 pt-safe">
+        <div className="flex items-center">
+          <Button variant="ghost" size="icon" onClick={() => navigate('/')} aria-label="Back" className="-ml-2">
+            <ArrowLeft className="w-5 h-5" />
+          </Button>
+          {loading && (
+            <Loader2 className="w-4 h-4 animate-spin text-muted-foreground" aria-label="Loading sessions" />
+          )}
+        </div>
+        <h1 className="mt-6 text-display text-foreground">Past sessions</h1>
       </header>
-      <p className="px-5 text-xs text-muted-foreground mb-3">
+      <p className="px-5 mt-3 mb-1 text-sm text-muted-foreground">
         {loading && !sessions.length
           ? (user?.subscriptionTier === 'pro'
             ? `${planLabel(user)} keeps your last ${cap} crams.`
@@ -298,46 +300,53 @@ export default function PastSessions() {
         </div>
       ) : sessions.length ? (
         <div className="flex-1 overflow-y-auto px-5 pb-safe">
-          <div className="max-w-md mx-auto w-full divide-y divide-border rounded-2xl border border-border bg-card overflow-hidden">
-            {sessions.map((session) => (
-              <div key={session.id} className="flex items-stretch">
-                <button
-                  type="button"
-                  onClick={() => openSession(session)}
-                  className="flex-1 min-w-0 text-left px-5 py-4 hover:bg-accent/60 transition"
-                >
-                  <div className="flex items-center gap-2 min-w-0">
-                    <p className="text-sm font-semibold truncate">{session.title || 'Cram'}</p>
-                    {session.current && (
-                      <span className="rounded-full bg-muted px-2 py-0.5 text-[11px] font-semibold tracking-wide text-muted-foreground shrink-0">
-                        {session.currentKind === 'finished' ? 'Current notes' : 'Current'}
-                      </span>
-                    )}
-                  </div>
-                  <p className="text-xs text-muted-foreground mt-1">
-                    {session.term_count || 0} terms
-                    {session.currentKind === 'finished'
-                      ? ' · Practice uses these terms'
-                      : formatWhen(session.finished_at || session.updated_at)
-                        ? ` · ${formatWhen(session.finished_at || session.updated_at)}`
-                        : ''}
-                  </p>
-                </button>
-                {!session.current && (
+          <div className="mx-auto w-full max-w-md space-y-2">
+            {sessions.map((session) => {
+              const when = session.currentKind === 'finished'
+                ? 'Practice uses these'
+                : formatWhen(session.finished_at || session.updated_at);
+              const status = session.current
+                ? (session.currentKind === 'finished' ? 'Current' : 'Open')
+                : 'Saved';
+              return (
+                <div key={session.id} className="option-surface flex items-center rounded-card pr-1">
                   <button
                     type="button"
-                    aria-label={`Delete ${session.title || 'cram'}`}
-                    onClick={() => {
-                      setError('');
-                      setPending(session);
-                    }}
-                    className="flex items-center justify-center w-12 shrink-0 text-muted-foreground hover:text-destructive hover:bg-accent/60 transition"
+                    onClick={() => openSession(session)}
+                    className="flex min-w-0 flex-1 items-center gap-3 py-3 pl-3 text-left"
                   >
-                    <Trash2 className="w-4 h-4" />
+                    <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-background">
+                      <BookOpen className="h-4 w-4" />
+                    </span>
+                    <span className="min-w-0 flex-1">
+                      <span className="block truncate text-[15px] font-semibold">{session.title || 'Cram'}</span>
+                      <span className="mt-0.5 block truncate text-sm text-muted-foreground">
+                        {session.term_count || 0} terms{when ? ` · ${when}` : ''}
+                      </span>
+                    </span>
+                    <span className="shrink-0 text-right">
+                      <span className="block text-base font-semibold tabular-nums">{session.term_count || 0}</span>
+                      <span className={session.current ? 'block text-sm font-semibold text-gain' : 'block text-sm text-muted-foreground'}>
+                        {status}
+                      </span>
+                    </span>
                   </button>
-                )}
-              </div>
-            ))}
+                  {!session.current && (
+                    <button
+                      type="button"
+                      aria-label={`Delete ${session.title || 'cram'}`}
+                      onClick={() => {
+                        setError('');
+                        setPending(session);
+                      }}
+                      className="ml-1 flex h-11 w-11 shrink-0 items-center justify-center rounded-full text-muted-foreground hover:bg-accent hover:text-destructive"
+                    >
+                      <Trash2 className="w-4 h-4" />
+                    </button>
+                  )}
+                </div>
+              );
+            })}
           </div>
           {error ? <p className="text-sm text-destructive text-center mt-3">{error}</p> : null}
         </div>
@@ -350,7 +359,7 @@ export default function PastSessions() {
       )}
 
       <AlertDialog open={!!pending} onOpenChange={(open) => !open && !deleting && setPending(null)}>
-        <AlertDialogContent className="rounded-2xl max-w-sm">
+        <AlertDialogContent className="rounded-card max-w-sm">
           <AlertDialogHeader>
             <AlertDialogTitle>Delete this cram?</AlertDialogTitle>
             <AlertDialogDescription>
@@ -382,7 +391,7 @@ export default function PastSessions() {
           }
         }}
       >
-        <DialogContent className="rounded-2xl max-w-sm">
+        <DialogContent className="rounded-card max-w-sm">
           <DialogHeader>
             <DialogTitle>Practice or cram?</DialogTitle>
             <DialogDescription>
@@ -394,16 +403,16 @@ export default function PastSessions() {
             <Button
               disabled={!!opening}
               onClick={() => startChoice('practice')}
-              className="h-12 rounded-2xl font-semibold"
+              className="h-12 rounded-full font-semibold"
             >
               {opening === 'practice' ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : null}
               Practice
             </Button>
             <Button
-              variant="outline"
+              variant="secondary"
               disabled={!!opening}
               onClick={() => startChoice('cram')}
-              className="h-12 rounded-2xl font-semibold"
+              className="h-12 rounded-full font-semibold"
             >
               {opening === 'cram' ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : null}
               Cram

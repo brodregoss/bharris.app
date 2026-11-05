@@ -3,80 +3,55 @@
 @tailwind utilities;
 
 @layer base {
-  :root {
-    --background: 0 0% 100%;
-    --foreground: 0 0% 3.9%;
-    --card: 0 0% 100%;
-    --card-foreground: 0 0% 3.9%;
-    --popover: 0 0% 100%;
-    --popover-foreground: 0 0% 3.9%;
-    --primary: 0 0% 9%;
-    --primary-foreground: 0 0% 98%;
-    --secondary: 0 0% 96.1%;
-    --secondary-foreground: 0 0% 9%;
-    --muted: 0 0% 96.1%;
-    --muted-foreground: 0 0% 45.1%;
-    --accent: 0 0% 96.1%;
-    --accent-foreground: 0 0% 9%;
-    --destructive: 0 84.2% 60.2%;
-    --destructive-foreground: 0 0% 98%;
-    --border: 0 0% 89.8%;
-    --input: 0 0% 89.8%;
-    --ring: 0 0% 3.9%;
-    --chart-1: 12 76% 61%;
-    --chart-2: 173 58% 39%;
-    --chart-3: 197 37% 24%;
-    --chart-4: 43 74% 66%;
-    --chart-5: 27 87% 67%;
-    --radius: 0.5rem;
-    --font-heading: ui-sans-serif, system-ui, sans-serif;
-    --font-body: ui-sans-serif, system-ui, sans-serif;
-    --font-display: ui-sans-serif, system-ui, sans-serif;
-    --font-mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
-    --sidebar-background: 0 0% 98%;
-    --sidebar-foreground: 240 5.3% 26.1%;
-    --sidebar-primary: 240 5.9% 10%;
-    --sidebar-primary-foreground: 0 0% 98%;
-    --sidebar-accent: 240 4.8% 95.9%;
-    --sidebar-accent-foreground: 240 5.9% 10%;
-    --sidebar-border: 220 13% 91%;
-    --sidebar-ring: 217.2 91.2% 59.8%;
-  }
-
-  /* Warm charcoal instead of near-black / near-white so contrast matches light mode. */
+  :root,
   .dark {
-    --background: 30 6% 11%;
-    --foreground: 36 10% 92%;
-    --card: 30 5% 14.5%;
-    --card-foreground: 36 10% 92%;
-    --popover: 30 5% 15%;
-    --popover-foreground: 36 10% 92%;
-    --primary: 36 10% 92%;
-    --primary-foreground: 30 8% 14%;
-    --secondary: 30 5% 18%;
-    --secondary-foreground: 36 10% 92%;
-    --muted: 30 4% 17.5%;
-    --muted-foreground: 30 6% 66%;
-    --accent: 30 5% 19%;
-    --accent-foreground: 36 10% 92%;
-    --destructive: 6 48% 55%;
-    --destructive-foreground: 0 0% 98%;
-    --border: 30 5% 23%;
-    --input: 30 5% 22%;
-    --ring: 36 8% 70%;
-    --chart-1: 220 42% 62%;
-    --chart-2: 160 32% 52%;
-    --chart-3: 32 42% 60%;
-    --chart-4: 280 30% 64%;
-    --chart-5: 340 32% 62%;
-    --sidebar-background: 30 6% 11%;
-    --sidebar-foreground: 36 10% 92%;
-    --sidebar-primary: 36 10% 92%;
-    --sidebar-primary-foreground: 30 8% 14%;
-    --sidebar-accent: 30 5% 18%;
-    --sidebar-accent-foreground: 36 10% 92%;
-    --sidebar-border: 30 5% 23%;
-    --sidebar-ring: 36 8% 70%;
+    --c-bg: 0 0 0;
+    --c-surface-1: 17 17 19;
+    --c-surface-2: 26 26 29;
+    --c-text: 245 245 247;
+    --c-text-2: 161 161 170;
+    --c-text-3: 110 110 120;
+    --c-accent: 185 220 251;
+    --c-accent-ink: 10 22 36;
+    --c-know: 74 222 128;
+    --c-shaky: 251 191 36;
+    --c-blank: 248 113 113;
+    --c-line: 255 255 255;
+
+    --bg: #000000;
+    --surface-1: #111113;
+    --surface-2: #1A1A1D;
+    --border: rgba(255, 255, 255, 0.08);
+    --text-primary: #F5F5F7;
+    --text-secondary: #A1A1AA;
+    --text-tertiary: #6E6E78;
+    --accent: #B9DCFB;
+    --accent-ink: #0A1624;
+    --know: #4ADE80;
+    --shaky: #FBBF24;
+    --blank: #F87171;
+
+    --radius-card: 24px;
+    --radius-input: 20px;
+    --radius-pill: 9999px;
+    --radius: 24px;
+
+    --space-1: 4px;
+    --space-2: 8px;
+    --space-3: 12px;
+    --space-4: 16px;
+    --space-6: 24px;
+    --space-8: 32px;
+    --space-12: 48px;
+    --space-gutter: 20px;
+    --space-tap: 44px;
+    --space-action: 56px;
+    --space-bar: 6px;
+
+    --font-heading: Inter, ui-sans-serif, system-ui, sans-serif;
+    --font-body: Inter, ui-sans-serif, system-ui, sans-serif;
+    --font-display: Inter, ui-sans-serif, system-ui, sans-serif;
+    --font-mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
   }
 }
 
@@ -84,11 +59,16 @@
 
 @layer base {
   * {
-    @apply border-border outline-ring/50;
+    @apply border-border;
+  }
+
+  *:focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 2px;
   }
 
   body {
-    @apply bg-background text-foreground font-body;
+    @apply bg-background text-foreground font-body text-body;
   }
 
   html,
@@ -97,8 +77,8 @@
     min-height: 100%;
     min-height: 100dvh;
     min-height: -webkit-fill-available;
-    background-color: hsl(var(--background));
-    color: hsl(var(--foreground));
+    background-color: var(--bg);
+    color: var(--text-primary);
   }
 
   /* Keep in-flow controls off the landscape notch. Fixed layers set this themselves. */
@@ -107,30 +87,19 @@
     padding-right: env(safe-area-inset-right, 0px);
   }
 
-  html {
-    color-scheme: light;
-  }
-
+  html,
   html.dark {
     color-scheme: dark;
   }
 
-  /* Keep drop shadows from turning into hard black blobs on dark surfaces. */
-  html.dark .shadow {
-    --tw-shadow: 0 1px 3px 0 hsl(30 10% 4% / 0.28), 0 1px 2px -1px hsl(30 10% 4% / 0.22);
-    --tw-shadow-colored: 0 1px 3px 0 var(--tw-shadow-color), 0 1px 2px -1px var(--tw-shadow-color);
-  }
-  html.dark .shadow-sm {
-    --tw-shadow: 0 1px 2px 0 hsl(30 10% 4% / 0.22);
-    --tw-shadow-colored: 0 1px 2px 0 var(--tw-shadow-color);
-  }
-  html.dark .shadow-md {
-    --tw-shadow: 0 4px 6px -1px hsl(30 10% 4% / 0.28), 0 2px 4px -2px hsl(30 10% 4% / 0.22);
-    --tw-shadow-colored: 0 4px 6px -1px var(--tw-shadow-color), 0 2px 4px -2px var(--tw-shadow-color);
-  }
-  html.dark .shadow-lg {
-    --tw-shadow: 0 10px 15px -3px hsl(30 10% 4% / 0.32), 0 4px 6px -4px hsl(30 10% 4% / 0.22);
-    --tw-shadow-colored: 0 10px 15px -3px var(--tw-shadow-color), 0 4px 6px -4px var(--tw-shadow-color);
+  .shadow,
+  .shadow-sm,
+  .shadow-md,
+  .shadow-lg,
+  .shadow-xl,
+  .shadow-2xl {
+    --tw-shadow: 0 0 #0000;
+    --tw-shadow-colored: 0 0 #0000;
   }
 
   html,
@@ -146,12 +115,54 @@
   input,
   textarea,
   select {
-    font-size: 16px;
+    font-size: 17px;
+    line-height: 26px;
+  }
+
+  input::placeholder,
+  textarea::placeholder {
+    color: var(--text-tertiary);
+    font-size: 15px;
+    line-height: 22px;
   }
 
   /* WKWebView paints underlined buttons as system-link blue; keep fill on the CSS color. */
   button {
     -webkit-text-fill-color: currentColor;
+  }
+}
+
+@layer components {
+  /* Tappable choices. Button variant "secondary" uses the same --secondary token. */
+  .option-surface {
+    border-color: transparent;
+    background-color: var(--surface-2);
+    color: var(--text-primary);
+  }
+
+  .option-surface:hover:not(:disabled) {
+    background-color: rgb(var(--c-surface-2) / 0.8);
+  }
+
+  .press {
+    transition: transform 180ms ease-out, background-color 150ms ease-out, color 150ms ease-out, border-color 150ms ease-out;
+  }
+
+  .press:active {
+    transform: scale(0.98);
+  }
+
+  .shell-tight-only {
+    display: none;
+  }
+
+  @media (max-height: 720px) {
+    .shell-tight-only {
+      display: block;
+    }
+    .shell-roomy-only {
+      display: none;
+    }
   }
 }
 
@@ -196,6 +207,15 @@
   animation: page-in 260ms cubic-bezier(0.22, 1, 0.36, 1) backwards;
 }
 
+@keyframes tour-step-in {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: none; }
+}
+
+.tour-step-in {
+  animation: tour-step-in 220ms cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
 @keyframes page-slide-over {
   from { transform: translate3d(100%, 0, 0); }
   to { transform: none; }
@@ -218,6 +238,15 @@
 
 html.page-transitioning {
   overflow-x: hidden;
+}
+
+@keyframes stat-swap {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: none; }
+}
+
+.stat-swap {
+  animation: stat-swap 240ms cubic-bezier(0.22, 1, 0.36, 1) backwards;
 }
 
 @keyframes brain-prompt-in {
@@ -243,10 +272,44 @@ html.page-transitioning {
   animation: brain-caret 0.85s steps(1) infinite;
 }
 
+/* Practice hub previews. Hover on the mode box plays one short motion. */
+.practice-flip-scene {
+  height: 100%;
+  perspective: 700px;
+}
+.practice-flip-card {
+  position: relative;
+  height: 100%;
+  transform-style: preserve-3d;
+  transition: transform 1.15s cubic-bezier(0.4, 0.05, 0.2, 1);
+}
+.group:hover .practice-flip-card {
+  transform: rotateY(180deg);
+}
+.practice-flip-face {
+  position: absolute;
+  inset: 0;
+  backface-visibility: hidden;
+  -webkit-backface-visibility: hidden;
+}
+.practice-flip-back {
+  transform: rotateY(180deg);
+}
+@keyframes practice-tap {
+  0% { transform: scale(1); }
+  40% { transform: scale(0.92); }
+  100% { transform: scale(1); }
+}
+.group:hover .practice-choice-right {
+  animation: practice-tap 0.9s ease 0.55s both;
+}
+
 @media (prefers-reduced-motion: reduce) {
   .page-in,
   .page-slide-over,
-  .page-slide-away {
+  .page-slide-away,
+  .tour-step-in,
+  .stat-swap {
     animation: none;
     box-shadow: none;
   }
@@ -254,5 +317,23 @@ html.page-transitioning {
   .brain-prompt-in,
   .brain-caret {
     animation: none;
+  }
+
+  .practice-flip-card {
+    transition: none;
+  }
+  .group:hover .practice-flip-card {
+    transform: none;
+  }
+  .group:hover .practice-choice-right {
+    animation: none;
+  }
+
+  .press,
+  .press:active,
+  .animate-reveal-in {
+    transition: none;
+    animation: none;
+    transform: none;
   }
 }

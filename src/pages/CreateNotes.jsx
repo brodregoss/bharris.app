@@ -132,36 +132,34 @@ export default function CreateNotes() {
         onAccept={handleAiConsentAccept}
         onDecline={handleAiConsentDecline}
       />
-      <header className="px-3 pt-safe pb-2 flex items-center gap-1">
+      <header className="px-5 pt-safe">
         <button
           type="button"
           onClick={() => navigate('/welcome')}
           aria-label="Back"
-          className="w-11 h-11 rounded-full flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-accent transition"
+          className="flex h-11 w-11 -ml-2 items-center justify-center rounded-full text-muted-foreground transition hover:bg-accent hover:text-foreground"
         >
           <ArrowLeft className="w-5 h-5" />
         </button>
-        <div>
-          <h1 className="text-base font-bold tracking-tight leading-none">Create terms</h1>
-          <p className="text-[11px] text-muted-foreground leading-none mt-1">Name the set, then add the terms you need</p>
-        </div>
+        <h1 className="mt-6 text-display text-foreground">Create terms</h1>
+        <p className="mt-3 text-sm text-muted-foreground">Name the set, then add the terms you need</p>
       </header>
 
-      <main className="flex-1 px-6 pt-4 overflow-y-auto">
+      <main className="flex-1 overflow-y-auto px-5 pt-5">
         <div className="max-w-md mx-auto w-full space-y-3 pb-4">
-          <div className="rounded-2xl border border-border bg-card p-4 space-y-2 shadow-sm">
+          <div className="rounded-card border border-border bg-card p-4 space-y-2 shadow-sm">
             <Label htmlFor="set-title" className="text-xs font-medium text-muted-foreground">Title</Label>
             <Input
               id="set-title"
               value={title}
               onChange={(e) => setTitle(e.target.value)}
               placeholder="e.g. Psych chapter 4"
-              className="h-11 rounded-xl font-semibold"
+              className="h-11 rounded-full font-semibold"
               autoComplete="off"
             />
           </div>
           {items.map((item, i) => (
-            <div key={item.id} className="rounded-2xl border border-border bg-card p-4 space-y-3 shadow-sm">
+            <div key={item.id} className="rounded-card border border-border bg-card p-4 space-y-3 shadow-sm">
               <div className="flex items-center justify-between gap-2">
                 <span className="text-xs font-medium text-muted-foreground">Term {i + 1}</span>
                 {items.length > 1 && (
@@ -179,7 +177,7 @@ export default function CreateNotes() {
                 value={item.term}
                 onChange={(e) => update(item.id, { term: e.target.value })}
                 placeholder="Term"
-                className="h-11 rounded-xl"
+                className="h-11 rounded-full"
               />
               <DefinitionBox
                 value={item.definition}
@@ -190,7 +188,7 @@ export default function CreateNotes() {
           <button
             type="button"
             onClick={() => setItems((prev) => [...prev, blankTerm()])}
-            className="w-full h-11 rounded-2xl border border-dashed border-border bg-card text-sm font-medium text-foreground hover:border-muted-foreground flex items-center justify-center gap-2"
+            className="w-full h-11 rounded-full border border-dashed border-border bg-card text-sm font-medium text-foreground hover:border-muted-foreground flex items-center justify-center gap-2"
           >
             <Plus className="w-4 h-4" />
             Add term
@@ -205,7 +203,7 @@ export default function CreateNotes() {
             disabled={!canContinue || saving}
             onClick={continueSetup}
             className={cn(
-              'w-full h-14 rounded-2xl text-base font-semibold transition-all',
+              'w-full h-14 rounded-full text-base font-semibold transition-all',
               canContinue
                 ? 'shadow-lg'
                 : 'bg-muted text-muted-foreground'

@@ -31,10 +31,10 @@ export default function LimitPicker({
               type="button"
               onClick={() => pickPreset(amount)}
               className={cn(
-                'h-14 rounded-2xl border text-sm font-bold transition',
+                'h-14 rounded-full border text-sm font-bold transition',
                 selected
                   ? 'border-primary bg-primary text-primary-foreground'
-                  : 'border-border bg-card hover:bg-accent',
+                  : 'option-surface',
               )}
             >
               ${amount}
@@ -63,7 +63,7 @@ export default function LimitPicker({
               const amount = Number(next);
               if (Number.isFinite(amount) && amount > 0) onChange(amount);
             }}
-            className="h-12 rounded-2xl pl-8"
+            className="h-12 rounded-full pl-8"
           />
         </div>
       </div>

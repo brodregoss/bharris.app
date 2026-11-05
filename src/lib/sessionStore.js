@@ -213,6 +213,11 @@ export async function listRemoteSessions() {
   return Array.isArray(data?.sessions) ? data.sessions : [];
 }
 
+export async function listSessionPace() {
+  const data = await workerRequest('GET', '/v1/sessions/pace');
+  return Array.isArray(data?.sessions) ? data.sessions : [];
+}
+
 export async function loadRemoteSession(id) {
   const data = await workerRequest('GET', `/v1/sessions/${id}`);
   return ownedByActiveUser(data?.session);

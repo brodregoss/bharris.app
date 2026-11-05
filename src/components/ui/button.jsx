@@ -5,28 +5,30 @@ import { cva } from "class-variance-authority";
 import { cn } from "@/lib/utils"
 
 const buttonVariants = cva(
-  "inline-flex max-w-full min-w-0 items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-medium transition-[color,background-color,border-color,text-decoration-color,fill,stroke,transform] duration-150 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring active:scale-[0.98] disabled:pointer-events-none disabled:opacity-50 [&_svg]:pointer-events-none [&_svg]:size-4 [&_svg]:shrink-0",
+  "press inline-flex max-w-full min-w-0 items-center justify-center gap-2 whitespace-nowrap rounded-pill text-body font-semibold transition-[color,background-color,border-color,transform] duration-150 ease-out focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:bg-surface-2 disabled:text-tertiary disabled:opacity-100 [&_svg]:pointer-events-none [&_svg]:size-4 [&_svg]:shrink-0",
   {
     variants: {
       variant: {
         default:
-          "bg-primary text-primary-foreground shadow hover:bg-primary/90",
+          "bg-primary text-primary-foreground hover:bg-primary/90",
         destructive:
-          "bg-destructive text-destructive-foreground shadow-sm hover:bg-destructive/90",
+          "bg-blank/12 text-blank hover:bg-blank/20",
+        shaky:
+          "bg-shaky/12 text-shaky hover:bg-shaky/20",
         success:
-          "bg-emerald-600 text-white shadow-sm hover:bg-emerald-700 dark:bg-emerald-700 dark:hover:bg-emerald-600 dark:text-emerald-50",
+          "bg-know/12 text-know hover:bg-know/20",
         outline:
-          "border border-input bg-transparent shadow-sm hover:bg-accent hover:text-accent-foreground",
+          "border border-border bg-transparent text-foreground hover:bg-surface-2",
         secondary:
-          "bg-secondary text-secondary-foreground shadow-sm hover:bg-secondary/80",
-        ghost: "hover:bg-accent hover:text-accent-foreground",
-        link: "text-primary underline-offset-4 hover:underline",
+          "bg-surface-2 text-foreground hover:bg-surface-2/80",
+        ghost: "bg-transparent text-foreground hover:bg-surface-2",
+        link: "h-auto bg-transparent p-0 text-primary underline-offset-4 hover:underline",
       },
       size: {
-        default: "h-9 px-4 py-2",
-        sm: "h-8 rounded-md px-3 text-xs",
-        lg: "h-10 rounded-md px-8",
-        icon: "h-11 w-11",
+        default: "h-action px-6",
+        sm: "h-8 px-3 text-meta",
+        lg: "h-action px-8",
+        icon: "h-tap w-tap",
       },
     },
     defaultVariants: {

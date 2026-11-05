@@ -1,10 +1,17 @@
 import React, { createContext, useContext, useEffect, useMemo, useState } from 'react';
 import PaywallSheet from '@/components/account/PaywallSheet';
+import { logProductEvent } from '@/lib/productEvents';
 
 const PaywallContext = createContext(null);
 
 export function PaywallProvider({ children }) {
   const [open, setOpen] = useState(false);
+  const wasOpen = React.useRef(false);
+
+  useEffect(() => {
+    if (open && !wasOpen.current) logProductEvent('pass_shown', { feature: 'plans' });
+    wasOpen.current = open;
+  }, [open]);
 
   useEffect(() => {
     const onOpen = () => setOpen(true);

@@ -2,6 +2,8 @@ import { errorJson, json, quotaLimit, readJson } from './util.js';
 import { appleEntitlementActive } from './billing.js';
 import { getUserRow, toPublicUser, updateUserBilling, upsertUser } from './users.js';
 import { detachGuest, endPartnerLink, ensureOwnerCode, syncGuestSchedule } from './partner.js';
+import { accountAge } from '../../src/lib/age.js';
+import { recordEvent } from './events.js';
 
 const PAID_STATUSES = new Set(['active', 'trialing', 'past_due']);
 
@@ -223,6 +225,9 @@ export async function handleCheckout(request, env, identity) {
     if (!plan) return errorJson('Choose a plan.', 400);
     const trialDays = promoTrialDays(env, body.code);
     const row = await upsertUser(env, identity);
+    if (accountAge(row).status !== 'ok') {
+      return errorJson('Add your birthday before buying a plan.', 403);
+    }
     if (row?.billing_plan === 'solo' || row?.billing_plan === 'partner') {
       if (row.billing_plan === plan) return errorJson('You already have this plan.', 409);
       return errorJson('Cancel the current plan before switching.', 409);
@@ -464,6 +469,20 @@ export async function handleStripeWebhook(request, env) {
       if (session.mode !== 'subscription' || !session.subscription) return json({ ok: true, ignored: true });
       const subscription = await stripeRequest(env, `/subscriptions/${session.subscription}`);
       const result = await syncSubscription(env, subscription, session.metadata || {});
+      if (result?.ok) {
+        const metadata = subscription?.metadata || session.metadata || {};
+        const uid = metadata.firebase_uid || '';
+        const plan = result.plan || metadata.plan || '';
+        const subscriptionId = typeof session.subscription === 'string' ? session.subscription : '';
+        if (uid) {
+          await recordEvent(env, {
+            uid,
+            name: 'pass_bought',
+            feature: plan,
+            detail: subscriptionId,
+          });
+        }
+      }
       return json({ ok: true, ...result });
     }
     if (type === 'customer.subscription.updated' || type === 'customer.subscription.deleted') {

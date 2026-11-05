@@ -161,8 +161,8 @@ function HighlightBox({ mark, draft, selected, onRemove }) {
   return (
     <div
       className={cn(
-        'pointer-events-none absolute rounded-sm border-2 bg-amber-300/45',
-        selected ? 'z-10 border-amber-600 shadow-[0_0_0_1px_rgba(217,119,6,0.35)]' : 'border-amber-500',
+        'pointer-events-none absolute rounded-sm border-2 bg-primary/30',
+        selected ? 'z-10 border-primary' : 'border-primary/60',
       )}
       style={{
         left: `${mark.x * 100}%`,
@@ -175,7 +175,7 @@ function HighlightBox({ mark, draft, selected, onRemove }) {
         <span
           key={handle.id}
           aria-hidden
-          className="absolute h-3.5 w-3.5 -translate-x-1/2 -translate-y-1/2 rounded-full border-2 border-amber-700 bg-white shadow-sm"
+          className="absolute h-4 w-4 -translate-x-1/2 -translate-y-1/2 rounded-pill border-2 border-primary bg-foreground"
           style={handle.style}
         />
       ))}
@@ -432,7 +432,7 @@ export default function HighlightNotes() {
         <div className="max-w-md mx-auto w-full flex-1 min-h-0 flex flex-col">
         <div
           ref={stageRef}
-          className="relative flex-1 min-h-[240px] rounded-2xl bg-muted overflow-hidden"
+          className="relative flex-1 min-h-[240px] rounded-card bg-muted overflow-hidden"
         >
           <img
             ref={imgRef}
@@ -512,13 +512,13 @@ export default function HighlightNotes() {
         <div className="max-w-md mx-auto w-full">
           <p className="text-xs text-muted-foreground text-center mb-2">{summarize(marks)}</p>
           {error && (
-            <p className="text-xs text-rose-600 dark:text-rose-300 text-center mb-2">{error}</p>
+            <p className="mb-2 text-center text-meta text-blank">{error}</p>
           )}
           <Button
             size="lg"
             disabled={busy}
             onClick={findTerms}
-            className="w-full h-14 rounded-2xl text-base font-semibold shadow-lg"
+            className="w-full h-14 rounded-full text-base font-semibold shadow-lg"
           >
             {busy ? 'Preparing…' : total ? 'Find terms' : 'Use the whole page'}
             {!busy && <ArrowRight className="w-5 h-5 ml-2" />}

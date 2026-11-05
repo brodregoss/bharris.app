@@ -39,6 +39,7 @@ import DebugPanel from '@/components/dev/DebugPanel';
 import { devToolsUnlocked } from '@/lib/devToolsLock';
 import PageTransition from '@/components/PageTransition';
 import { clearStaleAuthReturn } from '@/lib/onboarding';
+import HomeTour from '@/components/tour/HomeTour';
 
 function DevToolsGate() {
   const [unlocked, setUnlocked] = useState(devToolsUnlocked);
@@ -90,7 +91,7 @@ function AppRoutes({ location }) {
         <Route path="/practice" element={<Practice />} />
         <Route path="/upload-notes" element={<UploadNotes />} />
         <Route path="/triage" element={<Triage />} />
-        <Route path="/study" element={<StudyFlow />} />
+        <Route path="/study" element={<StudyFlow key={location.key} />} />
         <Route path="/true-cram" element={<TrueCram />} />
         <Route path="/spaced-cram" element={<SpacedCram />} />
         <Route path="/panic" element={<PanicReview />} />
@@ -103,24 +104,25 @@ function AppRoutes({ location }) {
 
 function App() {
   return (
-    <ThemeProvider attribute="class" defaultTheme="light" enableSystem={false} storageKey="bharris-theme">
+    <ThemeProvider attribute="class" forcedTheme="dark" enableSystem={false} storageKey="bharris-theme">
       <NativeChrome />
       <AuthProvider>
-        <PaywallProvider>
         <QueryClientProvider client={queryClientInstance}>
           <DebugProvider>
             <Router>
-              <ScrollToTop />
-              <AuthReturnScope />
-              <PageTransition>
-                {(location) => <AppRoutes location={location} />}
-              </PageTransition>
-              <DevToolsGate />
+              <PaywallProvider>
+                <ScrollToTop />
+                <AuthReturnScope />
+                <HomeTour />
+                <PageTransition>
+                  {(location) => <AppRoutes location={location} />}
+                </PageTransition>
+                <DevToolsGate />
+              </PaywallProvider>
             </Router>
             <Toaster />
           </DebugProvider>
         </QueryClientProvider>
-        </PaywallProvider>
       </AuthProvider>
     </ThemeProvider>
   )

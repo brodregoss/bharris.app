@@ -61,6 +61,7 @@ import SleepTimePicker from '@/components/study/SleepTimePicker';
 import { loadSession, saveSession, saveFinishedSession, clearSession } from '@/lib/sessionStore';
 import { getActiveUid } from '@/lib/userStorage';
 import { withInferredMastery } from '@/lib/mastery';
+import { logProductEvent } from '@/lib/productEvents';
 import { useDebug } from '@/lib/DebugContext';
 import { currentReminderMode, scheduleStudyReminder, WEB_REMINDER_NOTE } from '@/lib/studyReminder';
 import { logEstimateGap, recordSpacedMetric } from '@/lib/spacedMetrics';
@@ -635,6 +636,10 @@ export default function SpacedCram() {
       title: setup?.title,
       finishedAt: Date.now(),
     });
+    logProductEvent('cram_finished', {
+      feature: STUDY_MODE.SPACED_CRAM,
+      detail: sessionIdRef.current || '',
+    });
     clearSession();
     navigate('/');
   };
@@ -719,7 +724,7 @@ export default function SpacedCram() {
             <Button
               disabled={!sleepDraft || !wakeDraft || !examDraft}
               onClick={confirmTimes}
-              className="w-full h-14 rounded-2xl text-base font-semibold"
+              className="w-full h-14 rounded-full text-base font-semibold"
             >
               Build my plan
             </Button>
@@ -756,10 +761,10 @@ export default function SpacedCram() {
         </main>
         <footer className="px-6 pt-2 pb-safe">
           <div className="max-w-md mx-auto w-full flex flex-col gap-3">
-            <Button className="h-14 rounded-2xl text-base font-semibold" onClick={() => startSitting({ keepResults: true })}>
+            <Button className="h-14 rounded-full text-base font-semibold" onClick={() => startSitting({ keepResults: true })}>
               Continue
             </Button>
-            <Button variant="outline" className="h-14 rounded-2xl text-base font-semibold" onClick={endToHome}>
+            <Button variant="outline" className="h-14 rounded-full text-base font-semibold" onClick={endToHome}>
               Come back later
             </Button>
           </div>
@@ -886,7 +891,7 @@ export default function SpacedCram() {
                   </ul>
                 )}
                 {recognizedNames.length > 0 && (
-                  <div className="text-sm text-emerald-800 dark:text-emerald-300">
+                  <div className="text-meta text-know">
                     <p>{RECOGNIZED_LINE}</p>
                     <ul className="leading-relaxed">
                       {recognizedNames.map((name) => <li key={name}>{name}</li>)}
@@ -926,14 +931,14 @@ export default function SpacedCram() {
         <footer className="px-6 pt-2 pb-safe">
           <div className="max-w-md mx-auto w-full flex flex-col gap-3">
             {!finishedAll && (ready || leftHalfway) && (
-              <Button className="h-14 rounded-2xl text-base font-semibold" onClick={beginSitting}>
+              <Button className="h-14 rounded-full text-base font-semibold" onClick={beginSitting}>
                 {leftHalfway ? 'Continue' : 'Start'}
               </Button>
             )}
             {Number(spaced.examTime) > now && (
               <Button
                 variant="outline"
-                className="h-auto whitespace-normal rounded-2xl px-4 py-3 text-base font-semibold flex-col gap-1"
+                className="h-auto whitespace-normal rounded-full px-4 py-3 text-base font-semibold flex-col gap-1"
                 onClick={() => {
                   setReviewingPlan(false);
                   recordSpacedMetric({ type: 'last_look', sitting: spaced.sittingIndex || 1 });
@@ -957,7 +962,7 @@ export default function SpacedCram() {
             )}
             {!finishedAll && !ready && !leftHalfway && (
               <>
-                <Button disabled className="h-14 rounded-2xl text-base font-semibold bg-muted text-muted-foreground">
+                <Button disabled className="h-14 rounded-full text-base font-semibold bg-muted text-muted-foreground">
                   {waitCopy || 'Come back later'}
                 </Button>
                 {offerReminder(finishedNumber) && currentReminderMode() !== 'off' && reminderState !== 'hidden' && (
@@ -988,7 +993,7 @@ export default function SpacedCram() {
               </>
             )}
             {finishedAll && (
-              <Button className="h-14 rounded-2xl text-base font-semibold" onClick={finishAll}>
+              <Button className="h-14 rounded-full text-base font-semibold" onClick={finishAll}>
                 Finish this set
               </Button>
             )}

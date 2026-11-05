@@ -23,7 +23,7 @@ function to24(hour, minute, period) {
 }
 
 const selectClass =
-  'rounded-xl border border-border bg-card px-3 py-3 text-lg font-medium focus:outline-none focus:ring-2 focus:ring-slate-400 appearance-none';
+  'option-surface rounded-xl border px-3 py-3 text-lg font-medium focus:outline-none focus:ring-2 focus:ring-ring appearance-none';
 
 export default function SleepTimePicker({ value, onChange, requireChoice = false }) {
   const parsed = from24(value);

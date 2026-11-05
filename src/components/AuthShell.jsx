@@ -32,7 +32,7 @@ export default function AuthShell({
             {eyebrow && (
               <p className="text-sm font-medium tracking-wide text-muted-foreground">{eyebrow}</p>
             )}
-            <h1 className="text-4xl sm:text-5xl font-bold tracking-tight mt-2 leading-[1.05]">
+            <h1 className="mt-3 text-display text-foreground">
               {title}
             </h1>
             {subtitle && (

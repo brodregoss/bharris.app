@@ -71,7 +71,7 @@ export default function PassiveSkim({ terms, allTerms, behind, onUpdateTerm, onD
             : 'Quick exposure — no grading. Scroll through to review.'}
         </p>
         {behind && (
-          <div className="rounded-xl bg-amber-50 dark:bg-amber-400/10 border border-amber-200 dark:border-amber-400/20 p-3 mb-3 text-xs text-amber-800 dark:text-amber-100/80 flex gap-2">
+          <div className="mb-3 flex gap-2 rounded-card border border-shaky/30 bg-shaky/12 p-3 text-meta text-shaky">
             <AlertTriangle className="w-4 h-4 shrink-0" />
             <span>Running a bit behind — trimming your passive review to keep practice test time safe.</span>
           </div>
@@ -84,7 +84,7 @@ export default function PassiveSkim({ terms, allTerms, behind, onUpdateTerm, onD
                 key={t.id}
                 data-id={t.id}
                 className={`w-full rounded-xl border p-3 transition ${
-                  seen ? 'border-emerald-500 bg-emerald-50 dark:border-emerald-400/40 dark:bg-emerald-400/10' : 'border-border bg-card'
+                  seen ? 'border-know/30 bg-know/12' : 'border-border bg-surface-1'
                 }`}
               >
                 <p className="text-lg font-semibold">{t.term}</p>
@@ -100,13 +100,13 @@ export default function PassiveSkim({ terms, allTerms, behind, onUpdateTerm, onD
           <Button
             variant="outline"
             onClick={() => setExtra('type')}
-            className="w-full h-12 rounded-2xl font-semibold"
+            className="w-full h-12 rounded-full font-semibold"
           >
             Type the defs
           </Button>
           <Button
             onClick={onDone}
-            className="w-full h-12 rounded-2xl font-semibold"
+            className="w-full h-12 rounded-full font-semibold"
           >
             Continue
             <ArrowRight className="w-4 h-4 ml-2" />

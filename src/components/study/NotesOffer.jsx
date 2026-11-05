@@ -17,6 +17,7 @@ import {
 import {
   inferRankMode,
   rankModeSkimHint,
+  firstLookAtTerms,
   tierLabelsFor,
   SKIM_TIER_ORDER,
   topTierTerms,
@@ -27,7 +28,7 @@ import {
 export function NotesOfferPrompt({ onSkim, onSkip }) {
   return (
     <div className="w-full flex flex-col items-center justify-center px-8 py-16 text-center">
-      <div className="w-14 h-14 rounded-2xl bg-primary text-primary-foreground flex items-center justify-center mb-5">
+      <div className="w-14 h-14 rounded-full bg-primary text-primary-foreground flex items-center justify-center mb-5">
         <BookOpen className="w-7 h-7" />
       </div>
       <h2 className="text-xl font-bold tracking-tight mb-2">Skim your notes first?</h2>
@@ -35,7 +36,7 @@ export function NotesOfferPrompt({ onSkim, onSkip }) {
         Quick look at every term and definition before flashcards start. You can skip and jump straight in.
       </p>
       <div className="w-full max-w-xs space-y-3">
-        <Button type="button" onClick={onSkim} className="w-full h-12 rounded-2xl font-semibold">
+        <Button type="button" onClick={onSkim} className="w-full h-12 rounded-full font-semibold">
           Skim notes
         </Button>
         <button
@@ -66,12 +67,11 @@ function groupedTerms(terms, labels) {
   return groups;
 }
 
-function recommendCopy(groupLabel, topCount, recCount) {
-  const lead = `Putting ${groupLabel} in your own words helps them stick.`;
-  if (topCount <= 0) return `${lead} Pick any terms you want — no limit.`;
-  if (topCount === 1) return `${lead} We’ll start you with that 1 term — add more if you want.`;
-  if (topCount <= recCount) return `${lead} We’ll start you with those ${topCount} terms — add more if you want.`;
-  return `${lead} We’ll start you with the ${recCount} hardest — add more if you want.`;
+function recommendCopy(topCount, recCount) {
+  if (topCount <= 0) return 'Pick any terms.';
+  if (topCount === 1) return 'Start with that 1 term. Add more if you want.';
+  if (topCount <= recCount) return `Start with those ${topCount}. Add more if you want.`;
+  return `Start with the ${recCount} hardest. Add more if you want.`;
 }
 
 function OwnDefPicker({ terms, labels, selected, setSelected, suggestedIds, onBack, onStart }) {
@@ -120,7 +120,7 @@ function OwnDefPicker({ terms, labels, selected, setSelected, suggestedIds, onBa
                       onClick={() => toggle(t.id)}
                       className={cn(
                         'w-full text-left rounded-xl border p-3 transition',
-                        on ? 'border-foreground bg-card' : 'border-border bg-muted/30',
+                        on ? 'border-foreground bg-card' : 'option-surface',
                       )}
                     >
                       <p className="text-sm font-semibold">
@@ -140,7 +140,7 @@ function OwnDefPicker({ terms, labels, selected, setSelected, suggestedIds, onBa
         <Button
           disabled={!selected.size}
           onClick={onStart}
-          className="w-full h-12 rounded-2xl font-semibold"
+          className="w-full h-12 rounded-full font-semibold"
         >
           Start writing · {selected.size}
           <ArrowRight className="w-4 h-4 ml-2" />
@@ -223,6 +223,7 @@ export function NotesSkim({ terms, onDone, onUpdateTerm, rankMode }) {
 
   const writtenCount = (terms || []).filter((t) => String(t.ownDefinition || '').trim()).length;
   const group = labels.critical;
+  const showOwnDef = !firstLookAtTerms(terms);
 
   return (
     <div className="flex flex-col px-5 pt-4 pb-4 min-h-0">
@@ -230,7 +231,8 @@ export function NotesSkim({ terms, onDone, onUpdateTerm, rankMode }) {
         <h2 className="text-xl font-bold tracking-tight mb-1">Your notes</h2>
         <p className="text-xs text-muted-foreground mb-3">{rankModeSkimHint(mode)}</p>
 
-        <div className="rounded-2xl border border-border bg-card p-4 mb-4">
+        {showOwnDef && (
+        <div className="rounded-card border border-border bg-card p-4 mb-4">
           <div className="flex items-start gap-3">
             <div className="flex items-center justify-center w-9 h-9 rounded-xl bg-muted text-muted-foreground shrink-0">
               <PenLine className="w-4 h-4" />
@@ -238,7 +240,7 @@ export function NotesSkim({ terms, onDone, onUpdateTerm, rankMode }) {
             <div className="flex-1 min-w-0">
               <p className="text-sm font-semibold leading-tight">Write your own definitions</p>
               <p className="text-xs text-muted-foreground leading-relaxed mt-1">
-                {recommendCopy(group, top.length, recommended.length)}
+                {recommendCopy(top.length, recommended.length)}
               </p>
               {writtenCount > 0 && (
                 <p className="text-xs text-muted-foreground mt-1">
@@ -252,25 +254,26 @@ export function NotesSkim({ terms, onDone, onUpdateTerm, rankMode }) {
             variant="outline"
             onClick={beginWithRecommended}
             disabled={!canWrite}
-            className="w-full h-11 rounded-2xl font-semibold mt-3"
+            className="w-full h-11 rounded-full font-semibold mt-3"
           >
             {recommended.length
               ? `Write ${recommended.length} ${group} term${recommended.length === 1 ? '' : 's'}`
               : 'Pick terms to write'}
           </Button>
         </div>
+        )}
 
         <div className="mb-4">
           <TermDefList terms={terms} rankMode={mode} />
         </div>
-        <Button type="button" onClick={onDone} className="w-full h-12 rounded-2xl font-semibold">
+        <Button type="button" onClick={onDone} className="w-full h-12 rounded-full font-semibold">
           Start flashcards
           <ArrowRight className="w-4 h-4 ml-2" />
         </Button>
       </div>
 
       <AlertDialog open={askAddMore} onOpenChange={setAskAddMore}>
-        <AlertDialogContent className="rounded-2xl max-w-sm">
+        <AlertDialogContent className="rounded-card max-w-sm">
           <AlertDialogHeader>
             <AlertDialogTitle>Want to add more?</AlertDialogTitle>
             <AlertDialogDescription>

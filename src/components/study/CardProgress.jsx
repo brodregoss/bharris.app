@@ -12,16 +12,19 @@ export default function CardProgress({ done = 0, total = 0, caption }) {
   return (
     <div>
       <div
-        className="h-1.5 rounded-full bg-muted overflow-hidden"
+        className="h-bar overflow-hidden rounded-pill bg-surface-2"
         role="progressbar"
         aria-valuenow={safeDone}
         aria-valuemin={0}
         aria-valuemax={safeTotal}
         aria-label="Cards done"
       >
-        <div className="h-full bg-primary rounded-full" style={{ width: `${pct}%` }} />
+        <div
+          className="h-full rounded-pill bg-primary transition-[width] duration-200 ease-out"
+          style={{ width: `${pct}%` }}
+        />
       </div>
-      {caption ? <p className="text-[11px] text-muted-foreground mt-1 text-center">{caption}</p> : null}
+      {caption ? <p className="mt-2 text-center text-meta text-tertiary">{caption}</p> : null}
     </div>
   );
 }

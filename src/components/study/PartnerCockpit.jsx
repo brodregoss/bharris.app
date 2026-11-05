@@ -107,9 +107,9 @@ export default function PartnerCockpit({
                       className={cn(
                         'shrink-0 w-6 h-6 rounded-md text-[11px] font-bold tabular-nums flex items-center justify-center',
                         isCurrent && !isMissed && 'bg-primary-foreground/20 text-primary-foreground',
-                        isCurrent && isMissed && 'bg-rose-500/25 text-rose-50',
-                        !isCurrent && isMissed && 'bg-rose-500/15 text-rose-800 dark:text-rose-200',
-                        !isCurrent && !isMissed && covered.has(id) && 'bg-emerald-500/15 text-emerald-800 dark:text-emerald-200',
+                        isCurrent && isMissed && 'bg-loss text-white',
+                        !isCurrent && isMissed && 'bg-loss-soft text-loss',
+                        !isCurrent && !isMissed && covered.has(id) && 'bg-know/12 text-know',
                         !isCurrent && !isMissed && !covered.has(id) && 'bg-muted text-muted-foreground'
                       )}
                       aria-label={
@@ -133,7 +133,7 @@ export default function PartnerCockpit({
                       <Flag
                         className={cn(
                           'w-3.5 h-3.5 shrink-0 mt-1',
-                          isCurrent ? 'text-amber-300 fill-amber-300' : 'text-amber-500 fill-amber-500'
+                          'text-shaky fill-shaky'
                         )}
                         aria-label="Coming back to this term"
                       />
@@ -158,7 +158,7 @@ export default function PartnerCockpit({
         <Link
           to="/"
           aria-label="Home"
-          className="flex items-center justify-center w-11 h-11 rounded-xl bg-primary text-primary-foreground shrink-0 hover:bg-primary/90 transition"
+          className="flex items-center justify-center w-11 h-11 rounded-full bg-primary text-primary-foreground shrink-0 hover:bg-primary/90 transition"
         >
           <Home className="w-4 h-4" />
         </Link>
@@ -190,7 +190,7 @@ export default function PartnerCockpit({
             <Button
               type="button"
               variant="outline"
-              className="mt-6 rounded-2xl"
+              className="mt-6"
               onClick={() => setHideRotate(true)}
             >
               Study in portrait anyway
@@ -205,19 +205,19 @@ export default function PartnerCockpit({
               <>
                 <div className="flex-1 min-h-0 overflow-y-auto overscroll-y-contain flex flex-col justify-center">
                   <div className={cn(
-                    'w-full rounded-3xl border border-border bg-card shadow-sm p-8 flex flex-col',
-                    landscape ? 'min-h-0' : 'min-h-[280px] justify-center'
+                    'flex w-full flex-col rounded-card border border-border bg-surface-1 p-8',
+                    landscape ? 'min-h-0' : 'min-h-card justify-center'
                   )}
                   >
-                    <p className="text-[11px] uppercase tracking-wide text-muted-foreground mb-2">Term</p>
-                    <div className="flex items-start gap-2">
-                      <p className="text-3xl font-bold tracking-tight leading-tight flex-1 min-w-0">{current.term}</p>
+                    <p className="text-label uppercase text-muted-foreground">Term</p>
+                    <div className="mt-6 flex items-start gap-3">
+                      <p className="min-w-0 flex-1 break-words text-display text-foreground">{current.term}</p>
                       {missed.has(current.id) && (
-                        <Flag className="w-6 h-6 shrink-0 mt-1 text-amber-500 fill-amber-500" aria-label="Coming back to this term" />
+                        <Flag className="mt-1 h-6 w-6 shrink-0 fill-shaky text-shaky" aria-label="Coming back to this term" />
                       )}
                     </div>
-                    <p className="text-[11px] uppercase tracking-wide text-muted-foreground mt-5 mb-2">Definition</p>
-                    <p className="text-lg text-muted-foreground leading-relaxed">
+                    <p className="mt-6 text-label uppercase text-muted-foreground">Definition</p>
+                    <p className="mt-3 break-words text-body text-foreground">
                       {flashcardDef(current)}
                     </p>
                   </div>
@@ -226,7 +226,7 @@ export default function PartnerCockpit({
                   <Button
                     type="button"
                     variant="destructive"
-                    className="h-12 rounded-2xl font-semibold"
+                    className="h-12 rounded-full font-semibold"
                     onClick={onMissed}
                   >
                     <X className="w-4 h-4 mr-2" /> Missed
@@ -234,7 +234,7 @@ export default function PartnerCockpit({
                   <Button
                     type="button"
                     variant="success"
-                    className="h-12 rounded-2xl font-semibold"
+                    className="h-12 rounded-full font-semibold"
                     onClick={onGotIt}
                   >
                     <Check className="w-4 h-4 mr-2" /> Got it
@@ -249,7 +249,7 @@ export default function PartnerCockpit({
       </div>
 
       <Dialog open={directionsOpen} onOpenChange={setDirectionsOpen}>
-        <DialogContent className="rounded-2xl max-w-sm">
+        <DialogContent className="rounded-card max-w-sm">
           <DialogHeader className="text-left">
             <DialogTitle>Before you start</DialogTitle>
             <DialogDescription asChild>
@@ -262,7 +262,7 @@ export default function PartnerCockpit({
           </DialogHeader>
           <Button
             type="button"
-            className="h-12 rounded-2xl text-base font-semibold"
+            className="h-12 rounded-full text-base font-semibold"
             onClick={() => setDirectionsOpen(false)}
           >
             Start

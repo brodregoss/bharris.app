@@ -53,6 +53,56 @@ export function bumpFromPractice(current, { correct }) {
   return Math.max(MASTERY.GUESS, now - 1);
 }
 
+export const PRACTICE_BANDS = [
+  { key: 'work', title: 'Work on these', hint: "Don't know" },
+  { key: 'middle', title: 'Getting there', hint: 'Kind of know' },
+  { key: 'known', title: 'Known terms', hint: 'Know it' },
+];
+
+export function practiceBand(mastery) {
+  const level = clampMastery(mastery);
+  if (level >= MASTERY.SOLID) return 'known';
+  if (level >= MASTERY.PARTIAL) return 'middle';
+  return 'work';
+}
+
+// Dragging onto a list lands on that list's level. Mastered stays mastered.
+export function masteryForBand(band, current) {
+  const level = clampMastery(current);
+  if (band === 'known') return level >= MASTERY.SOLID ? level : MASTERY.SOLID;
+  if (band === 'middle') return MASTERY.PARTIAL;
+  return level < MASTERY.PARTIAL ? level : MASTERY.GUESS;
+}
+
+// A miss in the cram starts in Work on these. A clean pass starts in Known.
+// The first later success then steps up one list, instead of skipping the middle.
+export function seedCramMastery(terms, { flaggedTermIds = [], coveredIds = [] } = {}) {
+  const flagged = new Set(flaggedTermIds);
+  const covered = new Set(coveredIds);
+  const trackCovered = covered.size > 0;
+  return (terms || []).map((term) => {
+    const mastery = clampMastery(term.mastery);
+    if (flagged.has(term.id)) {
+      // A miss starts in Work on these. A later practice step (Getting there)
+      // is already below Solid, so leave it there.
+      if (mastery >= MASTERY.SOLID) return { ...term, mastery: MASTERY.GUESS };
+      return term;
+    }
+    const known = !trackCovered || covered.has(term.id);
+    if (known && mastery < MASTERY.SOLID) return { ...term, mastery: MASTERY.SOLID };
+    return term;
+  });
+}
+
+// Known terms leave the cram's miss list. Anything below Solid stays on it.
+export function cramGroupsAfterMastery(flaggedTermIds, coveredIds, termId, mastery) {
+  const known = clampMastery(mastery) >= MASTERY.SOLID;
+  const flagged = (flaggedTermIds || []).filter((id) => id !== termId);
+  if (!known) flagged.push(termId);
+  const covered = [...new Set([...(coveredIds || []).filter((id) => id !== termId), termId])];
+  return { flaggedTermIds: flagged, coveredIds: covered };
+}
+
 // User can set 0–3. Mastered cannot be chosen — only earned via Explain it.
 export function userSetMastery(current, next) {
   const want = clampMastery(next);

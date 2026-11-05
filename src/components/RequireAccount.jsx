@@ -3,9 +3,13 @@ import { Navigate, Outlet, useLocation } from 'react-router-dom';
 import { useAuth } from '@/lib/AuthContext';
 import { accountRedirect } from '@/lib/accountGate';
 import { devSampleOpen } from '@/lib/devSampleGate';
+import { needsAge } from '@/lib/age';
+import { usernamePromptPending } from '@/lib/signupProfile';
+import AgeCheck from '@/pages/AgeCheck';
+import UsernamePrompt from '@/pages/UsernamePrompt';
 
 export default function RequireAccount() {
-  const { isAuthenticated, isLoadingAuth } = useAuth();
+  const { user, isAuthenticated, isLoadingAuth } = useAuth();
   const location = useLocation();
 
   if (isLoadingAuth) {
@@ -24,6 +28,9 @@ export default function RequireAccount() {
   if (dest) {
     return <Navigate to={dest} replace state={{ from: location.pathname }} />;
   }
+
+  if (needsAge(user)) return <AgeCheck />;
+  if (usernamePromptPending() && !String(user?.username || '').trim()) return <UsernamePrompt />;
 
   return <Outlet />;
 }

@@ -6,6 +6,8 @@ const ALLOWED = new Set([
   'http://localhost:4173',
   'https://bharris-app.web.app',
   'capacitor://bharris-app.web.app',
+  'https://bharris.app',
+  'https://www.bharris.app',
   'https://bharris.broderickharris11.workers.dev',
 ]);
 

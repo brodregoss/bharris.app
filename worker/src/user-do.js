@@ -1,5 +1,6 @@
 import { DurableObject } from 'cloudflare:workers';
 import { nextScanFailure } from './notesScanLock.js';
+import { paceSnapshot } from './paceSnapshot.js';
 
 function nowIso() {
   return new Date().toISOString();
@@ -270,6 +271,25 @@ export class UserStudyDO extends DurableObject {
   async listSessionsCapped(limit) {
     await this.trimFinishedSessions(limit);
     return this.listSessions();
+  }
+
+  async listSessionPace() {
+    await this.ready;
+    const rows = this.ctx.storage.sql
+      .exec('SELECT session_json FROM sessions')
+      .toArray();
+    const sessions = [];
+    for (const row of rows) {
+      let session = null;
+      try {
+        session = JSON.parse(row.session_json);
+      } catch {
+        session = null;
+      }
+      const snap = paceSnapshot(session);
+      if (snap) sessions.push(snap);
+    }
+    return sessions;
   }
 
   async listSessions() {

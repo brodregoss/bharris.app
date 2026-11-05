@@ -69,21 +69,21 @@ export default function ManagePlan() {
 
   return (
     <div className="min-h-[100dvh] bg-background text-foreground flex flex-col">
-      <header className="flex items-center gap-1 px-3 pt-safe pb-2">
-        <Button variant="ghost" size="icon" onClick={() => navigate('/settings')} aria-label="Back">
+      <header className="px-5 pt-safe">
+        <Button variant="ghost" size="icon" onClick={() => navigate('/settings')} aria-label="Back" className="-ml-2">
           <ArrowLeft className="w-5 h-5" />
         </Button>
-        <h1 className="min-w-0 truncate text-base font-bold tracking-tight">Manage plan</h1>
+        <h1 className="mt-6 text-display text-foreground">Plan</h1>
       </header>
       <div className="flex-1 overflow-y-auto px-5 pb-24">
-        <div className="max-w-md mx-auto w-full flex flex-col gap-4">
-          <section className="rounded-2xl border border-border bg-card p-5">
-            <p className="text-lg font-bold tracking-tight inline-flex items-center gap-2">
+        <div className="mx-auto flex w-full max-w-md flex-col">
+          <section className="mt-6 border-t border-border pt-5">
+            <p className="inline-flex items-center gap-2 text-[2.2rem] font-semibold leading-none tracking-tight">
               {planLabel(me)}
-              {refreshing && <Loader2 className="w-4 h-4 animate-spin text-muted-foreground" aria-label="Loading plan" />}
+              {refreshing && <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" aria-label="Loading plan" />}
             </p>
-            {price && <p className="text-sm text-muted-foreground mt-1">{price}</p>}
-            <div className="mt-3 space-y-2">
+            {price && <p className="mt-3 text-lg font-semibold text-gain">{price}</p>}
+            <div className="mt-4 space-y-2">
               {lines.map((line) => (
                 <p key={line} className="text-sm leading-5 text-muted-foreground">{line}</p>
               ))}
@@ -96,7 +96,7 @@ export default function ManagePlan() {
             {me?.hasBilling && (
               <Button
                 type="button"
-                className="h-11 rounded-2xl"
+                className="h-12 rounded-full"
                 disabled={!!busy}
                 onClick={() => run('billing', async () => {
                   const data = await openBillingPortal();
@@ -107,7 +107,7 @@ export default function ManagePlan() {
               </Button>
             )}
             {showPlans && (
-              <Button type="button" variant="outline" className="h-11 rounded-2xl" onClick={openPaywall}>
+              <Button type="button" variant="secondary" className="h-12 rounded-full" onClick={openPaywall}>
                 See plans
               </Button>
             )}
@@ -115,7 +115,7 @@ export default function ManagePlan() {
               <Button
                 type="button"
                 variant="ghost"
-                className="h-11 rounded-2xl text-destructive"
+                className="h-12 rounded-full text-loss"
                 disabled={!!busy}
                 onClick={() => {
                   setError('');

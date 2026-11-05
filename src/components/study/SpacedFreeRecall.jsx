@@ -72,49 +72,49 @@ export default function SpacedFreeRecall({
   }
 
   return (
-    <div className="flex-1 flex flex-col px-5 pt-4">
-      <div className="flex items-center justify-between mb-3 text-xs text-muted-foreground">
-        <span>{blockLabel}</span>
-        <span>
-          {pos + 1}/{queue.length}
-        </span>
-      </div>
-      <div className="flex-1 flex flex-col items-center">
-        <div className="w-full max-w-md flex-1 flex flex-col">
-          <p className="text-[11px] uppercase tracking-wide text-muted-foreground mb-2">Term</p>
-          <p className="text-3xl font-bold tracking-tight mb-3">{current.term}</p>
-          <p className="text-sm text-muted-foreground leading-relaxed mb-3">
+    <div className="flex flex-1 flex-col px-gutter pb-6 pt-8">
+      <div className="mx-auto flex w-full max-w-study flex-1 flex-col gap-6">
+        <div className="flex items-center justify-between text-meta text-muted-foreground">
+          <span>{blockLabel}</span>
+          <span>
+            {pos + 1}/{queue.length}
+          </span>
+        </div>
+        <div className="rounded-card border border-border bg-surface-1 p-8">
+          <p className="text-label uppercase text-muted-foreground">Term</p>
+          <p className="mt-6 break-words text-display text-foreground">{current.term}</p>
+          <p className="mt-6 text-body text-muted-foreground">
             Think it or say it out loud. Typing is optional.
           </p>
-          <Textarea
+        </div>
+        <Textarea
             value={draft}
             onChange={(e) => setDraft(e.target.value)}
             placeholder="Type it if you want…"
-            className="min-h-[6rem] rounded-2xl text-base leading-relaxed"
           />
           {revealed && (
-            <div className="mt-4 grid gap-3 sm:grid-cols-2">
+            <div className="grid gap-6 sm:grid-cols-2">
               {earlierAttempt && (
-                <div className="rounded-2xl border border-border bg-muted/40 p-4">
-                  <p className="text-[11px] uppercase tracking-wide text-muted-foreground mb-1">
+                <div className="animate-reveal-in rounded-card border border-border bg-surface-1 p-6">
+                  <p className="text-label uppercase text-muted-foreground">
                     What you wrote
                   </p>
-                  <p className="text-base leading-relaxed">{earlierAttempt}</p>
+                  <p className="mt-3 break-words text-body text-foreground">{earlierAttempt}</p>
                 </div>
               )}
-              <div className={earlierAttempt ? 'rounded-2xl border border-border bg-card p-4' : 'rounded-2xl border border-border bg-card p-4 sm:col-span-2'}>
-                <p className="text-[11px] uppercase tracking-wide text-muted-foreground mb-1">
+              <div className={earlierAttempt ? 'animate-reveal-in rounded-card border border-know/30 bg-know/12 p-6' : 'animate-reveal-in rounded-card border border-know/30 bg-know/12 p-6 sm:col-span-2'}>
+                <p className="text-label uppercase text-know">
                   Definition
                 </p>
-                <p className="text-base leading-relaxed">{flashcardDef(current)}</p>
+                <p className="mt-3 break-words text-body text-foreground">{flashcardDef(current)}</p>
               </div>
             </div>
           )}
-          <div className="mt-4 pb-4">
+          <div>
             {!revealed ? (
               <Button
                 onClick={() => setRevealed(true)}
-                className="w-full h-12 rounded-2xl font-semibold"
+                className="w-full h-12 rounded-full font-semibold"
               >
                 <Eye className="w-4 h-4 mr-2" /> Show answer
               </Button>
@@ -123,21 +123,21 @@ export default function SpacedFreeRecall({
                 <Button
                   onClick={() => advance('missed')}
                   variant="destructive"
-                  className="h-12 rounded-2xl font-semibold px-2"
+                  className="h-12 rounded-full font-semibold px-2"
                 >
                   <X className="w-4 h-4 mr-1" /> Missed
                 </Button>
                 <Button
                   onClick={() => advance('partly')}
-                  variant="outline"
-                  className="h-12 rounded-2xl font-semibold px-2"
+                variant="shaky"
+                className="px-2"
                 >
                   Partly
                 </Button>
                 <Button
                   onClick={() => advance('got_it')}
                   variant="success"
-                  className="h-12 rounded-2xl font-semibold px-2"
+                  className="h-12 rounded-full font-semibold px-2"
                 >
                   <Check className="w-4 h-4 mr-1" /> Got it
                 </Button>
@@ -146,6 +146,5 @@ export default function SpacedFreeRecall({
           </div>
         </div>
       </div>
-    </div>
   );
 }

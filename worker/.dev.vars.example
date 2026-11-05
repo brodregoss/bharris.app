@@ -11,10 +11,8 @@ BETA_PROMO_CODE=beta
 BETA_TRIAL_DAYS=7
 ADMIN_EMAIL=
 CORS_ORIGIN=
-# Notes-scan lock. Generate with: node scripts/notes-scan-secret.mjs --write
-# Then: npx wrangler secret put NOTES_SCAN_PASSWORD_HASH
-#       npx wrangler secret put NOTES_SCAN_TOKEN_SECRET
-NOTES_SCAN_PASSWORD_HASH=
+# Dev-tools token secret. Generate with: node scripts/notes-scan-secret.mjs --write
+# Then: npx wrangler secret put NOTES_SCAN_TOKEN_SECRET
 NOTES_SCAN_TOKEN_SECRET=
 # Dev tools code. Generate with: node scripts/notes-scan-secret.mjs --dev --write
 # Then: npx wrangler secret put DEV_TOOLS_CODE_HASH

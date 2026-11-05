@@ -15,6 +15,13 @@ const HOME_LOCATION = {
 };
 
 let skipNextTransition = false;
+let forceSlide = false;
+
+export const PAGE_SLIDE_MS = SLIDE_MS;
+
+export function armPageSlide() {
+  forceSlide = true;
+}
 
 function prefersReducedMotion() {
   return window.matchMedia('(prefers-reduced-motion: reduce)').matches;
@@ -128,8 +135,10 @@ export default function PageTransition({ children }) {
     };
 
     const opening = openingRef.current && navType === 'REPLACE';
+    const forced = forceSlide;
+    forceSlide = false;
     if (navType !== 'REPLACE') openingRef.current = false;
-    if (!slidesOn() || opening || skipNextTransition || prefersReducedMotion()) {
+    if ((!slidesOn() && !forced) || opening || skipNextTransition || prefersReducedMotion()) {
       skipNextTransition = false;
       showDestination();
       if (navType !== 'POP') window.scrollTo(0, 0);

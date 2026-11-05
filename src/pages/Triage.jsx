@@ -7,11 +7,13 @@ import { Button } from '@/components/ui/button';
 import TriageCard from '@/components/triage/TriageCard';
 import { emptySrs } from '@/lib/spacedCram';
 import { beginSession } from '@/lib/sessionStore';
+import { logProductEvent } from '@/lib/productEvents';
+import { cn } from '@/lib/utils';
 
 const TIERS = [
-  { id: 'blank', label: 'Blank', sub: "Don't know", bg: '#FF8A8A' },
-  { id: 'shaky', label: 'Shaky', sub: 'Kind of know', bg: '#FFC078' },
-  { id: 'know_it', label: 'Know it', sub: 'Know it', bg: '#8CE99A' },
+  { id: 'blank', label: 'Blank', tone: 'text-blank bg-blank/12' },
+  { id: 'shaky', label: 'Shaky', tone: 'text-shaky bg-shaky/12' },
+  { id: 'know_it', label: 'Know it', tone: 'text-know bg-know/12' },
 ];
 
 const COL_ORDER = ['blank', 'shaky', 'know_it'];
@@ -190,6 +192,13 @@ function Triage() {
     return null;
   });
 
+  const termsLogged = React.useRef(false);
+  React.useEffect(() => {
+    if (termsLogged.current || loading || loadError || !ranked.length) return;
+    termsLogged.current = true;
+    logProductEvent('terms_shown', { feature: 'triage', detail: String(ranked.length) });
+  }, [loading, loadError, ranked.length]);
+
   const lockIn = () => {
     if (!ranked.length) return;
     const studyMode = normalizeStudyMode(setup?.studyMode);
@@ -240,6 +249,7 @@ function Triage() {
       title: source?.title || setup?.title || 'Cram',
       flaggedTermIds: [],
     });
+    logProductEvent('cram_started', { feature: studyMode, detail: saved?.id || '' });
     navigate(continueStudyPath(nextSetup), { state: { terms: studyTerms, setup: nextSetup, sessionId: saved?.id } });
   };
 
@@ -312,16 +322,19 @@ function Triage() {
 
   return (
     <div className="min-h-[100dvh] bg-background text-foreground flex flex-col">
-      <header className="px-6 pt-safe pb-2 flex items-center gap-2.5">
-        <div className="flex items-center justify-center w-9 h-9 rounded-xl bg-primary text-primary-foreground">
-          <Moon className="w-5 h-5" />
+      <header className="flex items-center gap-3 px-5 pt-safe pb-3">
+        <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-secondary">
+          <Moon className="h-5 w-5" />
         </div>
-        <div className="flex-1">
-          <h1 className="text-base font-bold tracking-tight leading-none">bharris.app</h1>
-          <p className="text-[11px] text-muted-foreground leading-none mt-1">Triage — {sourceTitle}</p>
+        <div className="min-w-0 flex-1">
+          <h1 className="truncate text-lg font-semibold leading-none tracking-tight">Triage</h1>
+          <p className="mt-1 truncate text-sm text-muted-foreground">{sourceTitle}</p>
         </div>
         {!loading && (
-          <span className="text-xs font-medium text-muted-foreground">{totalDone}/{termCount} ready</span>
+          <span className="text-right">
+            <span className="block text-base font-semibold tabular-nums">{totalDone}</span>
+            <span className="block text-meta font-semibold text-know">of {termCount}</span>
+          </span>
         )}
       </header>
 
@@ -344,7 +357,7 @@ function Triage() {
               setLoadingHint('Loading your terms…');
               setRetryTick((n) => n + 1);
             }}
-            className="mt-2 rounded-2xl"
+            className="mt-2"
           >
             Try again
           </Button>
@@ -359,34 +372,39 @@ function Triage() {
           <main className="flex-1 px-3 pb-4 flex flex-row gap-2 overflow-hidden">
             {TIERS.map((tier) => {
               const items = ranked.filter((t) => t.tier === tier.id);
+              const hot = dragOver === tier.id;
               return (
                 <div
                   key={tier.id}
                   data-triage-col={tier.id}
-                  className={`flex-1 flex flex-col min-w-0 rounded-t-lg transition-shadow ${
-                    dragOver === tier.id ? 'ring-2 ring-ring ring-offset-2 ring-offset-background' : ''
-                  }`}
+                  className={cn(
+                    'flex min-w-0 flex-1 flex-col overflow-hidden rounded-card border border-border',
+                    tier.tone,
+                    hot && 'ring-2 ring-primary'
+                  )}
                 >
+                  <div className="flex items-center justify-between gap-1 px-3 pb-3 pt-4">
+                    <span className="text-label uppercase">{tier.label}</span>
+                    <span className="text-meta tabular-nums text-muted-foreground">{items.length}</span>
+                  </div>
                   <div
-                    style={{ background: tier.bg }}
-                    className="rounded-t-lg px-2 py-2"
-                  >
-                    <div className="flex items-center justify-between gap-1">
-                      <span className="font-bold text-black text-sm leading-none">{tier.label}</span>
-                      <span className="text-[10px] text-black/60 leading-none">{items.length}</span>
-                    </div>
+                    aria-hidden
+                    className="mx-2.5 h-px shrink-0"
+                    style={{
+                      backgroundImage: 'repeating-linear-gradient(90deg, rgba(255,255,255,0.42) 0 3px, transparent 3px 7px)',
+                    }}
+                  />
+                  <div className="flex-1 min-h-0 overflow-y-auto bg-transparent p-1.5 pt-2 flex flex-col gap-1.5">
                     {tier.id === 'blank' && (
                       <button
                         type="button"
                         onClick={moveAllToBlank}
                         disabled={!outsideBlank}
-                        className="mt-1.5 w-full min-h-9 rounded-md bg-black/10 hover:bg-black/15 active:bg-black/20 text-black text-[11px] font-semibold py-2 disabled:opacity-40 disabled:pointer-events-none"
+                        className="press min-h-8 w-full rounded-pill border border-border bg-surface-1 py-1.5 text-label uppercase text-foreground disabled:pointer-events-none disabled:text-tertiary"
                       >
                         Move all
                       </button>
                     )}
-                  </div>
-                  <div className="flex-1 min-h-0 overflow-y-auto bg-muted p-2 flex flex-col gap-2">
                     {items.map((item, idx) => (
                       <TriageCard
                         key={item.id}
@@ -409,7 +427,7 @@ function Triage() {
                 type="button"
                 onClick={lockIn}
                 disabled={!ranked.length}
-                className="w-full h-12 rounded-2xl bg-primary hover:bg-primary/90 text-primary-foreground font-semibold"
+                className="w-full h-12 rounded-full bg-primary hover:bg-primary/90 text-primary-foreground font-semibold"
               >
                 <Check className="w-4 h-4 mr-2" /> Lock in triage
               </Button>

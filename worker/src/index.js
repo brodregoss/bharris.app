@@ -7,9 +7,12 @@ import {
   markDoReady,
   requireFreshQuota,
   toPublicUser,
+  applyProfileExtras,
   upsertUser,
   userStudyStub,
 } from './users.js';
+import { deleteAccountTelemetry, handleRecordEvent } from './events.js';
+import { claimUsername, releaseUsername } from './usernames.js';
 import { handleAi } from './ai.js';
 import {
   handleCreateNote,
@@ -21,10 +24,10 @@ import {
   deleteUserNotes,
 } from './notes.js';
 import {
-  handleScanUnlock,
   handleScanAdmin,
   handleScanKill,
-  handleScanPassword,
+  handleScanEnable,
+  handleScanStatus,
   handleDevUnlock,
   requireScanToken,
 } from './notesScanLock.js';
@@ -91,6 +94,15 @@ async function handleUsersMe(request, env, identity, ctx) {
     name: updateName ? submitted : (submitted || identity.name),
     updateName,
   });
+  if (typeof body.username === 'string') {
+    const claimed = await claimUsername(env, identity.uid, body.username);
+    if (claimed.error) return errorJson(claimed.error.message, claimed.error.status || 400);
+  }
+  if (typeof body.birthDate === 'string' || typeof body.referral === 'string') {
+    const applied = await applyProfileExtras(env, identity.uid, body);
+    if (applied.error) return errorJson(applied.error.message, applied.error.status || 400);
+    row = applied.row || row;
+  }
   if (!updateName) row = await billingForRequest(env, ctx, row, { fresh });
   return json({ user: await toPublicUser(env, row) });
 }
@@ -99,6 +111,7 @@ async function handleDeleteMe(env, identity) {
   const uid = identity.uid;
   const row = await getUserRow(env, uid);
   await releasePartnerOnDelete(env, uid);
+  await releaseUsername(env, uid);
   if (row?.stripe_subscription_id) {
     await cancelStripeSubscription(env, row.stripe_subscription_id).catch(() => {});
   }
@@ -107,6 +120,7 @@ async function handleDeleteMe(env, identity) {
     stub.evacuate().catch(() => {}),
     deleteUserNotes(env, uid),
   ]);
+  await deleteAccountTelemetry(env, uid);
   await deleteUserRow(env, uid);
   return json({ ok: true });
 }
@@ -181,9 +195,17 @@ async function handlePanic(request, env, identity, sessionId) {
   return json({ panic });
 }
 
+function canonicalHostRedirect(url) {
+  if (url.hostname !== 'www.bharris.app') return null;
+  url.hostname = 'bharris.app';
+  return Response.redirect(url.toString(), 308);
+}
+
 export default {
   async fetch(request, env, ctx) {
     const url = new URL(request.url);
+    const moved = canonicalHostRedirect(url);
+    if (moved) return moved;
     const donePage = openAppPage(url);
     if (donePage) return donePage;
 
@@ -254,20 +276,20 @@ export default {
         response = await handlePartnerReset(env, identity);
       } else if (parts[1] === 'billing' && parts[2] === 'partner' && parts[3] === 'remove' && request.method === 'POST') {
         response = await handlePartnerRemove(env, identity);
+      } else if (parts[1] === 'events' && request.method === 'POST') {
+        response = await handleRecordEvent(request, env, identity);
       } else if (parts[1] === 'ai' && request.method === 'POST') {
         response = await handleAi(request, env, identity, parts[2] || 'complete');
       } else if (parts[1] === 'dev-tools' && parts[2] === 'unlock' && request.method === 'POST') {
         response = await handleDevUnlock(request, env, identity);
-      } else if (parts[1] === 'notes' && parts[2] === 'scan-unlock' && request.method === 'POST') {
-        response = await handleScanUnlock(request, env, identity);
+      } else if (parts[1] === 'notes' && parts[2] === 'scan-status' && request.method === 'GET') {
+        response = await handleScanStatus(env);
       } else if (parts[1] === 'notes' && parts[2] === 'scan-admin' && request.method === 'GET') {
         response = await handleScanAdmin(request, env, identity);
       } else if (parts[1] === 'notes' && parts[2] === 'scan-kill' && request.method === 'POST') {
         response = await handleScanKill(request, env, identity);
-      } else if (parts[1] === 'notes' && parts[2] === 'scan-password' && request.method === 'POST') {
-        response = await handleScanPassword(request, env, identity);
-      } else if (parts[1] === 'notes' && parts[2] === 'scan-session' && request.method === 'GET') {
-        response = await requireScanToken(request, env, identity) || json({ ok: true });
+      } else if (parts[1] === 'notes' && parts[2] === 'scan-enable' && request.method === 'POST') {
+        response = await handleScanEnable(request, env, identity);
       } else if (parts[1] === 'notes' && request.method === 'GET' && !parts[2]) {
         response = await handleListNotes(env, identity);
       } else if (parts[1] === 'notes' && request.method === 'POST' && !parts[2]) {
@@ -282,6 +304,9 @@ export default {
         response = await handleDeleteNote(env, identity, parts[2]);
       } else if (parts[1] === 'sessions' && parts[2] === 'panic' && parts[3]) {
         response = await handlePanic(request, env, identity, parts[3]);
+      } else if (parts[1] === 'sessions' && parts[2] === 'pace' && request.method === 'GET') {
+        const { stub } = userStudyStub(env, identity.uid);
+        response = json({ sessions: await stub.listSessionPace() });
       } else if (parts[1] === 'sessions') {
         const id = parts[2] || (url.searchParams.get('id') || '');
         if (request.method === 'GET' && !parts[2] && url.searchParams.get('list') !== '0') {

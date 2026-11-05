@@ -1,9 +1,10 @@
 import React from 'react';
 import { useNavigate } from 'react-router-dom';
-import { X, FileText, RefreshCw, Loader2, ALargeSmall } from 'lucide-react';
+import { FileText, RefreshCw, Loader2, ALargeSmall } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 import { invokeLlm } from '@/api/invokeLlm';
 import { Button } from '@/components/ui/button';
+import StudyScreenShell from '@/components/study/StudyScreenShell';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Slider } from '@/components/ui/slider';
 import { loadLatestCram } from '@/lib/sessionStore';
@@ -53,14 +54,14 @@ function TextSizePopover({ textPx, onChange }) {
           <ALargeSmall className="w-5 h-5" />
         </button>
       </PopoverTrigger>
-      <PopoverContent align="end" sideOffset={6} className="w-64 rounded-2xl p-4">
+      <PopoverContent align="end" sideOffset={6} className="w-64 rounded-card p-4">
         <p className="text-xs font-semibold mb-3">Text size</p>
         <div className="flex items-center gap-2">
           <button
             type="button"
             aria-label="Smaller text"
             onClick={() => onChange(Math.max(TEXT_MIN, textPx - 2))}
-            className="flex items-center justify-center w-11 h-11 rounded-xl border border-border bg-card text-sm font-medium hover:bg-accent"
+            className="option-surface flex items-center justify-center w-11 h-11 rounded-xl border text-sm font-medium"
           >
             A−
           </button>
@@ -76,7 +77,7 @@ function TextSizePopover({ textPx, onChange }) {
             type="button"
             aria-label="Larger text"
             onClick={() => onChange(Math.min(TEXT_MAX, textPx + 2))}
-            className="flex items-center justify-center w-11 h-11 rounded-xl border border-border bg-card text-base font-semibold hover:bg-accent"
+            className="option-surface flex items-center justify-center w-11 h-11 rounded-xl border text-base font-semibold"
           >
             A+
           </button>
@@ -117,7 +118,7 @@ export default function PanicReview() {
     return (
       <div className="min-h-[100dvh] bg-background text-foreground flex flex-col items-center justify-center px-8 text-center">
         <p className="text-sm text-muted-foreground mb-4">No cram to build notes from yet.</p>
-        <Button onClick={() => navigate('/')} className="rounded-2xl">Back to start</Button>
+        <Button onClick={() => navigate('/')} className="rounded-full">Back to start</Button>
       </div>
     );
   }
@@ -173,36 +174,26 @@ export default function PanicReview() {
   };
 
   return (
-    <div className="min-h-[100dvh] bg-background text-foreground flex flex-col">
-      <header className="sticky top-0 z-20 bg-background/90 backdrop-blur px-3 pt-safe pb-2 flex items-center justify-between">
-        <button
-          type="button"
-          onClick={() => navigate(-1)}
-          aria-label="Exit"
-          className="flex items-center justify-center w-11 h-11 text-muted-foreground hover:text-foreground hover:bg-accent rounded-full transition"
-        >
-          <X className="w-5 h-5" />
-        </button>
-        <TextSizePopover textPx={textPx} onChange={changeTextPx} />
-      </header>
-
-      <main className="flex-1 px-5 pt-2 overflow-y-auto pb-safe">
-        <div className="max-w-md mx-auto w-full pb-8">
+    <StudyScreenShell
+      onBack={() => navigate(-1)}
+      backLabel="Exit"
+      headerExtra={<TextSizePopover textPx={textPx} onChange={changeTextPx} />}
+      action={!hasSummary && !generating ? (
+        <Button onClick={generate} className="w-full">
+          <FileText className="h-4 w-4" /> Generate notes
+        </Button>
+      ) : null}
+    >
+        <div className="flex w-full flex-col gap-6">
           {!hasSummary && !generating && (
-            <div className="rounded-2xl border border-border bg-card p-6 text-center shadow-sm">
-              <div className="flex items-center justify-center w-11 h-11 rounded-xl bg-primary text-primary-foreground mx-auto mb-3">
-                <FileText className="w-5 h-5" />
+            <div className="rounded-card border border-border bg-surface-1 p-8 text-center">
+              <div className="mx-auto mb-4 flex h-tap w-tap items-center justify-center rounded-pill bg-primary text-primary-foreground">
+                <FileText className="h-5 w-5" />
               </div>
-              <h2 className="text-base font-bold mb-1">Generate your panic notes?</h2>
-              <p className="text-sm text-muted-foreground mb-5">
+              <h2 className="text-title text-foreground">Generate your panic notes?</h2>
+              <p className="mt-3 text-body text-muted-foreground">
                 A one-page summary of what to know — built from {session.title || session.setup?.title || 'your last cram'}, weakest concepts first.
               </p>
-              <Button
-                onClick={generate}
-                className="w-full h-11 rounded-2xl font-semibold"
-              >
-                <FileText className="w-4 h-4 mr-2" /> Generate notes
-              </Button>
             </div>
           )}
 
@@ -233,7 +224,7 @@ export default function PanicReview() {
           {hasSummary && !generating && (
             <>
               <article
-                className="rounded-2xl border border-border bg-card p-6 shadow-sm"
+                className="rounded-card border border-border bg-surface-1 p-8"
                 style={{ fontSize: `${textPx}px` }}
               >
                 <ReactMarkdown components={MD_COMPONENTS}>{summary.text}</ReactMarkdown>
@@ -250,7 +241,6 @@ export default function PanicReview() {
             </p>
           )}
         </div>
-      </main>
-    </div>
+    </StudyScreenShell>
   );
 }

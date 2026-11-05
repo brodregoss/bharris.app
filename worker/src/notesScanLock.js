@@ -11,7 +11,6 @@ const TOKEN_TTL_MS = 8 * 60 * 60 * 1000;
 const LOCK_MS = 15 * 60 * 1000;
 const MAX_FAILS = 5;
 const MIN_TOKEN_SECRET = 32;
-const MIN_NEW_PASSWORD = 12;
 const LOCK_KEY = 'notes_scan_lock';
 
 function bytesToB64url(bytes) {
@@ -59,8 +58,7 @@ export function parseStoredScanHash(stored) {
 }
 
 export function scanLockConfigured(env) {
-  return Boolean(parseStoredScanHash(env?.NOTES_SCAN_PASSWORD_HASH))
-    && tokenSecretReady(env);
+  return tokenSecretReady(env);
 }
 
 function tokenSecretReady(env) {
@@ -106,23 +104,18 @@ async function writeLockRow(env, record) {
 export async function currentScanLock(env) {
   const row = await readLockRow(env);
   if (row) {
-    const hash = row.killed ? '' : row.hash;
     return {
       generation: row.generation,
-      hash,
       killed: row.killed,
       configured: true,
-      active: !row.killed && !!parseStoredScanHash(hash),
+      active: !row.killed,
     };
   }
-  const hash = String(env?.NOTES_SCAN_PASSWORD_HASH || '');
-  const parsed = !!parseStoredScanHash(hash);
   return {
     generation: 0,
-    hash,
     killed: false,
-    configured: parsed,
-    active: parsed,
+    configured: true,
+    active: true,
   };
 }
 
@@ -220,23 +213,9 @@ export function nextScanFailure(state, now, { maxFails = MAX_FAILS, lockMs = LOC
   return { locked: false, lockedUntil: 0, fails: nextFails };
 }
 
-export function scanTokenFrom(request) {
-  return request.headers.get('X-Notes-Scan-Token') || '';
-}
-
-export async function requireScanToken(request, env, identity) {
-  if (!tokenSecretReady(env)) return errorJson('Notes scanning is not set up.', 503);
+export async function requireScanToken(_request, env) {
   const lock = await currentScanLock(env);
-  if (!lock.configured) return errorJson('Notes scanning is not set up.', 503);
-  if (!lock.active) return errorJson('Enter the notes password to upload.', 401);
-  const ok = await verifyScanToken(
-    env.NOTES_SCAN_TOKEN_SECRET,
-    scanTokenFrom(request),
-    identity.uid,
-    lock.generation,
-    Date.now(),
-  );
-  if (!ok) return errorJson('Enter the notes password to upload.', 401);
+  if (!lock.active) return errorJson('Photo upload is off.', 403);
   return null;
 }
 
@@ -255,16 +234,14 @@ function lockStatus(lock) {
 export async function handleScanAdmin(request, env, identity) {
   const denied = await requireScanAdmin(request, env, identity);
   if (denied) return denied;
-  if (!tokenSecretReady(env)) return errorJson('Notes scanning is not set up.', 503);
   return json(lockStatus(await currentScanLock(env)));
 }
 
 export async function handleScanKill(request, env, identity) {
   const denied = await requireScanAdmin(request, env, identity);
   if (denied) return denied;
-  if (!env.APP?.prepare || !tokenSecretReady(env)) return errorJson('Notes scanning is not set up.', 503);
+  if (!env.APP?.prepare) return errorJson('Photo upload cannot be changed right now.', 503);
   const current = await currentScanLock(env);
-  if (!current.configured) return errorJson('Notes scanning is not set up.', 503);
   const saved = await writeLockRow(env, {
     generation: current.generation + 1,
     hash: '',
@@ -273,46 +250,22 @@ export async function handleScanKill(request, env, identity) {
   return json({ active: false, killed: true, generation: saved.generation });
 }
 
-export async function handleScanPassword(request, env, identity) {
+export async function handleScanEnable(request, env, identity) {
   const denied = await requireScanAdmin(request, env, identity);
   if (denied) return denied;
-  if (!env.APP?.prepare || !tokenSecretReady(env)) return errorJson('Notes scanning is not set up.', 503);
-  const body = await readJson(request);
-  const password = typeof body.password === 'string' ? body.password.trim() : '';
-  if (password.length < MIN_NEW_PASSWORD || password.length > MAX_PASSWORD_CHARS) {
-    return errorJson('Use at least 12 characters.', 400);
-  }
+  if (!env.APP?.prepare) return errorJson('Photo upload cannot be changed right now.', 503);
   const current = await currentScanLock(env);
   const saved = await writeLockRow(env, {
     generation: current.generation + 1,
-    hash: await formatScanPasswordHash(password),
+    hash: '',
     killed: false,
   });
   return json({ active: true, killed: false, generation: saved.generation });
 }
 
-export async function handleScanUnlock(request, env, identity) {
-  if (!tokenSecretReady(env)) return errorJson('Notes scanning is not set up.', 503);
-  const { stub } = userStudyStub(env, identity.uid);
-  const state = await stub.scanLockState();
-  const now = Date.now();
-  if ((Number(state?.lockedUntil) || 0) > now) {
-    return errorJson('Too many tries. Wait a few minutes and try again.', 429);
-  }
+export async function handleScanStatus(env) {
   const lock = await currentScanLock(env);
-  if (!lock.configured) return errorJson('Notes scanning is not set up.', 503);
-  const body = await readJson(request);
-  const password = typeof body.password === 'string' ? body.password : '';
-  const ok = lock.active && await verifyNotesScanPassword(lock.hash, password);
-  if (!ok) {
-    const next = await stub.recordScanFailure(now);
-    if (next.locked) return errorJson('Too many tries. Wait a few minutes and try again.', 429);
-    return errorJson('That password is wrong.', 401);
-  }
-  await stub.clearScanFailures();
-  const expiresAt = now + TOKEN_TTL_MS;
-  const token = await signScanToken(env.NOTES_SCAN_TOKEN_SECRET, identity.uid, expiresAt, lock.generation);
-  return json({ token, expiresAt });
+  return json(lockStatus(lock));
 }
 
 export async function signDevToken(secret, uid, expiresAt) {

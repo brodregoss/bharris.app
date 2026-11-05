@@ -46,9 +46,17 @@ export function tierHintsFor(rankMode) {
 
 export function rankModeSkimHint(rankMode) {
   if (normalizeRankMode(rankMode) === RANK_MODE.DIFFICULTY) {
-    return 'Every term is needed, so these are grouped by how hard they are to learn — Difficult concepts, Tougher concepts, then Easier concepts. Scroll through, then start flashcards when you’re ready.';
+    return 'Hardest first, then tougher, then easier.';
   }
-  return 'Grouped by how much they matter on the exam — Must know, Should know, then Nice to know. Scroll through, then start flashcards when you’re ready.';
+  return 'Must know, then should know, then nice to know.';
+}
+
+export function firstLookAtTerms(terms) {
+  return !(Array.isArray(terms) ? terms : []).some((t) => (
+    t?.seen
+    || (t?.recallHistory || []).length > 0
+    || String(t?.ownDefinition || '').trim()
+  ));
 }
 
 const LIST_STOP = new Set(['the', 'and', 'for', 'with', 'from', 'that', 'this', 'into', 'about', 'your']);
@@ -271,6 +279,106 @@ export function formatMinutesPerTerm(hours, termCount) {
   return `${m.toFixed(1)} min`;
 }
 
+export function formatStudyClock(hours) {
+  const total = Math.round(Number(hours) * 60);
+  if (!Number.isFinite(total) || total <= 0) return null;
+  if (total < 60) return `${total} min`;
+  const h = Math.floor(total / 60);
+  const m = total % 60;
+  const hourLabel = h === 1 ? '1 hour' : `${h} hours`;
+  if (!m) return hourLabel;
+  return `${hourLabel} ${m} min`;
+}
+
+function examFormatLabel(examType) {
+  const t = normalizeExamType(examType);
+  if (t === 'mcq') return 'multiple choice';
+  if (t === 'short_answer') return 'short answer';
+  return 'mixed';
+}
+
+function examWhenLabel(examTiming) {
+  if (examTiming === 'tomorrow') return 'tomorrow';
+  if (examTiming === '2days') return 'in 2 days';
+  return 'today';
+}
+
+function deckLine(count) {
+  return count === 1 ? '1 term' : `${count} terms`;
+}
+
+// Short, honest preview of the cram that starts after a study mode is chosen.
+export function buildCramPlan(options = {}) {
+  const mode = normalizeStudyMode(options.studyMode);
+  const count = Math.max(0, Math.round(Number(options.termCount) || 0));
+  const clock = formatStudyClock(options.hours);
+  const typeLabel = examFormatLabel(options.examType);
+  const when = examWhenLabel(options.examTiming);
+  const subject = String(options.title || '').trim();
+  const facts = [clock, count ? deckLine(count) : null, typeLabel, `exam ${when}`].filter(Boolean);
+  const writtenGrade = typeLabel === 'short answer'
+    ? ' You grade the written answers yourself.'
+    : typeLabel === 'mixed'
+      ? ' You grade the written ones yourself.'
+      : '';
+
+  if (mode === STUDY_MODE.TRUE_CRAM) {
+    const per = formatMinutesPerTerm(options.hours, count);
+    const minutes = minutesPerTerm(options.hours, count);
+    const pace = !per
+      ? 'Then you and a partner say every term out loud.'
+      : minutes < 1
+        ? `Then a partner pass, about ${per} a term. Fast — you’ll see the whole set.`
+        : `Then you and a partner say every term out loud. About ${per} each.`;
+    return {
+      mode,
+      subject,
+      facts,
+      lines: [
+        'First, sort each term: blank, shaky, or know it.',
+        pace,
+        'Misses get a second pass. This sitting covers the set.',
+      ],
+    };
+  }
+
+  if (mode === STUDY_MODE.SPACED_CRAM) {
+    return {
+      mode,
+      subject,
+      facts,
+      lines: [
+        'First, sort each term: blank, shaky, or know it. Then set when you sleep.',
+        `Short sittings from now until ${when}. Learn a chunk, then those terms come back. Shaky ones get more time.`,
+        `Come back for each sitting. About 10 minutes.${writtenGrade}`,
+      ],
+    };
+  }
+
+  const cap = recallTermCap(options.hours);
+  const drill = count ? Math.min(count, cap) : cap;
+  const rest = Math.max(0, count - drill);
+  const reps = !count
+    ? 'The terms most likely to cost you points get full flashcard reps.'
+    : rest > 0
+      ? `${drill} of ${count} terms get full reps. The other ${rest} are a skim, and those get cut first if you run behind.`
+      : `All ${count} terms get full reps.`;
+  return {
+    mode,
+    subject,
+    facts,
+    lines: [
+      'First, sort each term: blank, shaky, or know it.',
+      reps,
+      typeLabel === 'short answer'
+        ? 'The ones that matter most stay until you get them twice. Then a short written test. You grade it yourself.'
+        : typeLabel === 'mixed'
+          ? 'The ones that matter most stay until you get them twice. Then a short test with both kinds of questions. You grade the written ones yourself.'
+          : 'The ones that matter most stay until you get them twice. Then a short multiple-choice test.',
+    ],
+  };
+}
+
 export function suggestStudyMode(options = {}) {
   const hours = options.hours;
   const termCount = options.termCount;
@@ -348,6 +456,33 @@ export function shakyTermIds(terms, stillShaky = [], recallIds = null) {
   const ids = new Set(stillShaky);
   terms.forEach((t) => { if (isTermShaky(t, ids, recallIds)) ids.add(t.id); });
   return ids;
+}
+
+// A redo of the hard terms. Fewer than four is a tiny loop, so ask for more
+// when the rest of the set can actually fill it out.
+export function redoDeckPlan(shakyIds, allIds, min = 4) {
+  const all = [...new Set((allIds || []).filter(Boolean))];
+  const shakySet = new Set(shakyIds || []);
+  const lockedIds = all.filter((id) => shakySet.has(id));
+  const extraIds = all.filter((id) => !shakySet.has(id));
+  const target = Math.min(min, all.length);
+  const required = Math.max(0, target - lockedIds.length);
+  if (required === 0 || extraIds.length <= required) {
+    return {
+      ask: false,
+      required: 0,
+      lockedIds,
+      extraIds: [],
+      startIds: required === 0 ? lockedIds : all,
+    };
+  }
+  return {
+    ask: true,
+    required,
+    lockedIds,
+    extraIds,
+    startIds: lockedIds,
+  };
 }
 
 // Within ~45 min of the configured sleep time (HH:MM). Only meaningful for

@@ -28,6 +28,7 @@ import { closeAdminGate } from '@/lib/adminGate';
 import { clearAccountLocalData, getActiveUid } from '@/lib/userStorage';
 import { devSampleOpen } from '@/lib/devSampleGate';
 import { formatPersonName } from '@/lib/personName';
+import { settleSocialSignup } from '@/lib/signupProfile';
 
 const AuthContext = createContext();
 
@@ -79,6 +80,7 @@ export const AuthProvider = ({ children }) => {
           }
           try {
             const cloud = await ensureCloudUser(next);
+            settleSocialSignup(cloud);
             setUser(cloud);
             setAuthError(null);
             configurePurchases(next.uid).catch(() => {});
@@ -131,6 +133,7 @@ export const AuthProvider = ({ children }) => {
       setAuthError(null);
       try {
         const cloud = await ensureCloudUser(firebaseUser);
+        settleSocialSignup(cloud);
         setUser(cloud);
         configurePurchases(firebaseUser.uid).catch(() => {});
         hydrateRemoteSession().catch(() => {});
@@ -187,6 +190,7 @@ export const AuthProvider = ({ children }) => {
             email: fbUser.email,
             displayName: fbUser.displayName || name,
           });
+          settleSocialSignup(cloud);
           cacheUser(cloud);
           setUser(cloud);
           setAuthError(null);
@@ -201,6 +205,7 @@ export const AuthProvider = ({ children }) => {
         try {
           const fbUser = await firebaseSignIn(email, password);
           const cloud = await ensureCloudUser(fbUser);
+          settleSocialSignup(cloud);
           cacheUser(cloud);
           setUser(cloud);
           setAuthError(null);
@@ -216,6 +221,7 @@ export const AuthProvider = ({ children }) => {
           const fbUser = await firebaseSignInWithGoogle();
           if (!fbUser) return null;
           const cloud = await ensureCloudUser(fbUser);
+          settleSocialSignup(cloud);
           cacheUser(cloud);
           setUser(cloud);
           setAuthError(null);
@@ -231,6 +237,7 @@ export const AuthProvider = ({ children }) => {
           const fbUser = await firebaseSignInWithApple();
           if (!fbUser) return null;
           const cloud = await ensureCloudUser(fbUser);
+          settleSocialSignup(cloud);
           cacheUser(cloud);
           setUser(cloud);
           setAuthError(null);

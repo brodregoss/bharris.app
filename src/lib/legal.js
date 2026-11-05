@@ -1,6 +1,6 @@
 export const APP_NAME = 'bharris.app';
 export const APP_VERSION = '1.0.0';
-export const LEGAL_UPDATED = 'October 16, 2026';
+export const LEGAL_UPDATED = 'October 19, 2026';
 export const LEGAL_EMAIL = 'bharris.app@gmail.com';
 
 function asParagraphs(value) {
@@ -50,7 +50,7 @@ export const ABOUT_SECTIONS = [
 ];
 
 export const TERMS_LEAD = [
-  'These Terms of Service ("Terms") govern your use of bharris.app, including the website at https://bharris.broderickharris11.workers.dev and the iPhone application (collectively, the "Service"). The Service is operated by an individual in the United States, not a corporation or other separate business entity.',
+  'These Terms of Service ("Terms") govern your use of bharris.app, including the website at https://bharris.app and the iPhone application (collectively, the "Service"). The Service is operated by an individual in the United States, not a corporation or other separate business entity.',
   'By creating an account, continuing with Apple or Google, accessing features that require an account, purchasing a subscription, or using the Service, you agree to these Terms and the Privacy Policy. If you do not agree, do not use the Service. Signing in to an existing account does not require a new agreement. Continued use after these Terms are updated is acceptance of the updated Terms, as described below.',
   'For questions about these Terms, contact bharris.app@gmail.com.',
 ];
@@ -80,6 +80,7 @@ export const TERMS_SECTIONS = [
     body: [
       'Studying requires an account. The website and iPhone application use the same account.',
       '**You must be at least 18 years old to use the Service, or 13–17 with permission from a parent or legal guardian. Children under 13 may not use the Service.**',
+      'Creating an account asks for a birthday. Ages 13–17 must confirm that a parent or legal guardian gives permission and has reviewed these Terms and the Privacy Policy with them. A birthday that says the person is under 13 is not stored, and that person cannot use the Service.',
       'A parent or legal guardian should review these Terms and the Privacy Policy with the teen before use.',
       'Creating an account, including by continuing with Apple or Google, is your agreement to these Terms and the Privacy Policy. Signing in later does not ask for that agreement again.',
       'You may edit your display name, up to 80 characters.',
@@ -182,10 +183,12 @@ export const TERMS_SECTIONS = [
       'The local account-related data maintained by the Service',
       'Your Stripe subscription associated with the account',
       'A friend\'s Partner study access associated with your account',
+      'The birthday, any parent or guardian permission time, and an optional answer to how you heard about the Service',
+      'Product event counts and AI token totals stored for the account',
     ],
     after: [
       'You are responsible for saving anything you want to keep before deleting your account. There is no full-account download.',
-      'Account deletion does not cancel an Apple App Store subscription, remove failed Partner study code-attempt records retained for security, or retrieve information that has already been sent to third-party AI providers. It also does not require Stripe to delete records that Stripe is independently required or permitted to retain. Notes-scan password failure counts stored on the account are removed with the account.',
+      'Account deletion does not cancel an Apple App Store subscription, remove failed Partner study code-attempt records retained for security, or retrieve information that has already been sent to third-party AI providers. It also does not require Stripe to delete records that Stripe is independently required or permitted to retain.',
     ],
   },
   {
@@ -274,7 +277,7 @@ export const TERMS_SECTIONS = [
 ];
 
 export const PRIVACY_LEAD = [
-  'This Privacy Policy explains how bharris.app collects, uses, stores, and shares information when you use the website at https://bharris.broderickharris11.workers.dev or the iPhone application.',
+  'This Privacy Policy explains how bharris.app collects, uses, stores, and shares information when you use the website at https://bharris.app or the iPhone application.',
   'bharris.app is operated by an individual in the United States, not a corporation or other separate business entity.',
   'By creating an account, or by continuing with Apple or Google, you agree to this Privacy Policy. Signing in to an existing account does not require a new agreement.',
   'For privacy questions or requests, contact bharris.app@gmail.com.',
@@ -294,6 +297,9 @@ export const PRIVACY_SECTIONS = [
           'Account creation and update times',
           'Sign-in information handled through Firebase',
           'The name and email Google or Apple actually share when you choose those sign-in methods. Apple may hide your real email and often sends your name only the first time.',
+          'Birthday, used only to check that you are old enough to use the Service',
+          'For ages 13–17, the time a parent or legal guardian\'s permission was confirmed',
+          'An optional answer to "How did you hear about us?", if you choose to give one',
           'The time you last opened the app, stored as last_seen_at and updated at most once an hour',
         ],
       },
@@ -307,6 +313,8 @@ export const PRIVACY_SECTIONS = [
           'Panic-note content',
           'Information about how terms were studied',
           'Monthly AI usage: calls used, the limit, and the UTC month',
+          'Counts of a few product actions: a cram started, study terms shown, an AI monthly cap hit and which feature hit it, a cram finished, the plans sheet shown, and a plan bought',
+          'OpenAI token counts for each successful AI call: prompt tokens, completion tokens, total tokens, and which feature made the call. The note text is not stored in that record',
         ],
       },
       {
@@ -325,9 +333,9 @@ export const PRIVACY_SECTIONS = [
         body: 'For security and abuse prevention, the Service may store:',
         items: [
           'Failed Partner study code attempts, the account ID associated with those attempts, and the time of those attempts',
-          'Notes-scan password failure counts and temporary account lock information',
+          'Development-tools code failure counts and temporary account lock information',
         ],
-        after: 'Failed Partner study code-attempt records may remain after account deletion. Notes-scan failure counts are removed when the account is deleted.',
+        after: 'Failed Partner study code-attempt records may remain after account deletion. Development-tools failure counts are removed when the account is deleted.',
       },
     ],
   },
@@ -345,6 +353,7 @@ export const PRIVACY_SECTIONS = [
     after: [
       'Notes are not sent to advertising networks.',
       'The Service does not use a third-party analytics product to create an analytics profile about you. The last_seen_at value is used only to count how many accounts were active in the previous seven days.',
+      'The Service does keep its own counts of those product actions and OpenAI token totals in the Cloudflare account that hosts the Service. The counts do not include notes, photos, or answers, and they are not shown in the app. The operator reviews them in that Cloudflare account. Per-account rows are removed when the account is deleted. Aggregate copies in Cloudflare Analytics Engine are not tied to an account, so deleting an account does not erase those copies.',
       'The Service does not intentionally store your IP address as part of your account record. Cloudflare, as the infrastructure provider, may still receive normal technical request information through its infrastructure and logs.',
     ],
   },
@@ -356,7 +365,7 @@ export const PRIVACY_SECTIONS = [
       'The current live Worker does not have a configured permanent photo-storage bucket. The original photo is held in memory during processing, sent to the Service\'s server, forwarded to OpenAI for processing, and then discarded.',
       'The Service retains the resulting text, such as titles, terms, and definitions, as part of your stored notes.',
       'Photos are not written to browser or iPhone local storage as part of the normal scanning process.',
-      'Scanning is currently behind a notes password. The app does not save that password. The server stores a hash of it, not the password itself. A scan unlock token may sit in website session storage for about eight hours.',
+      'Photo upload does not ask for a separate password. The operator can turn photo upload off.',
     ],
   },
   {
@@ -375,8 +384,10 @@ export const PRIVACY_SECTIONS = [
       'Protect the security of the Service',
       'Provide customer support',
       'Count how many accounts were active in the previous seven days',
+      'Confirm an account is old enough to use the Service, and record parent or guardian permission for ages 13–17',
+      'Count the product actions and AI token totals described above',
     ],
-    after: 'A last_seen_at value may be updated no more than once per hour for that limited activity count. There is no third-party analytics product associated with it. The count itself is available only after the development-tools code is entered.',
+    after: 'A last_seen_at value may be updated no more than once per hour for that limited activity count. There is no third-party analytics product associated with it. Product-action counts are reviewed in the Cloudflare account that hosts the Service, not in the app.',
   },
   {
     title: '5. Artificial Intelligence',
@@ -392,7 +403,7 @@ export const PRIVACY_SECTIONS = [
       'Terms studied and information about recall or mastery used to generate study summaries',
     ],
     after: [
-      'We send content to OpenAI only as needed to provide the requested AI feature. Our server is intended not to log the content of AI requests. You should not submit highly sensitive information that is unnecessary for studying.',
+      'We send content to OpenAI only as needed to provide the requested AI feature. Our server is intended not to log the content of AI requests. A successful call does store the token counts OpenAI returns and which feature made the call. You should not submit highly sensitive information that is unnecessary for studying.',
       'OpenAI states that API data is not used to train or improve its models unless the customer explicitly opts in. OpenAI\'s API data controls also describe abuse-monitoring logs that may contain prompts and responses and are generally retained for up to 30 days, subject to exceptions and the applicable configuration.',
       'We do not sell your study content or use it to train our own AI model. If you withdraw consent for future AI processing, this does not undo processing already completed or automatically delete information already transmitted to a provider.',
       'Only a successful AI call is intended to count toward the monthly quota. The quota resets at the beginning of each calendar month in UTC.',
@@ -478,7 +489,7 @@ export const PRIVACY_SECTIONS = [
       'Study sessions, note text, and panic notes',
       'Greeting preferences and onboarding status',
     ],
-    after: 'Website session storage may temporarily contain a notes-scan unlock token lasting about eight hours, the page to return to after signing in, and a development-tools unlock flag. Those values are cleared when the tab closes.',
+    after: 'Website session storage may temporarily contain the page to return to after signing in, and a development-tools unlock flag. Those values are cleared when the tab closes.',
   },
   {
     title: '9. Reminders',
@@ -507,7 +518,8 @@ export const PRIVACY_SECTIONS = [
       'On-device copies associated with the Service',
       'Your Stripe subscription',
       'A friend\'s Partner study access associated with your account',
-      'Notes-scan password failure counts stored on the account',
+      'Birthday, parent or guardian permission time, and the optional referral answer',
+      'Product action counts and AI token totals stored for the account',
     ],
     after: [
       'Account deletion does not cancel an Apple App Store subscription, delete failed Partner study code-attempt records, or remove information already sent to OpenAI. It does not require Stripe to delete records it independently retains.',
@@ -536,6 +548,7 @@ export const PRIVACY_SECTIONS = [
     body: [
       'The Service is designed to support students, including high-school students. **The Service is not intended for children under 13, and children under 13 may not create an account or use the Service.**',
       '**You must be 18 or older to use the Service, or 13–17 with permission from a parent or legal guardian.**',
+      'The account screen asks for a birthday before the account can be used. Anyone under 13 is stopped, and that birthday is not saved. Ages 13–17 cannot continue unless they confirm a parent or legal guardian has given permission.',
       'If we learn that a child under 13 has provided personal information, we will take appropriate steps to stop the relevant processing and delete the information or account where required by law.',
       'Users aged 13–17 may use the Service only with permission from a parent or legal guardian. Parents or guardians should review this Privacy Policy with the teen and understand that study material, answers, and photos submitted for scanning may be processed by our service providers, including OpenAI.',
       'If you believe a child under 13 has provided personal information to the Service, contact bharris.app@gmail.com.',
@@ -545,7 +558,7 @@ export const PRIVACY_SECTIONS = [
     title: '15. Data Security',
     body: [
       'We take reasonable measures to protect information used by the Service. These measures include server-side authentication, restricted access to server credentials, password hashing where applicable, and controls intended to prevent unauthorized access.',
-      'The notes-scan password and the development-tools code are stored as hashes on the server, not as the passwords themselves. The app does not save those passwords.',
+      'The development-tools code is stored as a hash on the server, not as the code itself. The app does not save that code.',
       'No internet service or storage system can guarantee absolute security. You should avoid submitting sensitive information that is not necessary for studying.',
     ],
   },

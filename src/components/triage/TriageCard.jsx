@@ -4,11 +4,28 @@ import { motion } from 'framer-motion';
 import { GripVertical } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
-const TIER_BORDER = {
-  blank: 'border-l-rose-400',
-  shaky: 'border-l-amber-400',
-  know_it: 'border-l-emerald-400',
-};
+function CardFace({ item, tier: _tier, dragging, className, ...props }) {
+  return (
+    <div
+      className={cn(
+        'flex select-none items-center justify-between gap-1 rounded-input border border-border px-3 py-2',
+        dragging ? 'bg-surface-2' : 'bg-surface-1',
+        className
+      )}
+      {...props}
+    >
+      <p
+        className={cn(
+          'min-w-0 flex-1 break-words text-xs font-medium leading-tight text-foreground',
+          dragging ? 'whitespace-normal' : 'line-clamp-3'
+        )}
+      >
+        {item.term}
+      </p>
+      <GripVertical className="w-3.5 h-3.5 shrink-0 pointer-events-none text-muted-foreground/50" />
+    </div>
+  );
+}
 
 function columnAtPoint(clientX, clientY) {
   const cols = document.querySelectorAll('[data-triage-col]');
@@ -19,30 +36,6 @@ function columnAtPoint(clientX, clientY) {
     }
   }
   return null;
-}
-
-function CardFace({ item, tier, dragging, className, ...props }) {
-  return (
-    <div
-      className={cn(
-        'rounded-lg border-l-4 bg-card p-2.5 shadow-sm flex items-center justify-between gap-2 select-none',
-        TIER_BORDER[tier],
-        dragging && 'shadow-xl ring-2 ring-ring/40',
-        className
-      )}
-      {...props}
-    >
-      <p
-        className={cn(
-          'text-sm font-semibold leading-tight text-card-foreground',
-          dragging ? 'whitespace-normal' : 'line-clamp-2'
-        )}
-      >
-        {item.term}
-      </p>
-      <GripVertical className="w-4 h-4 text-muted-foreground/50 shrink-0 pointer-events-none" />
-    </div>
-  );
 }
 
 export default function TriageCard({ item, tier, animationDelay, onMove, onDragOver }) {
