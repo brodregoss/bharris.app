@@ -18,8 +18,8 @@ export default function AppleSignInButton({ onClick, loading, disabled, classNam
   return (
     <Button
       type="button"
-      variant="outline"
-      className={cn('w-full h-14 rounded-2xl text-base font-semibold', className)}
+      variant="secondary"
+      className={cn('w-full h-14 rounded-full text-base font-semibold', className)}
       onClick={onClick}
       disabled={loading || disabled}
     >

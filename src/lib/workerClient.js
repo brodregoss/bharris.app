@@ -70,6 +70,24 @@ async function nativeJson(url, { method, headers, body }) {
   return throwIfNotOk(data || {}, res.status);
 }
 
+export async function checkUsernameAvailable(username) {
+  const url = workerPath(`/v1/usernames/available?name=${encodeURIComponent(username)}`);
+  const headers = {};
+  const token = await getIdToken().catch(() => '');
+  if (token) headers.Authorization = `Bearer ${token}`;
+  if (!Capacitor.isNativePlatform()) {
+    const res = await fetch(url, { headers });
+    return parseResponse(res);
+  }
+  try {
+    const res = await fetch(url, { headers });
+    return parseResponse(res);
+  } catch (err) {
+    if (!isNetworkError(err)) throw err;
+  }
+  return nativeJson(url, { method: 'GET', headers });
+}
+
 export async function workerRequest(method, path, body, extraHeaders) {
   const url = workerPath(path);
   const token = await getIdToken();

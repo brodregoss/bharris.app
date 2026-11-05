@@ -21,15 +21,15 @@ function show(id, on) {
   if (el) el.hidden = !on;
 }
 
-function promptSignIn() {
-  const dialog = document.getElementById('sign-in-dialog');
+function openModal(id) {
+  const dialog = document.getElementById(id);
   if (!dialog || dialog.open) return;
   dialog.classList.remove('closing');
   dialog.showModal();
 }
 
-function closeSignIn() {
-  const dialog = document.getElementById('sign-in-dialog');
+function closeModal(id) {
+  const dialog = document.getElementById(id);
   if (!dialog?.open) return;
   const reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
   if (reduce || dialog.classList.contains('closing')) {
@@ -48,6 +48,14 @@ function closeSignIn() {
   dialog.classList.add('closing');
   dialog.addEventListener('transitionend', finish);
   window.setTimeout(finish, 420);
+}
+
+function promptSignIn() {
+  openModal('sign-in-dialog');
+}
+
+function closeSignIn() {
+  closeModal('sign-in-dialog');
 }
 
 async function api(path, { method = 'POST', body } = {}) {
@@ -147,41 +155,95 @@ function restorePromo() {
 }
 
 const TERMS_AGREE_ERROR = 'Agree to the Terms of Service and Privacy Policy first.';
+const CHECKOUT_PLANS = {
+  solo: { name: 'Study', price: '$8' },
+  partner: { name: 'Partner study', price: '$12' },
+};
+let checkoutPlan = '';
 
-function agreedToTerms() {
-  return document.getElementById('terms-agree')?.checked === true;
+function agreedToTerms(id) {
+  return document.getElementById(id)?.checked === true;
 }
 
-async function subscribe(plan) {
-  if (!agreedToTerms()) {
-    setStatus(TERMS_AGREE_ERROR);
+function setCheckoutStatus(message) {
+  const el = document.getElementById('checkout-status');
+  if (el) el.textContent = message || '';
+}
+
+function syncCheckoutConfirm() {
+  const button = document.getElementById('checkout-confirm');
+  if (!button || button.classList.contains('is-busy')) return;
+  button.disabled = !agreedToTerms('terms-agree');
+}
+
+function syncRedeemSubmit() {
+  const button = document.getElementById('redeem-submit');
+  if (!button || button.classList.contains('is-busy')) return;
+  button.disabled = !agreedToTerms('redeem-agree');
+}
+
+function openCheckout(plan) {
+  const info = CHECKOUT_PLANS[plan];
+  if (!info) return;
+  checkoutPlan = plan;
+  const title = document.getElementById('checkout-title');
+  const price = document.getElementById('checkout-price');
+  if (title) title.textContent = info.name;
+  if (price) {
+    price.replaceChildren(document.createTextNode(info.price));
+    const span = document.createElement('span');
+    span.textContent = ' / month';
+    price.append(span);
+  }
+  const box = document.getElementById('terms-agree');
+  if (box) box.checked = false;
+  setCheckoutStatus('');
+  restorePromo();
+  syncCheckoutConfirm();
+  openModal('checkout-dialog');
+}
+
+function closeCheckout() {
+  if (document.getElementById('checkout-confirm')?.classList.contains('is-busy')) return;
+  closeModal('checkout-dialog');
+}
+
+async function confirmCheckout() {
+  if (!agreedToTerms('terms-agree')) {
+    setCheckoutStatus(TERMS_AGREE_ERROR);
     return;
   }
+  const plan = checkoutPlan;
+  if (!plan) return;
   rememberPromo();
   if (!auth?.currentUser) {
+    const dialog = document.getElementById('checkout-dialog');
+    dialog?.classList.remove('closing');
+    if (dialog?.open) dialog.close();
     promptSignIn();
     return;
   }
   const code = promoCode();
-  const button = document.getElementById(plan === 'partner' ? 'partner-subscribe' : 'solo-subscribe');
+  const button = document.getElementById('checkout-confirm');
   setButtonBusy(button, true, code ? 'Checking code' : 'Opening checkout');
-  setStatus('');
+  setCheckoutStatus('');
   try {
     const data = await api('/v1/billing/checkout', { body: { plan, code } });
-  const dest = checkoutDestination(plan, data);
-  if (!dest) throw new Error('Could not start checkout.');
-  try {
-    sessionStorage.removeItem(PROMO_KEY);
-  } catch {
-    // The redirect still continues.
-  }
+    const dest = checkoutDestination(plan, data);
+    if (!dest) throw new Error('Could not start checkout.');
+    try {
+      sessionStorage.removeItem(PROMO_KEY);
+    } catch {
+      // The redirect still continues.
+    }
     if (data.granted && data.user) {
       writePlanCookie({ ...data.user, uid: data.user.uid || auth.currentUser.uid });
     }
     window.location.assign(dest);
   } catch (err) {
     setButtonBusy(button, false);
-    throw err;
+    syncCheckoutConfirm();
+    setCheckoutStatus(err instanceof Error ? err.message : 'Something went wrong.');
   }
 }
 
@@ -197,8 +259,9 @@ function bind(id, fn) {
 }
 
 restorePromo();
-bind('solo-subscribe', () => subscribe('solo'));
-bind('partner-subscribe', () => subscribe('partner'));
+bind('solo-subscribe', () => openCheckout('solo'));
+bind('partner-subscribe', () => openCheckout('partner'));
+bind('checkout-confirm', confirmCheckout);
 bind('cancel-plan', async () => {
   if (!canCancelWebsitePlan(me)) return;
   if (!window.confirm(cancelPlanQuestion(me))) return;
@@ -268,6 +331,16 @@ bind('remove-partner', async () => {
   }
 });
 
+document.getElementById('checkout-close')?.addEventListener('click', closeCheckout);
+document.getElementById('checkout-dialog')?.addEventListener('click', (event) => {
+  if (event.target?.id === 'checkout-dialog') closeCheckout();
+});
+document.getElementById('checkout-dialog')?.addEventListener('cancel', (event) => {
+  event.preventDefault();
+  closeCheckout();
+});
+document.getElementById('terms-agree')?.addEventListener('change', syncCheckoutConfirm);
+document.getElementById('redeem-agree')?.addEventListener('change', syncRedeemSubmit);
 document.getElementById('sign-in-close')?.addEventListener('click', closeSignIn);
 document.getElementById('sign-in-dialog')?.addEventListener('click', (event) => {
   if (event.target?.id === 'sign-in-dialog') closeSignIn();
@@ -280,12 +353,12 @@ document.getElementById('redeem-form')?.addEventListener('submit', async (event)
       promptSignIn();
       return;
     }
-    if (!agreedToTerms()) {
+    if (!agreedToTerms('redeem-agree')) {
       setRedeemStatus(TERMS_AGREE_ERROR);
       return;
     }
     const code = document.getElementById('redeem-code')?.value || '';
-    const button = event.submitter || document.querySelector('#redeem-form button');
+    const button = event.submitter || document.getElementById('redeem-submit');
     setButtonBusy(button, true, 'Checking code');
     setRedeemStatus('');
     try {
@@ -293,6 +366,7 @@ document.getElementById('redeem-form')?.addEventListener('submit', async (event)
       window.location.assign('/thanks/');
     } catch (err) {
       setButtonBusy(button, false);
+      syncRedeemSubmit();
       setRedeemStatus(err instanceof Error ? err.message : 'Could not redeem that code.');
     }
   } catch (err) {

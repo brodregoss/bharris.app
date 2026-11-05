@@ -6,7 +6,11 @@ import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
 import { cn } from '@/lib/utils';
+import { regenerateDefinition } from '@/lib/extractNotes';
 import { saveManualNote } from '@/lib/notesUpload';
+import { hasAiConsent, setAiConsent } from '@/lib/aiConsent';
+import AiConsentModal from '@/components/account/AiConsentModal';
+import AiWait from '@/components/AiWait';
 
 function blankTerm() {
   return { id: `m${Date.now()}-${Math.random().toString(36).slice(2, 7)}`, term: '', definition: '' };
@@ -48,6 +52,11 @@ export default function CreateNotes() {
       : ''
   ));
   const [saving, setSaving] = React.useState(false);
+  const [showAiConsent, setShowAiConsent] = React.useState(false);
+  const [generatingId, setGeneratingId] = React.useState('');
+  const [generateErrorId, setGenerateErrorId] = React.useState('');
+  const consentIntent = React.useRef('continue');
+  const pendingGenerate = React.useRef(null);
   const [items, setItems] = React.useState(() => {
     if (incoming?.kind === 'manual' && incoming.items?.length) {
       return incoming.items.map((t, i) => ({
@@ -71,8 +80,7 @@ export default function CreateNotes() {
     setItems((prev) => (prev.length <= 1 ? prev : prev.filter((t) => t.id !== id)));
   };
 
-  const continueSetup = async () => {
-    if (!canContinue || saving) return;
+  const proceedToSetup = async () => {
     setSaving(true);
     const nextItems = filled.map((t, i) => ({
       id: t.id || `m${i}`,
@@ -103,38 +111,98 @@ export default function CreateNotes() {
     });
   };
 
+  const writeDefinition = async ({ id, term, definition }) => {
+    if (!term || generatingId) return;
+    setGeneratingId(id);
+    setGenerateErrorId('');
+    try {
+      const next = await regenerateDefinition({ term, definition });
+      update(id, { definition: next });
+    } catch {
+      setGenerateErrorId(id);
+    } finally {
+      setGeneratingId('');
+    }
+  };
+
+  const generate = (item) => {
+    const term = item.term.trim();
+    if (!term || generatingId) return;
+    const request = { id: item.id, term, definition: item.definition.trim() };
+    if (!hasAiConsent()) {
+      consentIntent.current = 'generate';
+      pendingGenerate.current = request;
+      setShowAiConsent(true);
+      return;
+    }
+    writeDefinition(request);
+  };
+
+  const continueSetup = async () => {
+    if (!canContinue || saving) return;
+    if (!hasAiConsent()) {
+      consentIntent.current = 'continue';
+      pendingGenerate.current = null;
+      setShowAiConsent(true);
+      return;
+    }
+    proceedToSetup();
+  };
+
+  const handleAiConsentAccept = () => {
+    setAiConsent(true);
+    setShowAiConsent(false);
+    if (consentIntent.current === 'generate' && pendingGenerate.current) {
+      const request = pendingGenerate.current;
+      pendingGenerate.current = null;
+      writeDefinition(request);
+      return;
+    }
+    proceedToSetup();
+  };
+
+  const handleAiConsentDecline = () => {
+    setAiConsent(false);
+    setShowAiConsent(false);
+    pendingGenerate.current = null;
+    consentIntent.current = 'continue';
+  };
+
   return (
     <div className="min-h-[100dvh] bg-background text-foreground flex flex-col">
-      <header className="px-3 pt-safe pb-2 flex items-center gap-1">
+      <AiConsentModal
+        open={showAiConsent}
+        onAccept={handleAiConsentAccept}
+        onDecline={handleAiConsentDecline}
+      />
+      <header className="px-5 pt-safe">
         <button
           type="button"
           onClick={() => navigate('/welcome')}
           aria-label="Back"
-          className="w-11 h-11 rounded-full flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-accent transition"
+          className="flex h-11 w-11 -ml-2 items-center justify-center rounded-full text-muted-foreground transition hover:bg-accent hover:text-foreground"
         >
           <ArrowLeft className="w-5 h-5" />
         </button>
-        <div>
-          <h1 className="text-base font-bold tracking-tight leading-none">Create terms</h1>
-          <p className="text-[11px] text-muted-foreground leading-none mt-1">Name the set, then add the terms you need</p>
-        </div>
+        <h1 className="mt-6 text-display text-foreground">Create terms</h1>
+        <p className="mt-3 text-sm text-muted-foreground">Name the set, then add the terms you need</p>
       </header>
 
-      <main className="flex-1 px-6 pt-4 overflow-y-auto">
+      <main className="flex-1 overflow-y-auto px-5 pt-5">
         <div className="max-w-md mx-auto w-full space-y-3 pb-4">
-          <div className="rounded-2xl border border-border bg-card p-4 space-y-2 shadow-sm">
+          <div className="rounded-card border border-border bg-card p-4 space-y-2 shadow-sm">
             <Label htmlFor="set-title" className="text-xs font-medium text-muted-foreground">Title</Label>
             <Input
               id="set-title"
               value={title}
               onChange={(e) => setTitle(e.target.value)}
               placeholder="e.g. Psych chapter 4"
-              className="h-11 rounded-xl font-semibold"
+              className="h-11 rounded-full font-semibold"
               autoComplete="off"
             />
           </div>
           {items.map((item, i) => (
-            <div key={item.id} className="rounded-2xl border border-border bg-card p-4 space-y-3 shadow-sm">
+            <div key={item.id} className="rounded-card border border-border bg-card p-4 space-y-3 shadow-sm">
               <div className="flex items-center justify-between gap-2">
                 <span className="text-xs font-medium text-muted-foreground">Term {i + 1}</span>
                 {items.length > 1 && (
@@ -152,8 +220,27 @@ export default function CreateNotes() {
                 value={item.term}
                 onChange={(e) => update(item.id, { term: e.target.value })}
                 placeholder="Term"
-                className="h-11 rounded-xl"
+                className="h-11 rounded-full"
               />
+              {item.term.trim() && (
+                <div className="flex items-center justify-between gap-3">
+                  <Button
+                    type="button"
+                    variant="secondary"
+                    size="sm"
+                    className="rounded-full"
+                    disabled={!!generatingId}
+                    onClick={() => generate(item)}
+                  >
+                    {generatingId === item.id ? (
+                      <AiWait compact label="Generating" estimateMs={8000} />
+                    ) : 'Generate'}
+                  </Button>
+                  {generateErrorId === item.id && (
+                    <p className="text-xs text-blank">Couldn't write a definition. Try again.</p>
+                  )}
+                </div>
+              )}
               <DefinitionBox
                 value={item.definition}
                 onChange={(e) => update(item.id, { definition: e.target.value })}
@@ -163,7 +250,7 @@ export default function CreateNotes() {
           <button
             type="button"
             onClick={() => setItems((prev) => [...prev, blankTerm()])}
-            className="w-full h-11 rounded-2xl border border-dashed border-border bg-card text-sm font-medium text-foreground hover:border-muted-foreground flex items-center justify-center gap-2"
+            className="w-full h-11 rounded-full border border-dashed border-border bg-card text-sm font-medium text-foreground hover:border-muted-foreground flex items-center justify-center gap-2"
           >
             <Plus className="w-4 h-4" />
             Add term
@@ -178,7 +265,7 @@ export default function CreateNotes() {
             disabled={!canContinue || saving}
             onClick={continueSetup}
             className={cn(
-              'w-full h-14 rounded-2xl text-base font-semibold transition-all',
+              'w-full h-14 rounded-full text-base font-semibold transition-all',
               canContinue
                 ? 'shadow-lg'
                 : 'bg-muted text-muted-foreground'

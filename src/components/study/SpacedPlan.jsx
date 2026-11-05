@@ -81,7 +81,7 @@ function SittingRow({ sitting, schedule, currentSitting, defaultOpen, leftover, 
     <Collapsible open={open} onOpenChange={setOpen}>
       <div
         className={cn(
-          'rounded-2xl border overflow-hidden',
+          'rounded-card border overflow-hidden',
           isCurrent ? 'border-primary bg-primary/5 ring-2 ring-primary' : 'border-border bg-card',
           isDone && 'opacity-70'
         )}
@@ -91,7 +91,7 @@ function SittingRow({ sitting, schedule, currentSitting, defaultOpen, leftover, 
             className={cn(
               'w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold shrink-0 mt-0.5',
               isDone
-                ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-400/15 dark:text-emerald-300'
+                ? 'bg-know/12 text-know'
                 : isCurrent
                   ? 'bg-primary text-primary-foreground'
                   : 'bg-muted text-muted-foreground'
@@ -118,7 +118,7 @@ function SittingRow({ sitting, schedule, currentSitting, defaultOpen, leftover, 
           </div>
         </CollapsibleTrigger>
         <CollapsibleContent>
-          <div className="px-4 pb-3 pt-0 border-t border-border/60 ml-10 mr-3">
+          <div className="ml-8 mr-3 border-t border-border px-4 pb-3 pt-0">
             <p className="text-sm text-muted-foreground leading-relaxed pt-3">
               {sittingDetail(sitting, schedule)}
             </p>
@@ -166,7 +166,7 @@ export default function SpacedPlan({ schedule, currentSitting = 1, spaced, terms
         )}
       </div>
 
-      <div className="rounded-2xl border border-primary bg-primary/5 px-4 py-3">
+      <div className="rounded-card border border-primary bg-primary/5 px-4 py-3">
         <p className="text-[10px] font-bold uppercase tracking-wide text-primary">You are here</p>
         <p className="text-base font-bold tracking-tight mt-0.5">{progress.hereLine}</p>
         {progress.nextLine && (
@@ -190,7 +190,7 @@ export default function SpacedPlan({ schedule, currentSitting = 1, spaced, terms
         </p>
       </div>
 
-      <div className="rounded-2xl border border-border bg-card px-4 py-3">
+      <div className="rounded-card border border-border bg-card px-4 py-3">
         <p className="text-[10px] font-bold uppercase tracking-wide text-muted-foreground mb-2">Key</p>
         <ul className="space-y-1.5">
           {KEY_ORDER.map((id) => {

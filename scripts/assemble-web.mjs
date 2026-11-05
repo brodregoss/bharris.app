@@ -43,7 +43,15 @@ const css = `
   .brand {
     position: absolute;
     left: 1.25rem;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4rem;
     font-weight: 700;
+  }
+  .brand img {
+    height: 1.15em;
+    width: auto;
+    display: block;
   }
   .bar-links {
     position: absolute;
@@ -84,6 +92,7 @@ const css = `
     border-radius: 999px;
     font-size: 0.9rem;
     font-weight: 600;
+    transition: background-color 0.22s ease, color 0.22s ease, transform 0.22s cubic-bezier(0.22, 1, 0.36, 1);
   }
   a.bar-signin,
   button.bar-signin {
@@ -97,14 +106,14 @@ const css = `
     font-family: inherit;
   }
   a.bar-signin:hover,
-  button.bar-signin:hover { background: #f5f5f5; color: #0a0a0a; }
+  button.bar-signin:hover { background: #f5f5f5; color: #0a0a0a; transform: translateY(-1px); }
   a.bar-signin[hidden],
   button.bar-signin[hidden] { display: none !important; }
   a.bar-open {
     background: #0a0a0a;
     color: #fff;
   }
-  a.bar-open:hover { background: #262626; color: #fff; }
+  a.bar-open:hover { background: #262626; color: #fff; transform: translateY(-1px); }
   .hero {
     min-height: 100dvh;
     display: flex;
@@ -116,10 +125,19 @@ const css = `
   }
   .hero h1 {
     margin: 0;
-    font-size: clamp(3.4rem, 11vw, 7.25rem);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.16em;
+    font-size: clamp(2.35rem, 8vw, 7.25rem);
     font-weight: 700;
     letter-spacing: -0.05em;
     line-height: 0.95;
+  }
+  .hero h1 img {
+    height: 0.7em;
+    width: auto;
+    display: block;
   }
   .tag {
     margin: 1.35rem 0 0;
@@ -141,8 +159,13 @@ const css = `
     font-weight: 600;
     letter-spacing: -0.02em;
   }
-  a.jump svg { width: 1.75rem; height: 1.75rem; }
+  a.jump svg {
+    width: 1.75rem;
+    height: 1.75rem;
+    transition: transform 0.35s cubic-bezier(0.22, 1, 0.36, 1);
+  }
   a.jump:hover { color: #525252; }
+  a.jump:hover svg { transform: translateY(4px); }
   .block {
     scroll-margin-top: 3.25rem;
     width: min(40rem, 100%);
@@ -338,6 +361,21 @@ const css = `
     border-radius: 1.9rem;
     background: linear-gradient(180deg, #fff 0%, #f5f5f5 100%);
     box-shadow: 0 30px 70px rgba(10, 10, 10, 0.1);
+    transition:
+      transform 0.45s cubic-bezier(0.22, 1, 0.36, 1),
+      box-shadow 0.45s cubic-bezier(0.22, 1, 0.36, 1),
+      border-color 0.45s ease;
+  }
+  .mode-card:hover {
+    transform: translateY(-12px);
+    border-color: #d4d4d4;
+    box-shadow: 0 42px 80px rgba(10, 10, 10, 0.16);
+  }
+  .mode-stage .phone.portrait {
+    transition: transform 0.5s cubic-bezier(0.22, 1, 0.36, 1);
+  }
+  .mode-card:hover .mode-stage .phone.portrait {
+    transform: translateY(-8px);
   }
   .mode-card h3 {
     margin: 0;
@@ -1012,6 +1050,7 @@ const css = `
   .note { margin: 0.85rem 0 0; font-size: 0.95rem; color: #404040; }
   .stack { display: flex; flex-direction: column; gap: 0.65rem; width: 100%; margin-top: 1.15rem; }
   .stack .plan-btn { margin-top: 0; }
+  .stack .agree { width: 100%; margin: 0; }
   dialog.sign-in {
     margin: auto;
     border: 0;
@@ -1069,6 +1108,77 @@ const css = `
     color: #525252;
     text-align: center;
   }
+  dialog.checkout {
+    margin: auto;
+    border: 0;
+    border-radius: 1.75rem;
+    padding: 1.85rem 1.6rem 1.45rem;
+    width: min(28rem, calc(100vw - 2.5rem));
+    max-height: min(85dvh, 40rem);
+    overflow: auto;
+    background: #fff;
+    color: #0a0a0a;
+    text-align: left;
+    box-shadow: 0 1.5rem 4rem rgba(0, 0, 0, 0.22);
+    opacity: 0;
+    transform: translateY(14px) scale(0.96);
+    transition:
+      opacity 0.28s ease,
+      transform 0.36s cubic-bezier(0.16, 1, 0.3, 1),
+      overlay 0.28s ease allow-discrete,
+      display 0.28s ease allow-discrete;
+  }
+  dialog.checkout[open] { opacity: 1; transform: none; }
+  @starting-style {
+    dialog.checkout[open] { opacity: 0; transform: translateY(14px) scale(0.96); }
+  }
+  dialog.checkout.closing { opacity: 0; transform: translateY(8px) scale(0.98); }
+  dialog.checkout::backdrop {
+    background: rgba(10, 10, 10, 0);
+    transition:
+      background 0.28s ease,
+      overlay 0.28s ease allow-discrete,
+      display 0.28s ease allow-discrete;
+  }
+  dialog.checkout[open]::backdrop { background: rgba(10, 10, 10, 0.46); }
+  @starting-style {
+    dialog.checkout[open]::backdrop { background: rgba(10, 10, 10, 0); }
+  }
+  dialog.checkout.closing::backdrop { background: rgba(10, 10, 10, 0); }
+  dialog.checkout h3 {
+    margin: 0;
+    font-size: 1.85rem;
+    letter-spacing: -0.045em;
+    line-height: 1.05;
+  }
+  dialog.checkout .price {
+    margin: 0.35rem 0 0;
+    font-size: 1.35rem;
+    font-weight: 700;
+    letter-spacing: -0.03em;
+  }
+  dialog.checkout .price span {
+    font-size: 0.95rem;
+    font-weight: 500;
+    color: #737373;
+  }
+  dialog.checkout .renew-note { width: 100%; }
+  dialog.checkout .promo {
+    flex-direction: column;
+    align-items: stretch;
+    width: 100%;
+    margin-top: 1.1rem;
+  }
+  dialog.checkout .agree { width: 100%; }
+  dialog.checkout .plan-btn { width: 100%; margin-top: 1.15rem; }
+  dialog.checkout .text-btn {
+    display: block;
+    width: 100%;
+    margin-top: 0.85rem;
+    text-align: center;
+  }
+  dialog.checkout #checkout-status { min-height: 0; margin: 0.75rem 0 0; color: #404040; }
+  dialog.checkout #checkout-status:empty { display: none; }
   dialog.account {
     margin: auto;
     border: 0;
@@ -1235,9 +1345,13 @@ const css = `
   dialog.password .account-status { text-align: left; }
   @media (prefers-reduced-motion: reduce) {
     dialog.sign-in,
-    dialog.sign-in::backdrop { transition: none; }
+    dialog.sign-in::backdrop,
+    dialog.checkout,
+    dialog.checkout::backdrop { transition: none; }
     dialog.sign-in,
-    dialog.sign-in.closing { transform: none; }
+    dialog.sign-in.closing,
+    dialog.checkout,
+    dialog.checkout.closing { transform: none; }
     .spin, .is-loading::before { animation: none; }
   }
   .stack input,
@@ -1489,6 +1603,19 @@ const css = `
     opacity: 1;
     transform: none;
   }
+  html.motion.motion-ready .mode-card.reveal.in {
+    transition:
+      opacity 0.7s cubic-bezier(0.16, 1, 0.3, 1),
+      transform 0.45s cubic-bezier(0.22, 1, 0.36, 1),
+      box-shadow 0.45s cubic-bezier(0.22, 1, 0.36, 1),
+      border-color 0.45s ease;
+    transition-delay: 0s;
+  }
+  html.motion .mode-card.reveal.in:hover {
+    transform: translateY(-12px);
+    border-color: #d4d4d4;
+    box-shadow: 0 42px 80px rgba(10, 10, 10, 0.16);
+  }
   html.motion .bar.reveal,
   html.motion .bar.reveal.in {
     transform: none;
@@ -1496,6 +1623,22 @@ const css = `
   @media (prefers-reduced-motion: reduce) {
     html.motion .reveal {
       opacity: 1;
+      transform: none;
+      transition: none;
+    }
+    .mode-card,
+    .mode-card:hover,
+    html.motion .mode-card.reveal.in:hover,
+    .mode-stage .phone.portrait,
+    .mode-card:hover .mode-stage .phone.portrait,
+    a.jump svg,
+    a.jump:hover svg,
+    a.bar-signin,
+    button.bar-signin,
+    a.bar-open,
+    a.bar-signin:hover,
+    button.bar-signin:hover,
+    a.bar-open:hover {
       transform: none;
       transition: none;
     }
@@ -1839,6 +1982,8 @@ function page({ title, description, body, foot = '' }) {
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <meta name="theme-color" content="#ffffff" />
+  <link rel="icon" href="/site-icon.png?v=3" type="image/png" />
+  <link rel="apple-touch-icon" href="/apple-touch-icon.png?v=4" />
   <title>${escapeHtml(title)}</title>
   <meta name="description" content="${escapeHtml(description)}" />
   <style>${css}</style>
@@ -2000,7 +2145,7 @@ function siteFooter() {
         </div>
         <div class="footer-col">
           <h3>Contact</h3>
-          <a href="mailto:broderickharris11@gmail.com">broderickharris11@gmail.com</a>
+          <a href="mailto:bharris.app@gmail.com">bharris.app@gmail.com</a>
         </div>
         <div class="footer-col">
           <h3>Socials</h3>
@@ -2016,7 +2161,7 @@ function navBar({ prefix = '', back = '/' } = {}) {
   const here = prefix || '';
   const signIn = `/app/#/account/signin?return=${encodeURIComponent(back)}`;
   return `  <nav class="bar reveal">
-    <a class="brand" href="${here}#home">bharris.app</a>
+    <a class="brand" href="${here}#home">bharris.app<img src="/logo-site.png" alt="" /></a>
     <div class="bar-links">
       <div class="bar-cluster bar-cluster-left">
         <a href="${here}#home">Home</a>
@@ -2159,7 +2304,7 @@ function homePage(firebaseConfig) {
 ${siteAuthFoot(firebaseConfig)}`,
     body: `${navBar({ back: '/' })}
   <section id="home" class="hero">
-    <h1 class="reveal">bharris.app</h1>
+    <h1 class="reveal">bharris.app<img src="/logo-site.png" alt="" /></h1>
     <p class="tag reveal" style="--d:90ms">Time is money, so we will make sure not to waste yours.</p>
     <a class="jump reveal" style="--d:180ms" href="#features">
       <span>Jump in</span>
@@ -2337,7 +2482,7 @@ function contactPage(firebaseConfig) {
   <main class="contact-page reveal">
     <div class="contact-head">
       <h1>Contact</h1>
-      <p class="contact-email"><a href="mailto:broderickharris11@gmail.com">broderickharris11@gmail.com</a></p>
+      <p class="contact-email"><a href="mailto:bharris.app@gmail.com">bharris.app@gmail.com</a></p>
       <p class="lede">Questions about the app, a plan, or your account.</p>
     </div>
     <section class="faq" aria-labelledby="faq-title">
@@ -2420,11 +2565,6 @@ function plansPage(firebaseConfig) {
     body: `${navBar({ prefix: '/', back: '/plans/' })}
   <main class="block plans-wrap reveal">
     <h2>Plans</h2>
-    <p class="note renew-note">${escapeHtml(RENEWAL_NOTICE)}</p>
-    <label class="agree" for="terms-agree">
-      <input id="terms-agree" type="checkbox" />
-      <span>I agree to the <a href="/terms/">Terms of Service</a> and <a href="/privacy/">Privacy Policy</a>.</span>
-    </label>
     <div class="plan-grid">
       <article class="plan-card">
         <h3>Study</h3>
@@ -2465,18 +2605,34 @@ function plansPage(firebaseConfig) {
         ${featureList(REDEEM_POINTS)}
         <form class="stack" id="redeem-form">
           <input id="redeem-code" name="code" autocomplete="off" spellcheck="false" placeholder="Partner code" aria-label="Partner code" />
-          <button class="plan-btn" type="submit">Redeem</button>
+          <label class="agree" for="redeem-agree">
+            <input id="redeem-agree" type="checkbox" />
+            <span>I agree to the <a href="/terms/">Terms of Service</a> and <a href="/privacy/">Privacy Policy</a>.</span>
+          </label>
+          <button class="plan-btn" id="redeem-submit" type="submit" disabled>Redeem</button>
           <p id="redeem-status" role="status"></p>
         </form>
       </section>
     </div>
-    <div class="promo">
-      <label for="promo-code">Code</label>
-      <input id="promo-code" name="code" autocomplete="off" spellcheck="false" placeholder="Optional" aria-label="Code" />
-    </div>
     <p class="note" id="beta-ended" hidden>Your free week ended.</p>
     <p id="plans-status" role="status"></p>
     <button class="plan-btn secondary" id="manage" type="button" hidden>Manage subscription</button>
+    <dialog class="checkout" id="checkout-dialog">
+      <h3 id="checkout-title">Study</h3>
+      <p class="price" id="checkout-price">$8<span> / month</span></p>
+      <p class="note renew-note">${escapeHtml(RENEWAL_NOTICE)}</p>
+      <div class="promo">
+        <label for="promo-code">Code</label>
+        <input id="promo-code" name="code" autocomplete="off" spellcheck="false" placeholder="Optional" aria-label="Code" />
+      </div>
+      <label class="agree" for="terms-agree">
+        <input id="terms-agree" type="checkbox" />
+        <span>I agree to the <a href="/terms/">Terms of Service</a> and <a href="/privacy/">Privacy Policy</a>.</span>
+      </label>
+      <p id="checkout-status" role="status"></p>
+      <button class="plan-btn" id="checkout-confirm" type="button" disabled>Continue</button>
+      <button class="text-btn" id="checkout-close" type="button">Not now</button>
+    </dialog>
     <dialog class="sign-in" id="sign-in-dialog">
       <p class="mark">bharris.app</p>
       <h3>Sign in first</h3>
@@ -2633,6 +2789,12 @@ await mkdir(path.join(webDir, 'mockup'), { recursive: true });
 await cp(path.join(root, 'site', 'mockup', 'phone.mp4'), path.join(webDir, 'mockup', 'phone.mp4'));
 await cp(path.join(root, 'site', 'brain-side.png'), path.join(webDir, 'brain-side.png'));
 await cp(path.join(root, 'site', 'brain-top.png'), path.join(webDir, 'brain-top.png'));
+await cp(path.join(root, 'public', 'logo-light.png'), path.join(webDir, 'logo-light.png'));
+await cp(path.join(root, 'public', 'logo-site.png'), path.join(webDir, 'logo-site.png'));
+await cp(path.join(root, 'public', 'favicon.png'), path.join(webDir, 'site-icon.png'));
+await cp(path.join(root, 'public', 'favicon.png'), path.join(webDir, 'favicon.png'));
+await cp(path.join(root, 'public', 'favicon.png'), path.join(webDir, 'favicon.ico'));
+await cp(path.join(root, 'public', 'apple-touch-icon.png'), path.join(webDir, 'apple-touch-icon.png'));
 const siteEnv = loadSiteEnv();
 const firebaseConfig = {
   apiKey: siteEnv.VITE_FIREBASE_API_KEY || '',

@@ -1,6 +1,7 @@
 import React from 'react';
 import { Button } from '@/components/ui/button';
 import { ArrowRight } from 'lucide-react';
+import StudyScreenShell from '@/components/study/StudyScreenShell';
 import { bumpFromPractice, sortForPractice } from '@/lib/mastery';
 import { flashcardDef } from '@/lib/studyUtils';
 import WriteOwnDef, {
@@ -12,7 +13,7 @@ import { ShortcutKey, useFlashcardShortcuts, useIsComputer } from '@/components/
 import FlashCardStage from '@/components/study/FlashCardStage';
 import { cardProgressCaption } from '@/components/study/CardProgress';
 
-export default function PracticeFlashcards({ terms, onUpdateTerm, onDone, heading = 'Flashcards' }) {
+export default function PracticeFlashcards({ terms, onUpdateTerm, onDone, onBack, heading = 'Flashcards' }) {
   const computer = useIsComputer();
   const byId = React.useMemo(() => Object.fromEntries(terms.map((t) => [t.id, t])), [terms]);
   const [items, setItems] = React.useState(() => sortForPractice(terms).map((t) => t.id));
@@ -68,7 +69,10 @@ export default function PracticeFlashcards({ terms, onUpdateTerm, onDone, headin
   const bump = (id, correct) => {
     const t = byId[id];
     if (!t) return;
-    onUpdateTerm(id, { mastery: bumpFromPractice(t.mastery, { correct }) });
+    onUpdateTerm(id, {
+      mastery: bumpFromPractice(t.mastery, { correct }),
+      practiceCorrect: correct,
+    });
   };
 
   const retireIds = (ids, defs = {}) => {
@@ -76,7 +80,10 @@ export default function PracticeFlashcards({ terms, onUpdateTerm, onDone, headin
     ids.forEach((id) => {
       const t = byId[id];
       const patch = {};
-      if (t) patch.mastery = bumpFromPractice(t.mastery, { correct: true });
+      if (t) {
+        patch.mastery = bumpFromPractice(t.mastery, { correct: true });
+        patch.practiceCorrect = true;
+      }
       if (defs[id]) patch.ownDefinition = defs[id];
       if (Object.keys(patch).length) onUpdateTerm(id, patch);
       deferredRef.current.delete(id);
@@ -178,6 +185,7 @@ export default function PracticeFlashcards({ terms, onUpdateTerm, onDone, headin
         cards={writeCards}
         allTerms={defMode ? terms : undefined}
         variant={defMode ? 'defMode' : 'stuck'}
+        onBack={onBack}
         onComplete={(entries) => startWrittenReview(entries, writeCards)}
         onSkip={
           defMode
@@ -213,21 +221,33 @@ export default function PracticeFlashcards({ terms, onUpdateTerm, onDone, headin
   );
 
   if (finished || items.length === 0) {
+    const doneBody = (
+      <div className="flex flex-col items-center text-center">
+        <h2 className="text-title text-foreground">Flashcards done</h2>
+        <p className="mt-3 text-body text-muted-foreground">
+          Got it moves the term up one list. A miss moves it down one. Mastered still has to be earned in Explain it.
+        </p>
+        {defModeButton}
+      </div>
+    );
+    const doneAction = (
+      <Button onClick={onDone} className="w-full">
+        Back to practice
+        <ArrowRight className="h-4 w-4" />
+      </Button>
+    );
+    if (onBack) {
+      return (
+        <StudyScreenShell onBack={onBack} action={doneAction}>
+          {doneBody}
+        </StudyScreenShell>
+      );
+    }
     return (
-      <div className="flex-1 flex flex-col px-5 pt-6">
-        <div className="max-w-md mx-auto w-full flex-1 flex flex-col items-center text-center pt-8">
-          <h2 className="text-2xl font-bold tracking-tight mb-2">Flashcards done</h2>
-          <p className="text-sm text-muted-foreground mb-6">
-            Got-it cards moved up. Misses stay in the work-on pile. Mastered still has to be earned in Explain it.
-          </p>
-          {defModeButton}
-          <Button
-            onClick={onDone}
-            className="w-full h-12 rounded-2xl font-semibold mt-4"
-          >
-            Back to practice
-            <ArrowRight className="w-4 h-4 ml-2" />
-          </Button>
+      <div className="flex flex-1 flex-col px-gutter pt-8">
+        <div className="mx-auto flex w-full max-w-study flex-1 flex-col">
+          {doneBody}
+          <div className="mt-6">{doneAction}</div>
         </div>
       </div>
     );
@@ -243,8 +263,11 @@ export default function PracticeFlashcards({ terms, onUpdateTerm, onDone, headin
 
   return (
     <FlashCardStage
+      onBack={onBack}
       done={retired}
       total={deckTotalRef.current}
+      index={pos + 1}
+      count={items.length}
       caption={cardProgressCaption(deckTotalRef.current, retired)}
       label={reviewing ? 'Practice your wording' : heading}
       prompt={current.term}

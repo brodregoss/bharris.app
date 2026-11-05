@@ -23,6 +23,7 @@ import {
   WIND_DOWN_BUDGET_MS,
   BLOCK_BUDGET_RATIO,
   planRecallQueues,
+  sessionBudgetMs,
   sessionRankMode,
   tierLabelsFor,
   RANK_MODE,
@@ -34,6 +35,7 @@ import { loadSession, saveSession, clearSession, saveFinishedSession } from '@/l
 import { getActiveUid } from '@/lib/userStorage';
 import { withInferredMastery } from '@/lib/mastery';
 import { useDebug } from '@/lib/DebugContext';
+import { logProductEvent } from '@/lib/productEvents';
 
 function byPriorityDesc(a, b) {
   return priority(b) - priority(a);
@@ -125,7 +127,7 @@ function StudyFlow() {
 
   const setup = init?.setup || null;
   const [terms, setTerms] = React.useState(() => (init ? init.terms : []));
-  const totalMs = Math.max(15 * 60 * 1000, (setup?.hours || 1) * 3600 * 1000);
+  const totalMs = sessionBudgetMs(setup?.hours);
   const [sessionStart] = React.useState(() => (init ? init.sessionStart : Date.now()));
   const [phase, setPhase] = React.useState(() => (init ? init.phase : 'critical'));
   const [blockStats, setBlockStats] = React.useState(() => (init ? init.blockStats : {}));
@@ -304,7 +306,7 @@ function StudyFlow() {
     return (
       <div className="min-h-[100dvh] flex flex-col items-center justify-center px-8 text-center">
         <p className="text-sm text-muted-foreground mb-4">No study session found.</p>
-        <Button onClick={() => navigate('/')} className="rounded-2xl">
+        <Button onClick={() => navigate('/')} className="rounded-full">
           Back to start
         </Button>
       </div>
@@ -351,6 +353,22 @@ function StudyFlow() {
   const rankMode = sessionRankMode(setup, terms, { title: init?.title });
   const labels = tierLabelsFor(rankMode);
   const difficultyRank = rankMode === RANK_MODE.DIFFICULTY;
+
+  const finishCram = (go) => {
+    logProductEvent('cram_finished', {
+      feature: normalizeStudyMode(setup?.studyMode),
+      detail: sessionIdRef.current || '',
+    });
+    saveFinishedSession({
+      id: sessionIdRef.current,
+      terms: withInferredMastery(terms),
+      setup,
+      title: setup?.title,
+      finishedAt: Date.now(),
+    });
+    clearSession();
+    go();
+  };
 
   let blockLabel = 'Study session';
   let content = null;
@@ -508,16 +526,21 @@ function StudyFlow() {
           onOpenCheat={openCheat}
           stopTime={stopTime}
           onSetStopTime={setStopTime}
-          onDone={() => {
-            saveFinishedSession({
-              id: sessionIdRef.current,
-              terms: withInferredMastery(terms),
-              setup,
-              title: setup?.title,
-              finishedAt: Date.now(),
-            });
-            clearSession();
-            navigate('/');
+          onDone={() => finishCram(() => navigate('/'))}
+          onPractice={() => finishCram(() => navigate('/practice', { state: { workOn: true } }))}
+          onRedo={(ids) => {
+            const keep = new Set(ids);
+            const nextTerms = terms
+              .filter((t) => keep.has(t.id))
+              .map((t) => ({
+                ...t,
+                recallHistory: [],
+                correctStreak: 0,
+                seen: false,
+                testResult: null,
+              }));
+            if (!nextTerms.length) return;
+            finishCram(() => navigate('/study', { state: { terms: nextTerms, setup } }));
           }}
         />
       );
@@ -534,16 +557,16 @@ function StudyFlow() {
         blockLabel={blockLabel}
       />
       {windDownActive && !windDownAcknowledged && (
-        <div className="px-5 py-3 bg-amber-50 dark:bg-amber-400/10 border-b border-amber-200 dark:border-amber-400/20 flex items-start gap-2">
-          <Moon className="w-4 h-4 text-amber-700 dark:text-amber-200 shrink-0 mt-0.5" />
-          <p className="text-xs text-amber-800 dark:text-amber-100/80 flex-1 leading-relaxed">
+        <div className="flex items-start gap-2 border-b border-shaky/30 bg-shaky/12 px-gutter py-3">
+          <Moon className="mt-1 h-4 w-4 shrink-0 text-shaky" />
+          <p className="flex-1 text-meta text-shaky">
             You're close to your stop time — here's your last quick pass, then get some sleep. Recall locks in
             better after sleep than more cramming right now.
           </p>
           <button
             type="button"
             onClick={() => setWindDownAcknowledged(true)}
-            className="text-xs text-amber-700 dark:text-amber-200 font-semibold underline-offset-4 hover:underline shrink-0"
+            className="shrink-0 text-meta font-semibold text-shaky underline-offset-4 hover:underline"
           >
             Got it
           </button>
@@ -580,7 +603,7 @@ class StudyErrorBoundary extends React.Component {
           <p className="text-xs text-muted-foreground mb-4 max-w-sm">
             {String(this.state.error?.message || this.state.error)}
           </p>
-          <Button type="button" onClick={() => { window.location.hash = '#/'; }} className="rounded-2xl">
+          <Button type="button" onClick={() => { window.location.hash = '#/'; }} className="rounded-full">
             Back to start
           </Button>
         </div>

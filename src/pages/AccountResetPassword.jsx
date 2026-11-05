@@ -111,15 +111,15 @@ export default function AccountResetPassword() {
             </div>
           ) : done ? (
             <>
-              <div className="flex justify-center text-emerald-700">
+              <div className="flex justify-center text-know">
                 <ShieldCheck className="w-8 h-8" aria-hidden="true" />
               </div>
-              <Button className="h-16 rounded-2xl text-lg font-bold" onClick={() => returnToSignIn(navigate)}>
+              <Button className="h-16 rounded-full text-lg font-bold" onClick={() => returnToSignIn(navigate)}>
                 Open bharris.app
               </Button>
             </>
           ) : linkInvalid ? (
-            <Button asChild className="h-16 rounded-2xl text-lg font-bold">
+            <Button asChild className="h-16 rounded-full text-lg font-bold">
               <Link to="/account/forgot">Request a new link</Link>
             </Button>
           ) : (
@@ -135,7 +135,7 @@ export default function AccountResetPassword() {
                   placeholder="New password"
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
-                  className="pl-11 h-16 rounded-2xl text-base"
+                  className="pl-11 h-16 rounded-full text-base"
                   minLength={8}
                   required
                 />
@@ -150,12 +150,12 @@ export default function AccountResetPassword() {
                   placeholder="Confirm password"
                   value={confirm}
                   onChange={(e) => setConfirm(e.target.value)}
-                  className="pl-11 h-16 rounded-2xl text-base"
+                  className="pl-11 h-16 rounded-full text-base"
                   minLength={8}
                   required
                 />
               </div>
-              <Button type="submit" className="h-16 rounded-2xl text-lg font-bold" disabled={loading}>
+              <Button type="submit" className="h-16 rounded-full text-lg font-bold" disabled={loading}>
                 {loading ? 'Saving…' : 'Save password'}
               </Button>
             </form>

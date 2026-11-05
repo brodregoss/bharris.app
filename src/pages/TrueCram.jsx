@@ -15,6 +15,7 @@ import {
 import { loadSession, saveSession, saveFinishedSession, clearSession } from '@/lib/sessionStore';
 import { getActiveUid } from '@/lib/userStorage';
 import { withInferredMastery } from '@/lib/mastery';
+import { logProductEvent } from '@/lib/productEvents';
 
 function hydrate(location) {
   const ownerUid = getActiveUid();
@@ -109,6 +110,10 @@ export default function TrueCram() {
   };
 
   const finishSession = () => {
+    logProductEvent('cram_finished', {
+      feature: STUDY_MODE.TRUE_CRAM,
+      detail: sessionIdRef.current || '',
+    });
     saveFinishedSession({
       id: sessionIdRef.current,
       terms: withInferredMastery(terms),
@@ -123,25 +128,8 @@ export default function TrueCram() {
     navigate('/');
   };
 
-  const practiceMissed = () => {
-    saveSession({
-      id: sessionIdRef.current,
-      setup,
-      terms,
-      phase: 'fork',
-      trueCram,
-      flaggedTermIds: trueCram.flaggedTermIds,
-      coveredIds: trueCram.coveredIds || [],
-      title: init.title || setup?.title,
-      noteId: init.noteId || null,
-    });
-    navigate('/practice', {
-      state: {
-        flaggedOnly: true,
-        flaggedTermIds: trueCram.flaggedTermIds,
-        coveredIds: trueCram.coveredIds || [],
-      },
-    });
+  const openSelfPractice = () => {
+    navigate('/practice', { state: { wholeSet: true } });
   };
 
   const restartDeck = () => {
@@ -156,7 +144,7 @@ export default function TrueCram() {
           <Link
             to="/"
             aria-label="Home"
-            className="flex items-center justify-center w-11 h-11 rounded-xl bg-primary text-primary-foreground shrink-0 hover:bg-primary/90 transition"
+            className="flex items-center justify-center w-11 h-11 rounded-full bg-primary text-primary-foreground shrink-0 hover:bg-primary/90 transition"
           >
             <Home className="w-4 h-4" />
           </Link>
@@ -173,30 +161,30 @@ export default function TrueCram() {
               {flagged > 0 ? (
                 <div className="flex gap-3">
                   <Button
-                    className="h-14 flex-1 min-w-0 rounded-2xl text-sm font-semibold px-2"
+                    className="h-14 flex-1 min-w-0 rounded-full text-sm font-semibold px-2"
                     onClick={() => setTrueCram((prev) => startFlaggedPass(prev))}
                   >
                     Practice missed
                   </Button>
                   <Button
-                    variant="outline"
-                    className="h-14 flex-1 min-w-0 rounded-2xl text-sm font-semibold px-2"
-                    onClick={practiceMissed}
+                    variant="secondary"
+                    className="h-14 flex-1 min-w-0 rounded-full text-sm font-semibold px-2"
+                    onClick={openSelfPractice}
                   >
                     Self practice
                   </Button>
                 </div>
               ) : (
                 <Button
-                  className="h-14 rounded-2xl text-base font-semibold"
-                  onClick={practiceMissed}
+                  className="h-14 rounded-full text-base font-semibold"
+                  onClick={openSelfPractice}
                 >
                   Self practice
                 </Button>
               )}
               <Button
                 variant="outline"
-                className="h-14 rounded-2xl text-base font-semibold"
+                className="h-14 rounded-full text-base font-semibold"
                 onClick={finishSession}
               >
                 Done

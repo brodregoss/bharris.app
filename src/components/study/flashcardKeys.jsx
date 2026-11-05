@@ -51,7 +51,7 @@ export function useFlashcardShortcuts({ enabled, revealed, onFlip, onMiss, onKno
 
 export function ShortcutKey({ children }) {
   return (
-    <kbd className="rounded-md border border-current/30 bg-background/10 px-1.5 py-0.5 text-[10px] font-semibold leading-none tracking-wide">
+    <kbd className="inline-flex items-center rounded-pill bg-primary-foreground/15 px-2 py-1 text-meta font-semibold leading-none text-primary-foreground">
       {children}
     </kbd>
   );

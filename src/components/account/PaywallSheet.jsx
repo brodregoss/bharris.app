@@ -46,8 +46,8 @@ function formatPlanDate(iso) {
 function PlanCard({ plan, current, highlight, action, busy }) {
   return (
     <div className={cn(
-      'rounded-2xl border p-4 text-left w-full',
-      highlight ? 'border-foreground bg-card' : 'border-border bg-muted/40',
+      'w-full rounded-card border p-6 text-left',
+      highlight ? 'border-foreground bg-card' : 'option-surface',
     )}
     >
       <div className="flex items-baseline justify-between gap-3">
@@ -76,14 +76,14 @@ function PlanCard({ plan, current, highlight, action, busy }) {
       {action ? (
         <Button
           type="button"
-          className="w-full h-11 rounded-2xl mt-4 font-semibold"
+          className="w-full h-11 rounded-full mt-4 font-semibold"
           disabled={busy}
           onClick={action.onClick}
         >
           {busy ? <Loader2 className="w-4 h-4 animate-spin" /> : action.label}
         </Button>
       ) : current && plan.monthlyPrice ? (
-        <div className="w-full h-11 rounded-2xl mt-4 font-semibold bg-primary text-primary-foreground flex items-center justify-center">
+        <div className="w-full h-11 rounded-full mt-4 font-semibold bg-primary text-primary-foreground flex items-center justify-center">
           Current
         </div>
       ) : null}
@@ -98,7 +98,9 @@ export default function PaywallSheet({ open, onOpenChange }) {
   const [code, setCode] = React.useState('');
   const [redeemCode, setRedeemCode] = React.useState('');
   const [cancelOpen, setCancelOpen] = React.useState(false);
+  const [checkoutPlan, setCheckoutPlan] = React.useState('');
   const [agreed, setAgreed] = React.useState(false);
+  const [redeemAgreed, setRedeemAgreed] = React.useState(false);
 
   const billingPlan = user?.billingPlan || '';
   const websitePlan = billingPlan === 'solo' || billingPlan === 'partner';
@@ -114,7 +116,9 @@ export default function PaywallSheet({ open, onOpenChange }) {
       setError('');
       setBusy('');
       setCancelOpen(false);
+      setCheckoutPlan('');
       setAgreed(false);
+      setRedeemAgreed(false);
       return undefined;
     }
     let cancelled = false;
@@ -160,9 +164,15 @@ export default function PaywallSheet({ open, onOpenChange }) {
     });
   };
 
+  const openCheckout = (planId) => {
+    setError('');
+    setAgreed(false);
+    setCheckoutPlan(planId);
+  };
+
   const subscribeAction = (planId, isCurrent) => {
     if (isCurrent && billingPlan !== 'guest') return null;
-    return { label: 'Subscribe', onClick: () => subscribe(planId) };
+    return { label: 'Subscribe', onClick: () => openCheckout(planId) };
   };
 
   const manageBilling = () => run('portal', async () => {
@@ -177,7 +187,7 @@ export default function PaywallSheet({ open, onOpenChange }) {
       setError('Enter a code.');
       return;
     }
-    if (!agreed) {
+    if (!redeemAgreed) {
       setError(TERMS_AGREE_ERROR);
       return;
     }
@@ -190,7 +200,7 @@ export default function PaywallSheet({ open, onOpenChange }) {
 
   const studyAction = subscribeAction('solo', currentStudy);
   const partnerAction = subscribeAction('partner', currentPartner);
-  const needsAgreement = Boolean(studyAction || partnerAction || !billingPlan);
+  const pendingPlan = checkoutPlan === 'partner' ? PLANS.partner : checkoutPlan === 'solo' ? PLANS.study : null;
 
   return (
     <>
@@ -203,13 +213,7 @@ export default function PaywallSheet({ open, onOpenChange }) {
             </SheetDescription>
           </SheetHeader>
           <div className="space-y-3 pt-4 pb-6">
-            {error && <p className="text-sm text-destructive">{error}</p>}
-            {(studyAction || partnerAction) && (
-              <p className="text-xs text-muted-foreground leading-relaxed">{RENEWAL_NOTICE}</p>
-            )}
-            {needsAgreement && (
-              <TermsAgreement id="paywall-agree-terms" checked={agreed} onCheckedChange={setAgreed} />
-            )}
+            {error && !checkoutPlan && !cancelOpen && <p className="text-sm text-destructive">{error}</p>}
             {user?.billingNotice === 'beta_ended' && !billingPlan && (
               <p className="text-sm text-muted-foreground">Your free week ended.</p>
             )}
@@ -249,26 +253,11 @@ export default function PaywallSheet({ open, onOpenChange }) {
               action={partnerAction}
             />
 
-            {(studyAction || partnerAction) && (
-              <div className="space-y-2">
-                <Label htmlFor="plan-code">Code</Label>
-                <Input
-                  id="plan-code"
-                  value={code}
-                  autoComplete="off"
-                  spellCheck={false}
-                  placeholder="Optional"
-                  onChange={(event) => setCode(event.target.value)}
-                  className="h-11 rounded-2xl"
-                />
-              </div>
-            )}
-
             {canCancel && (
               <Button
                 type="button"
                 variant="outline"
-                className="w-full h-11 rounded-2xl"
+                className="w-full h-11 rounded-full"
                 disabled={!!busy}
                 onClick={() => {
                   setError('');
@@ -282,7 +271,7 @@ export default function PaywallSheet({ open, onOpenChange }) {
               <Button
                 type="button"
                 variant="outline"
-                className="w-full h-11 rounded-2xl"
+                className="w-full h-11 rounded-full"
                 disabled={!!busy}
                 onClick={manageBilling}
               >
@@ -291,7 +280,7 @@ export default function PaywallSheet({ open, onOpenChange }) {
             )}
 
             {!billingPlan && (
-              <form onSubmit={redeem} className="rounded-2xl border border-border p-4 space-y-3">
+              <form onSubmit={redeem} className="rounded-card border border-border p-4 space-y-3">
                 <p className="text-sm font-bold tracking-tight">Redeem partner code</p>
                 <p className="text-xs text-muted-foreground">
                   Get a code from someone on partner study. It works for one friend.
@@ -303,9 +292,10 @@ export default function PaywallSheet({ open, onOpenChange }) {
                   placeholder="Partner code"
                   aria-label="Partner code"
                   onChange={(event) => setRedeemCode(event.target.value)}
-                  className="h-11 rounded-2xl"
+                  className="h-11 rounded-full"
                 />
-                <Button type="submit" className="w-full h-11 rounded-2xl font-semibold" disabled={!!busy}>
+                <TermsAgreement id="paywall-redeem-terms" checked={redeemAgreed} onCheckedChange={setRedeemAgreed} />
+                <Button type="submit" className="w-full h-11 rounded-full font-semibold" disabled={!!busy || !redeemAgreed}>
                   {busy === 'redeem' ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Redeem'}
                 </Button>
               </form>
@@ -320,6 +310,58 @@ export default function PaywallSheet({ open, onOpenChange }) {
           </div>
         </SheetContent>
       </Sheet>
+
+      <AlertDialog
+        open={!!pendingPlan}
+        onOpenChange={(next) => {
+          if (next || busy === checkoutPlan) return;
+          setCheckoutPlan('');
+          setAgreed(false);
+        }}
+      >
+        <AlertDialogContent className="max-h-[85dvh] overflow-y-auto">
+          {pendingPlan && (
+            <>
+              <AlertDialogHeader>
+                <AlertDialogTitle>
+                  {pendingPlan.name}
+                  <span className="block text-base font-semibold mt-1">
+                    {pendingPlan.monthlyPrice}
+                    <span className="text-sm font-medium text-muted-foreground"> / month</span>
+                  </span>
+                </AlertDialogTitle>
+                <AlertDialogDescription className="text-xs leading-relaxed">
+                  {RENEWAL_NOTICE}
+                </AlertDialogDescription>
+              </AlertDialogHeader>
+              <div className="space-y-2">
+                <Label htmlFor="plan-code">Code</Label>
+                <Input
+                  id="plan-code"
+                  value={code}
+                  autoComplete="off"
+                  spellCheck={false}
+                  placeholder="Optional"
+                  onChange={(event) => setCode(event.target.value)}
+                  className="h-11 rounded-full"
+                />
+              </div>
+              <TermsAgreement id="paywall-agree-terms" checked={agreed} onCheckedChange={setAgreed} />
+              {error && <p className="text-sm text-destructive">{error}</p>}
+              <AlertDialogFooter>
+                <AlertDialogCancel disabled={busy === checkoutPlan}>Not now</AlertDialogCancel>
+                <Button
+                  className="h-11 rounded-full font-semibold"
+                  disabled={!agreed || busy === checkoutPlan}
+                  onClick={() => subscribe(checkoutPlan)}
+                >
+                  {busy === checkoutPlan ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Continue'}
+                </Button>
+              </AlertDialogFooter>
+            </>
+          )}
+        </AlertDialogContent>
+      </AlertDialog>
 
       <AlertDialog open={cancelOpen} onOpenChange={(next) => { if (busy !== 'cancel') setCancelOpen(next); }}>
         <AlertDialogContent>

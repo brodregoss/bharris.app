@@ -1,6 +1,7 @@
 import React from 'react';
 import { useLocation, useNavigate, Navigate } from 'react-router-dom';
-import { ArrowLeft, Check, Loader2 } from 'lucide-react';
+import { ArrowLeft, Check } from 'lucide-react';
+import AiWait from '@/components/AiWait';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
@@ -43,6 +44,7 @@ export default function ReviewNotes() {
     () => source?.kind === 'photo' && !source?.items?.length && photosFor(source).length > 0
   );
   const [extractHint, setExtractHint] = React.useState('Finding terms…');
+  const [aiWait, setAiWait] = React.useState({ floor: 0, ceiling: 30, estimateMs: 20000 });
   const [extractError, setExtractError] = React.useState('');
   const [regenId, setRegenId] = React.useState(null);
   const foundRef = React.useRef(null);
@@ -84,11 +86,17 @@ export default function ReviewNotes() {
       let found = foundRef.current;
       if (!found?.length) {
         setExtractHint('Finding terms…');
-        found = await extractTermsFromPhotos(images, setExtractHint);
+        found = await extractTermsFromPhotos(images, (message, meta) => {
+          setExtractHint(message);
+          if (meta) setAiWait(meta);
+        });
         foundRef.current = found;
       }
       setExtractHint('Writing definitions…');
-      const withDefs = await generateDefinitions(found, setExtractHint);
+      const withDefs = await generateDefinitions(found, (message, meta) => {
+        setExtractHint(message);
+        if (meta) setAiWait(meta);
+      });
       setItems(withDefs);
       if (source?.noteId) {
         const transcript = found
@@ -227,14 +235,14 @@ export default function ReviewNotes() {
       <main className="flex-1 px-5 pt-3 overflow-y-auto">
         <div className="max-w-md mx-auto w-full space-y-3 pb-4">
           {extracting ? (
-            <div className="flex flex-col items-center justify-center py-16 text-center gap-3">
-              <Loader2 className="w-8 h-8 text-muted-foreground animate-spin" />
-              <p className="text-sm font-medium">{extractHint}</p>
-              <p className="text-xs text-muted-foreground max-w-xs">
-                {photosFor(source).some((item) => item?.scoped)
+            <div className="flex flex-col items-center justify-center py-16">
+              <AiWait
+                label={extractHint}
+                detail={photosFor(source).some((item) => item?.scoped)
                   ? 'Reading the areas you highlighted, then writing a short definition for each term.'
                   : `Reading your photo${photosFor(source).length > 1 ? 's' : ''}, then writing a short definition for each term.`}
-              </p>
+                {...aiWait}
+              />
             </div>
           ) : extractError ? (
             <div className="flex flex-col items-center justify-center py-16 text-center gap-3">
@@ -246,7 +254,7 @@ export default function ReviewNotes() {
                   ranExtract.current = true;
                   runExtract();
                 }}
-                className="mt-2 rounded-2xl"
+                className="mt-2"
               >
                 Try again
               </Button>
@@ -270,13 +278,13 @@ export default function ReviewNotes() {
             </div>
           ) : (
             <>
-              <div className="rounded-2xl border border-border bg-card p-4 space-y-2 shadow-sm">
+              <div className="rounded-card border border-border bg-card p-4 space-y-2 shadow-sm">
                 <p className="text-xs font-medium text-muted-foreground">Title</p>
                 <Input
                   value={title}
                   onChange={(e) => setTitle(e.target.value)}
                   placeholder="e.g. Bio lecture 3"
-                  className="h-11 rounded-xl font-semibold"
+                  className="h-11 rounded-full font-semibold"
                   autoComplete="off"
                 />
               </div>
@@ -288,14 +296,14 @@ export default function ReviewNotes() {
               {items.map((item, i) => (
                 <div
                   key={item.id}
-                  className="rounded-2xl border border-border bg-card p-4 space-y-3 shadow-sm"
+                  className="rounded-card border border-border bg-card p-4 space-y-3 shadow-sm"
                 >
                   <p className="text-xs font-medium text-muted-foreground">Term {i + 1}</p>
                   <Input
                     value={item.term}
                     onChange={(e) => update(item.id, { term: e.target.value })}
                     placeholder="Term"
-                    className="h-11 rounded-xl font-semibold"
+                    className="h-11 rounded-full font-semibold"
                   />
                   <Textarea
                     value={item.definition}
@@ -310,7 +318,9 @@ export default function ReviewNotes() {
                       disabled={!!regenId || !item.term.trim()}
                       className="text-xs text-muted-foreground hover:text-foreground underline-offset-4 hover:underline disabled:opacity-50"
                     >
-                      {regenId === item.id ? 'Regenerating…' : 'Regenerate definition'}
+                      {regenId === item.id ? (
+                        <AiWait compact label="Regenerating" estimateMs={8000} />
+                      ) : 'Regenerate definition'}
                     </button>
                     <button
                       type="button"
@@ -340,7 +350,7 @@ export default function ReviewNotes() {
             size="lg"
             disabled={!filled.length || !trimmedTitle || extracting || saving}
             onClick={continueSetup}
-            className="w-full h-14 rounded-2xl text-base font-semibold shadow-lg"
+            className="w-full h-14 rounded-full text-base font-semibold shadow-lg"
           >
             <Check className="w-5 h-5 mr-2" />
             {saving ? 'Saving…' : 'Looks good'}

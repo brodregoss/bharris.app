@@ -51,7 +51,7 @@ export default function ForgotPassword() {
       onBack={() => navigate('/account/signin')}
     >
       {error && (
-        <div className="mb-4 p-3 rounded-2xl bg-destructive/10 text-destructive text-sm">
+        <div className="mb-4 p-3 rounded-card bg-destructive/10 text-destructive text-sm">
           {error}
         </div>
       )}
@@ -63,7 +63,7 @@ export default function ForgotPassword() {
           <Button
             type="button"
             variant="outline"
-            className="w-full h-14 rounded-2xl text-base font-semibold"
+            className="w-full h-14 rounded-full text-base font-semibold"
             disabled={loading || waitSeconds > 0}
             onClick={sendReset}
           >
@@ -93,12 +93,12 @@ export default function ForgotPassword() {
                 placeholder="you@example.com"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
-                className="pl-10 h-12 rounded-2xl"
+                className="pl-10 h-12 rounded-full"
                 required
               />
             </div>
           </div>
-          <Button type="submit" className="w-full h-14 rounded-2xl text-base font-semibold" disabled={loading}>
+          <Button type="submit" className="w-full h-14 rounded-full text-base font-semibold" disabled={loading}>
             {loading ? (
               <>
                 <Loader2 className="w-4 h-4 mr-2 animate-spin" />

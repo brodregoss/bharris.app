@@ -51,10 +51,10 @@ function UploadNotes() {
                   type="button"
                   onClick={() => pickSample(s)}
                   className={cn(
-                    'w-full text-left rounded-2xl border p-4 flex items-start gap-3 transition',
+                    'w-full text-left rounded-card border p-4 flex items-start gap-3 transition',
                     active
-                      ? 'border-primary bg-primary/5'
-                      : 'border-border bg-card hover:border-muted-foreground'
+                      ? 'option-surface ring-2 ring-primary'
+                      : 'option-surface'
                   )}
                 >
                   <div className="w-10 h-10 rounded-lg bg-muted flex items-center justify-center shrink-0">
@@ -63,7 +63,7 @@ function UploadNotes() {
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center justify-between gap-2">
                       <span className="text-sm font-semibold truncate">{s.title}</span>
-                      {active && <Check className="w-4 h-4 text-foreground shrink-0" />}
+                      {active && <Check className="w-4 h-4 shrink-0 text-primary" />}
                     </div>
                     <p className="text-xs text-muted-foreground mt-0.5">{s.meta}</p>
                     <p className="text-[11px] text-muted-foreground mt-1">{s.terms} terms</p>
@@ -82,7 +82,7 @@ function UploadNotes() {
             disabled={!selected}
             onClick={() => navigate('/setup', { state: { source: selected } })}
             className={cn(
-              'w-full h-14 rounded-2xl text-base font-semibold transition-all',
+              'w-full h-14 rounded-full text-base font-semibold transition-all',
               selected
                 ? 'shadow-lg'
                 : 'bg-muted text-muted-foreground'

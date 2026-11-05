@@ -45,7 +45,7 @@ Create an account on `/account/create` or tap **Continue with Google**. That cal
 ### Google sign-in
 
 1. Firebase Console → **Authentication** → **Sign-in method** → enable **Google** → Save.
-2. **Authentication** → **Settings** → **Authorized domains**: keep `localhost`, `bharris-app.web.app` (the iPhone app hostname), and `bharris.broderickharris11.workers.dev`.
+2. **Authentication** → **Settings** → **Authorized domains**: keep `localhost`, `bharris-app.web.app` (the iPhone app hostname), `bharris.app`, and `bharris.broderickharris11.workers.dev`.
 3. For the iPhone app: Project settings → **Add app** → iOS, bundle id `app.bharris.cram`. Download `GoogleService-Info.plist` into `ios/App/App/`.
 4. In Xcode, **Info** → **URL Types**, add a URL scheme equal to `REVERSED_CLIENT_ID` from that plist.
 5. `npm run ios:sync` and rebuild in Xcode.
@@ -64,7 +64,7 @@ Then open `ios/App/App.xcodeproj`. The shared App scheme points at `ios/StudyApp
 
 Plans in the app: **Free** (5 AI calls/month) and **Study Pro** (30 AI calls/month, $4.99/mo or $39.99/yr). The paywall in Settings shows that comparison. StoreKit / RevenueCat supply the live prices on device.
 
-The iPhone app hostname is `bharris-app.web.app`. Password-reset links return through `bharris.broderickharris11.workers.dev`.
+The public site is [https://bharris.app](https://bharris.app). `www.bharris.app` redirects there. The iPhone app hostname is `bharris-app.web.app`. Password-reset links return through `bharris.app`.
 
 ## What uses OpenAI
 
@@ -91,13 +91,12 @@ npx wrangler secret put STRIPE_SECRET_KEY
 npx wrangler secret put STRIPE_WEBHOOK_SECRET
 npx wrangler secret put STRIPE_PRICE_SOLO
 npx wrangler secret put STRIPE_PRICE_PARTNER
-npx wrangler secret put NOTES_SCAN_PASSWORD_HASH
 npx wrangler secret put NOTES_SCAN_TOKEN_SECRET
 npx wrangler secret put DEV_TOOLS_CODE_HASH
 npm run worker:deploy
 ```
 
-Photo uploads stay locked until the notes password is entered. `node scripts/notes-scan-secret.mjs --write` creates that password for local development and prints it once. Use the same two values for the Worker secrets above. The password is not stored in the app. Settings has a Dev tools code. After that code checks out, Kill current code is on the same screen. That turns the live notes code off immediately. Save new code replaces it. The dev code is checked on the server and is not stored in the app.
+Photo upload does not ask for a password. Settings has a Dev tools code. After that code checks out, Kill photo upload turns scanning off for everyone, and Turn photo upload on brings it back. `node scripts/notes-scan-secret.mjs --write` creates the token secret used by that dev code. `node scripts/notes-scan-secret.mjs --dev --write` creates the dev code and prints it once. The dev code is checked on the server and is not stored in the app.
 
 Website plans are Study at $8/month and Partner study at $12/month.
 
@@ -108,7 +107,7 @@ Website plans are Study at $8/month and Partner study at $12/month.
 
 Checkout sends the buyer to `/thanks/`. The plans page has a Code field. `beta` starts a 7-day free period with no card and no charge. When that week ends, access ends and the plans page says the free week ended. Each account can use that code once. Set `BETA_PROMO_CODE` to `off` to stop accepting it. A free trial configured on a Stripe price is different: those buyers enter a card, and Stripe charges the plan price when the trial ends. Manage customers, trials, and cancellations in the Stripe Dashboard under Customers and Subscriptions. Partner study creates one code; resetting it voids the old code, and ending that subscription removes access for both people.
 
-Set `VITE_WORKER_URL` to the `workers.dev` URL it prints, then `npm run ios:sync`. Opening that URL in a browser loads the public homepage. The study app is at `/app/` (`/v1` stays the API). Add the same hostname under Firebase Authentication → Settings → Authorized domains.
+Set `VITE_WORKER_URL` to `https://bharris.app`, then `npm run ios:sync`. Opening https://bharris.app loads the public homepage. The study app is at `/app/` (`/v1` stays the API). Add `bharris.app` under Firebase Authentication → Settings → Authorized domains. The `workers.dev` hostname still reaches the same Worker.
 
 The live app does not use Vercel. Old `api/llm.js` / `api/account.js` files are leftover and unused.
 

@@ -74,13 +74,13 @@ export default function EditNameSheet({ open, onOpenChange, displayName, onSaved
         <SheetHeader className="text-left pr-10">
           <SheetTitle>Edit name</SheetTitle>
           <SheetDescription>
-            This is the name on your account and in the home greeting.
+            This is the name on your account.
           </SheetDescription>
         </SheetHeader>
 
         <form onSubmit={handleSave} className="space-y-4 pt-4 pb-6">
           {error && (
-            <div className="p-3 rounded-2xl bg-destructive/10 text-destructive text-sm">
+            <div className="p-3 rounded-card bg-destructive/10 text-destructive text-sm">
               {error}
             </div>
           )}
@@ -94,7 +94,7 @@ export default function EditNameSheet({ open, onOpenChange, displayName, onSaved
               placeholder="First name"
               value={first}
               onChange={(e) => setFirst(e.target.value)}
-              className="h-12 rounded-2xl"
+              className="h-12 rounded-full"
               maxLength={40}
               required
             />
@@ -108,11 +108,11 @@ export default function EditNameSheet({ open, onOpenChange, displayName, onSaved
               placeholder="Last name"
               value={last}
               onChange={(e) => setLast(e.target.value)}
-              className="h-12 rounded-2xl"
+              className="h-12 rounded-full"
               maxLength={40}
             />
           </div>
-          <Button type="submit" className="w-full h-12 rounded-2xl" disabled={saving}>
+          <Button type="submit" className="w-full h-12 rounded-full" disabled={saving}>
             {saving ? (
               <>
                 <Loader2 className="w-4 h-4 mr-2 animate-spin" />

@@ -1,9 +1,11 @@
 import React from 'react';
-import { ArrowLeft, ArrowRight } from 'lucide-react';
+import { ArrowLeft, ArrowRight, Eye } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
+import StudyScreenShell from '@/components/study/StudyScreenShell';
 import { invokeLlm } from '@/api/invokeLlm';
 import { cn } from '@/lib/utils';
+import AiWait from '@/components/AiWait';
 
 export const STUCK_AFTER_ROTATIONS = 3;
 
@@ -158,6 +160,7 @@ export default function WriteOwnDef({
   skipLabel,
   onComplete,
   onSkip,
+  onBack,
 }) {
   const [list, setList] = React.useState(() => uniqueCards(initialCards));
   const [step, setStep] = React.useState('intro');
@@ -269,22 +272,38 @@ export default function WriteOwnDef({
 
   const endPeek = () => setPeeking(false);
 
+  const frameScreen = (node, { action, current: stepCurrent, total: stepTotal } = {}) => {
+    if (!onBack) return node;
+    return (
+      <StudyScreenShell
+        onBack={onBack}
+        current={stepCurrent}
+        total={stepTotal}
+        action={action}
+        shellRef={fitRef}
+        shellStyle={fitStyle}
+      >
+        {node}
+      </StudyScreenShell>
+    );
+  };
+
   if (step === 'add') {
     return (
-      <div ref={fitRef} style={fitStyle} className="flex flex-col min-h-0 overflow-hidden px-5 pt-4">
-        <div className="max-w-md mx-auto w-full flex-1 flex flex-col min-h-0">
+      <div ref={fitRef} style={fitStyle} className="flex min-h-0 flex-col overflow-y-auto px-gutter pb-6 pt-8">
+        <div className="mx-auto flex w-full max-w-study flex-col gap-4">
           <button
             type="button"
             onClick={() => setStep('intro')}
-            className="self-start text-sm text-muted-foreground hover:text-foreground underline-offset-4 hover:underline mb-3"
+            className="self-start text-meta text-primary underline-offset-4 hover:underline"
           >
             Back
           </button>
-          <h2 className="text-xl font-bold tracking-tight mb-1">Add others</h2>
-          <p className="text-xs text-muted-foreground mb-4">
+          <h2 className="text-title text-foreground">Add others</h2>
+          <p className="text-body text-muted-foreground">
             Tap any extra terms you want in this round.
           </p>
-          <div className="flex-1 overflow-y-auto space-y-2 mb-4">
+          <div className="flex flex-col gap-2">
             {extras.length ? (
               extras.map((t) => {
                 const on = picked.has(t.id);
@@ -301,12 +320,12 @@ export default function WriteOwnDef({
                       });
                     }}
                     className={cn(
-                      'w-full text-left rounded-xl border p-3 transition',
-                      on ? 'border-foreground bg-card' : 'border-border bg-muted/30',
+                      'press w-full rounded-card border p-4 text-left transition-colors duration-150 ease-out',
+                      on ? 'border-primary bg-surface-1' : 'option-surface',
                     )}
                   >
-                    <p className="text-sm font-semibold">{t.term}</p>
-                    <p className="text-xs text-muted-foreground mt-0.5 line-clamp-2">{t.definition}</p>
+                    <p className="text-body font-semibold text-foreground">{t.term}</p>
+                    <p className="mt-1 line-clamp-2 text-meta text-muted-foreground">{t.definition}</p>
                   </button>
                 );
               })
@@ -324,7 +343,7 @@ export default function WriteOwnDef({
                 setList(chosen);
                 setStep('intro');
               }}
-              className="w-full h-12 rounded-2xl font-semibold"
+              className="w-full h-12 rounded-full font-semibold"
             >
               Done
             </Button>
@@ -335,46 +354,55 @@ export default function WriteOwnDef({
   }
 
   if (step === 'intro') {
+    const introAction = (
+      <div className="flex flex-col gap-3">
+        <Button onClick={() => startWriting(list)} className="w-full">
+          Next
+          <ArrowRight className="h-4 w-4" />
+        </Button>
+        {onSkip && (
+          <button
+            type="button"
+            onClick={onSkip}
+            className="text-meta text-muted-foreground underline-offset-4 hover:text-foreground hover:underline"
+          >
+            {skipLabel || 'Keep going'}
+          </button>
+        )}
+      </div>
+    );
+    const introBody = (
+      <>
+        <h2 className="text-title text-foreground">
+          {variant === 'defMode' ? 'Write your own def' : 'Feeling stuck?'}
+        </h2>
+        <p className="text-body text-muted-foreground">
+          Try writing your own definition to lock it in.
+        </p>
+        <div className="overflow-hidden rounded-card border border-border bg-surface-1">
+          {list.map((t) => (
+            <div key={t.id} className="flex h-action items-center border-b border-border px-4 last:border-b-0">
+              <p className="truncate text-body text-foreground">{t.term}</p>
+            </div>
+          ))}
+        </div>
+        {variant === 'defMode' && allTerms?.length > list.length && (
+          <button
+            type="button"
+            onClick={() => setStep('add')}
+            className="self-start text-meta text-primary underline-offset-4 hover:underline"
+          >
+            Add more terms
+          </button>
+        )}
+      </>
+    );
+    if (onBack) return frameScreen(introBody, { action: introAction });
     return (
-      <div ref={fitRef} style={fitStyle} className="flex flex-col min-h-0 overflow-hidden px-5 pt-4">
-        <div className="max-w-md mx-auto w-full flex-1 flex flex-col min-h-0">
-          <h2 className="text-2xl font-bold tracking-tight mb-2">
-            {variant === 'defMode' ? 'Write your own def' : 'Feeling stuck?'}
-          </h2>
-          <p className="text-base text-muted-foreground leading-relaxed mb-4">
-            Try writing your own definition to lock it in.
-          </p>
-          <div className="flex-1 overflow-y-auto space-y-2 mb-4">
-            {list.map((t) => (
-              <div key={t.id} className="rounded-xl border border-border bg-card px-3 py-2.5">
-                <p className="text-sm font-semibold">{t.term}</p>
-              </div>
-            ))}
-          </div>
-          {variant === 'defMode' && allTerms?.length > list.length && (
-            <button
-              type="button"
-              onClick={() => setStep('add')}
-              className="mb-3 text-sm text-muted-foreground hover:text-foreground underline-offset-4 hover:underline self-start"
-            >
-              Add more terms
-            </button>
-          )}
-          <div className="shrink-0 pb-safe">
-            <Button onClick={() => startWriting(list)} className="w-full h-12 rounded-2xl font-semibold">
-              Next
-              <ArrowRight className="w-4 h-4 ml-2" />
-            </Button>
-            {onSkip && (
-              <button
-                type="button"
-                onClick={onSkip}
-                className="mt-3 text-sm text-muted-foreground hover:text-foreground underline-offset-4 hover:underline"
-              >
-                {skipLabel || 'Keep going'}
-              </button>
-            )}
-          </div>
+      <div ref={fitRef} style={fitStyle} className="flex min-h-0 flex-col overflow-y-auto px-gutter pb-6 pt-8">
+        <div className="mx-auto flex w-full max-w-study flex-col gap-6">
+          {introBody}
+          {introAction}
         </div>
       </div>
     );
@@ -382,18 +410,31 @@ export default function WriteOwnDef({
 
   if (!current) return null;
 
-  return (
-    <div ref={fitRef} style={fitStyle} className="flex flex-col min-h-0 overflow-hidden px-5 pt-3">
-      <div className="max-w-md mx-auto w-full flex-1 flex flex-col min-h-0">
-        {list.length > 1 && (
-          <p className="text-xs text-muted-foreground mb-1 shrink-0">
-            {idx + 1}/{list.length}
-          </p>
-        )}
-        <p className="text-[11px] uppercase tracking-wide text-muted-foreground mb-1 shrink-0">Term</p>
-        <h3 className="text-xl font-bold tracking-tight mb-2 shrink-0 leading-tight">{current.term}</h3>
+  const cardActions = (
+    <div className={cn(idx > 0 && 'grid grid-cols-2 gap-3')}>
+      {idx > 0 && (
+        <Button variant="outline" onClick={goPrevCard}>
+          <ArrowLeft className="h-4 w-4" /> Back
+        </Button>
+      )}
+      <Button onClick={finishCard} disabled={!own.trim()} className="w-full">
+        Next
+        <ArrowRight className="h-4 w-4" />
+      </Button>
+    </div>
+  );
+
+  const cardBody = (
+    <>
+      {!onBack && list.length > 1 && (
+        <p className="text-meta text-muted-foreground">
+          {idx + 1}/{list.length}
+        </p>
+      )}
+      <p className="text-label uppercase text-muted-foreground">Term</p>
+      <h3 className="break-words text-display text-foreground">{current.term}</h3>
         {!frame.keyboard && (
-          <p className="text-sm text-muted-foreground leading-relaxed mb-3 shrink-0">
+          <p className="text-body text-muted-foreground">
             {typing
               ? 'Hold the definition to peek. Let go, then type your own version.'
               : 'Look at the definition. Try to memorize it. Don’t just rewrite — paraphrase and recall information to build a definition you will remember.'}
@@ -401,8 +442,7 @@ export default function WriteOwnDef({
         )}
         <div
           className={cn(
-            'relative min-h-[4.5rem] flex-1 basis-44 max-h-44 overflow-y-auto rounded-2xl border border-border bg-card p-4 select-none',
-            frame.keyboard && 'basis-28 max-h-28',
+            'relative shrink-0 rounded-card border border-border bg-surface-1 p-6 select-none',
             typing && !peeking && 'touch-none cursor-pointer',
           )}
           style={typing ? { WebkitTouchCallout: 'none' } : undefined}
@@ -412,42 +452,57 @@ export default function WriteOwnDef({
           onLostPointerCapture={typing ? endPeek : undefined}
           onContextMenu={typing ? (e) => e.preventDefault() : undefined}
         >
-          <p className="text-xs uppercase tracking-wide text-muted-foreground mb-2">Definition</p>
-          <p className={cn('text-base leading-relaxed', typing && !peeking && 'invisible')}>
+          <p className="text-label uppercase text-muted-foreground">Definition</p>
+          <p className={cn(
+            'mt-3 break-words text-body text-foreground',
+            typing && !peeking && 'select-none blur-xl',
+          )}
+          >
             {current.definition}
           </p>
-          {typing && !peeking && (
-            <div className="absolute inset-0 rounded-2xl bg-muted flex items-center justify-center px-6">
-              <p className="text-sm font-medium text-muted-foreground text-center">Hold to peek</p>
+          {typing && (
+            <div
+              className={cn(
+                'absolute inset-0 flex flex-col items-center justify-center gap-2 rounded-card bg-surface-1 transition-opacity duration-200 ease-out',
+                peeking ? 'pointer-events-none opacity-0' : 'opacity-100',
+              )}
+              aria-hidden={peeking}
+            >
+              <span className="flex h-10 w-10 items-center justify-center rounded-pill border border-border bg-surface-2">
+                <Eye className="h-4 w-4 text-muted-foreground" />
+              </span>
+              <p className="text-meta text-muted-foreground">Hold to peek</p>
             </div>
           )}
         </div>
         {current?.id && (helps[current.id]?.explain || helps[current.id]?.example) && (
-          <div className={cn('mt-2 shrink-0 space-y-2 overflow-y-auto', frame.keyboard ? 'max-h-16' : 'max-h-32')}>
+          <div className="flex flex-col gap-6">
             {helps[current.id]?.explain && (
-              <div className="rounded-2xl border border-border bg-muted/40 px-3 py-2.5">
-                <p className="text-[11px] uppercase tracking-wide text-muted-foreground mb-1">Explanation</p>
-                <p className="text-sm leading-relaxed">{helps[current.id].explain}</p>
+              <div className="animate-reveal-in shrink-0 rounded-card border border-border bg-surface-1 p-6">
+                <p className="text-label uppercase text-muted-foreground">Explanation</p>
+                <p className="mt-3 break-words text-body text-foreground">{helps[current.id].explain}</p>
               </div>
             )}
             {helps[current.id]?.example && (
-              <div className="rounded-2xl border border-border bg-muted/40 px-3 py-2.5">
-                <p className="text-[11px] uppercase tracking-wide text-muted-foreground mb-1">Example</p>
-                <p className="text-sm leading-relaxed">{helps[current.id].example}</p>
+              <div className="animate-reveal-in shrink-0 rounded-card border border-border bg-surface-1 p-6">
+                <p className="text-label uppercase text-muted-foreground">Example</p>
+                <p className="mt-3 break-words text-body text-foreground">{helps[current.id].example}</p>
               </div>
             )}
           </div>
         )}
         {current?.id && (!helps[current.id]?.explain || !helps[current.id]?.example) && (
-          <div className="mt-2 shrink-0 flex flex-wrap items-center gap-x-4 gap-y-1">
+          <div className="flex shrink-0 flex-wrap items-center gap-x-4 gap-y-2">
             {!helps[current.id]?.explain && (
               <button
                 type="button"
                 onClick={() => askHelp('explain')}
                 disabled={!!helping}
-                className="text-sm text-muted-foreground hover:text-foreground underline-offset-4 hover:underline disabled:opacity-60"
+                className="text-meta text-primary underline-offset-4 hover:underline disabled:text-tertiary"
               >
-                {helping === 'explain' ? 'Explaining…' : 'Explain the term'}
+                {helping === 'explain' ? (
+                  <AiWait compact label="Explaining" estimateMs={8000} />
+                ) : 'Explain the term'}
               </button>
             )}
             {!helps[current.id]?.example && (
@@ -455,62 +510,64 @@ export default function WriteOwnDef({
                 type="button"
                 onClick={() => askHelp('example')}
                 disabled={!!helping}
-                className="text-sm text-muted-foreground hover:text-foreground underline-offset-4 hover:underline disabled:opacity-60"
+                className="text-meta text-primary underline-offset-4 hover:underline disabled:text-tertiary"
               >
-                {helping === 'example' ? 'Thinking…' : 'Give an example'}
+                {helping === 'example' ? (
+                  <AiWait compact label="Thinking" estimateMs={8000} />
+                ) : 'Give an example'}
               </button>
             )}
           </div>
         )}
-        <div className="mt-3 shrink-0">
+        <div>
           {typing ? (
-            <Textarea
-              value={own}
-              onChange={(e) => {
-                const id = current.id;
-                const value = e.target.value;
-                setDrafts((prev) => ({ ...prev, [id]: value }));
-              }}
-              onFocus={() => {
-                if (window.scrollY > 0) window.scrollTo(0, 0);
-              }}
-              autoFocus
-              rows={3}
-              placeholder="Don’t just rewrite — paraphrase and recall information to build a definition you will remember"
-              className={cn(
-                'rounded-2xl text-base resize-none',
-                frame.keyboard ? 'h-16 min-h-0' : 'h-28 min-h-0',
-              )}
-            />
+            <>
+              <p className="mb-2 text-label uppercase text-muted-foreground">Explain the term</p>
+              <Textarea
+                value={own}
+                onChange={(e) => {
+                  const id = current.id;
+                  const value = e.target.value;
+                  setDrafts((prev) => ({ ...prev, [id]: value }));
+                }}
+                onFocus={(e) => {
+                  if (window.scrollY > 0) window.scrollTo(0, 0);
+                  const scroller = e.currentTarget.closest('.overflow-y-auto');
+                  if (!scroller) return;
+                  const field = e.currentTarget.getBoundingClientRect();
+                  const box = scroller.getBoundingClientRect();
+                  if (field.bottom > box.bottom - 8) {
+                    scroller.scrollTop += field.bottom - box.bottom + 16;
+                  }
+                }}
+                autoFocus
+                rows={4}
+                placeholder="Don’t just rewrite — paraphrase and recall information to build a definition you will remember"
+                className="resize-none"
+              />
+            </>
           ) : (
-            <Button
-              type="button"
-              onClick={() => setTyping(true)}
-              className="w-full h-12 rounded-2xl font-semibold"
-            >
+            <Button type="button" onClick={() => setTyping(true)} className="w-full">
               Start typing
             </Button>
           )}
         </div>
-        <div className={cn('mt-3 shrink-0', frame.keyboard ? 'pb-2' : 'pb-safe', idx > 0 && 'grid grid-cols-2 gap-3')}>
-          {idx > 0 && (
-            <Button
-              variant="outline"
-              onClick={goPrevCard}
-              className="h-12 rounded-2xl font-semibold"
-            >
-              <ArrowLeft className="w-4 h-4 mr-2" /> Back
-            </Button>
-          )}
-          <Button
-            onClick={finishCard}
-            disabled={!own.trim()}
-            className="h-12 rounded-2xl font-semibold w-full"
-          >
-            Next
-            <ArrowRight className="w-4 h-4 ml-2" />
-          </Button>
-        </div>
+        {!onBack ? cardActions : null}
+    </>
+  );
+
+  if (onBack) {
+    return frameScreen(cardBody, {
+      action: cardActions,
+      current: idx + 1,
+      total: list.length,
+    });
+  }
+
+  return (
+    <div ref={fitRef} style={fitStyle} className="flex min-h-0 flex-col overflow-y-auto px-gutter pb-6 pt-8">
+      <div className="mx-auto flex w-full max-w-study flex-col gap-6">
+        {cardBody}
       </div>
     </div>
   );

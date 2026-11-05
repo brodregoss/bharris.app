@@ -75,7 +75,7 @@ export default function ChangePasswordSheet({ open, onOpenChange, firebaseUser }
 
         <div className="space-y-4 pt-4 pb-6">
           {error && (
-            <div className="p-3 rounded-2xl bg-destructive/10 text-destructive text-sm">
+            <div className="p-3 rounded-card bg-destructive/10 text-destructive text-sm">
               {error}
             </div>
           )}
@@ -98,7 +98,7 @@ export default function ChangePasswordSheet({ open, onOpenChange, firebaseUser }
                     placeholder="••••••••"
                     value={currentPassword}
                     onChange={(e) => setCurrentPassword(e.target.value)}
-                    className="pl-10 h-12 rounded-2xl"
+                    className="pl-10 h-12 rounded-full"
                     required
                   />
                 </div>
@@ -114,7 +114,7 @@ export default function ChangePasswordSheet({ open, onOpenChange, firebaseUser }
                     placeholder="At least 8 characters"
                     value={newPassword}
                     onChange={(e) => setNewPassword(e.target.value)}
-                    className="pl-10 h-12 rounded-2xl"
+                    className="pl-10 h-12 rounded-full"
                     minLength={8}
                     required
                   />
@@ -131,13 +131,13 @@ export default function ChangePasswordSheet({ open, onOpenChange, firebaseUser }
                     placeholder="••••••••"
                     value={confirm}
                     onChange={(e) => setConfirm(e.target.value)}
-                    className="pl-10 h-12 rounded-2xl"
+                    className="pl-10 h-12 rounded-full"
                     minLength={8}
                     required
                   />
                 </div>
               </div>
-              <Button type="submit" className="w-full h-12 rounded-2xl" disabled={saving}>
+              <Button type="submit" className="w-full h-12 rounded-full" disabled={saving}>
                 {saving ? (
                   <>
                     <Loader2 className="w-4 h-4 mr-2 animate-spin" />

@@ -73,14 +73,28 @@ export async function runLlm(env, { prompt, response_json_schema, image } = {}) 
   if (!res.ok) throw new Error(openaiErrorMessage(payload, res.status));
 
   const text = payload?.choices?.[0]?.message?.content;
+  const usage = readUsage(payload?.usage);
   if (typeof text !== 'string' || !text.trim()) {
-    throw new Error('OpenAI returned an empty response');
+    const error = new Error('OpenAI returned an empty response');
+    error.usage = usage;
+    error.model = MODEL;
+    throw error;
   }
 
-  if (!response_json_schema) return text;
+  if (!response_json_schema) return { result: text, usage, model: MODEL };
   try {
-    return JSON.parse(text);
+    return { result: JSON.parse(text), usage, model: MODEL };
   } catch {
-    throw new Error('OpenAI returned unreadable JSON');
+    const error = new Error('OpenAI returned unreadable JSON');
+    error.usage = usage;
+    error.model = MODEL;
+    throw error;
   }
+}
+
+function readUsage(usage) {
+  const prompt = Number(usage?.prompt_tokens ?? usage?.input_tokens) || 0;
+  const completion = Number(usage?.completion_tokens ?? usage?.output_tokens) || 0;
+  const total = Number(usage?.total_tokens) || prompt + completion;
+  return { prompt_tokens: prompt, completion_tokens: completion, total_tokens: total };
 }

@@ -94,7 +94,7 @@ export default function ManageAccounts() {
             You set each account’s monthly AI cap. People using the app cannot change it.
           </p>
           {error && (
-            <div className="p-3 rounded-2xl bg-destructive/10 text-destructive text-sm">{error}</div>
+            <div className="p-3 rounded-card bg-destructive/10 text-destructive text-sm">{error}</div>
           )}
           {loading ? (
             <div className="flex justify-center py-10">
@@ -108,7 +108,7 @@ export default function ManageAccounts() {
                 key={account.email}
                 type="button"
                 onClick={() => openEditor(account)}
-                className="w-full text-left rounded-2xl border border-border bg-card p-4 space-y-2 hover:bg-accent/40 transition"
+                className="option-surface w-full text-left rounded-card border p-4 space-y-2 transition"
               >
                 <div className="flex items-center justify-between gap-3">
                   <p className="text-sm font-bold tracking-tight truncate">{account.email}</p>
@@ -148,7 +148,7 @@ export default function ManageAccounts() {
                 />
                 <Button
                   onClick={() => save()}
-                  className="w-full h-12 rounded-2xl font-semibold"
+                  className="w-full h-12 rounded-full font-semibold"
                   disabled={saving || (!unlimited && !(Number(amount) >= 0.5))}
                 >
                   {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Save cap'}

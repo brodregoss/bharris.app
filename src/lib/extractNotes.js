@@ -91,11 +91,11 @@ function asExtractImage(item) {
 }
 
 export async function extractTermsFromPhoto(image, onProgress, options) {
-  onProgress?.('Finding terms…');
+  onProgress?.('Finding terms…', { floor: 0, ceiling: 30, estimateMs: 20000 });
   const first = await extractPass(image, null, options);
   let list = first.slice(0, HARD_CAP);
   if (list.length >= 8 && list.length < HARD_CAP) {
-    onProgress?.('Looking for more terms…');
+    onProgress?.('Looking for more terms…', { floor: 30, ceiling: 48, estimateMs: 15000 });
     const more = await extractPass(image, list.map((t) => t.term), options);
     list = mergeUnique(list, more);
   }
@@ -110,9 +110,15 @@ export async function extractTermsFromPhotos(images, onProgress) {
   for (let i = 0; i < list.length; i++) {
     const page = list.length > 1 ? ` (${i + 1} of ${list.length})` : '';
     try {
+      const share = 48 / list.length;
+      const base = i * share;
       const found = await extractTermsFromPhoto(
         list[i].image,
-        (msg) => onProgress?.(`${msg}${page}`),
+        (msg, meta) => onProgress?.(`${msg}${page}`, {
+          floor: base + ((meta?.floor || 0) / 48) * share,
+          ceiling: base + ((meta?.ceiling || 48) / 48) * share,
+          estimateMs: (meta?.estimateMs || 20000) + (list.length - i - 1) * 20000,
+        }),
         { scoped: list[i].scoped },
       );
       all = mergeUnique(all, found);
@@ -165,9 +171,17 @@ async function defineChunk(terms) {
 
 export async function generateDefinitions(terms, onProgress) {
   const out = [];
-  for (let i = 0; i < terms.length; i += BATCH) {
+  const batches = Math.max(1, Math.ceil(terms.length / BATCH));
+  let step = 0;
+  for (let i = 0; i < terms.length; i += BATCH, step += 1) {
     const chunk = terms.slice(i, i + BATCH);
-    onProgress?.(`Writing definitions… ${Math.min(i + chunk.length, terms.length)}/${terms.length}`);
+    const end = Math.min(i + chunk.length, terms.length);
+    const span = 47;
+    onProgress?.(`Writing definitions… ${end}/${terms.length}`, {
+      floor: 48 + Math.round((i / Math.max(terms.length, 1)) * span),
+      ceiling: 48 + Math.round((end / Math.max(terms.length, 1)) * span),
+      estimateMs: (batches - step) * 12000,
+    });
     const defined = await defineChunk(chunk);
     out.push(...defined);
   }

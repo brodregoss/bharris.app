@@ -7,10 +7,10 @@ import { Label } from '@/components/ui/label';
 import AuthShell from '@/components/AuthShell';
 import AppleSignInButton from '@/components/account/AppleSignInButton';
 import GoogleSignInButton from '@/components/account/GoogleSignInButton';
-import TermsAgreement from '@/components/account/TermsAgreement';
-import { TERMS_AGREE_ERROR } from '@/lib/legal';
+import TermsNotice from '@/components/account/TermsNotice';
 import { useAuth } from '@/lib/AuthContext';
 import { afterAuthPath, leaveForAuthReturn, rememberAuthReturn } from '@/lib/onboarding';
+import { beginSocialSignup, cancelSocialSignup, clearSignupProfile, settleSocialSignup } from '@/lib/signupProfile';
 
 export default function AccountSignIn() {
   const navigate = useNavigate();
@@ -22,7 +22,6 @@ export default function AccountSignIn() {
   const [loading, setLoading] = React.useState(false);
   const [appleLoading, setAppleLoading] = React.useState(false);
   const [googleLoading, setGoogleLoading] = React.useState(false);
-  const [agreed, setAgreed] = React.useState(false);
 
   React.useEffect(() => {
     rememberAuthReturn();
@@ -49,11 +48,9 @@ export default function AccountSignIn() {
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError('');
-    if (!agreed) {
-      setError(TERMS_AGREE_ERROR);
-      return;
-    }
     setLoading(true);
+    clearSignupProfile();
+    cancelSocialSignup();
     try {
       await signIn(email, password);
       finish();
@@ -66,15 +63,15 @@ export default function AccountSignIn() {
 
   const handleApple = async () => {
     setError('');
-    if (!agreed) {
-      setError(TERMS_AGREE_ERROR);
-      return;
-    }
+    beginSocialSignup();
     setAppleLoading(true);
     try {
-      await signInWithApple();
+      const signedIn = await signInWithApple();
+      if (!signedIn) return;
+      settleSocialSignup(signedIn);
       finish();
     } catch (err) {
+      cancelSocialSignup();
       setError(err.message || 'Could not sign in with Apple.');
     } finally {
       setAppleLoading(false);
@@ -83,15 +80,15 @@ export default function AccountSignIn() {
 
   const handleGoogle = async () => {
     setError('');
-    if (!agreed) {
-      setError(TERMS_AGREE_ERROR);
-      return;
-    }
+    beginSocialSignup();
     setGoogleLoading(true);
     try {
       const signedIn = await signInWithGoogle();
-      if (signedIn) finish();
+      if (!signedIn) return;
+      settleSocialSignup(signedIn);
+      finish();
     } catch (err) {
+      cancelSocialSignup();
       setError(err.message || 'Could not sign in with Google.');
     } finally {
       setGoogleLoading(false);
@@ -106,12 +103,12 @@ export default function AccountSignIn() {
       onBack={() => navigate('/account')}
     >
       {error && (
-        <div className="mb-4 p-3 rounded-2xl bg-destructive/10 text-destructive text-sm">
+        <div className="mb-4 p-3 rounded-card bg-destructive/10 text-destructive text-sm">
           {error}
         </div>
       )}
       <div className="space-y-3">
-        <TermsAgreement id="signin-agree-terms" checked={agreed} onCheckedChange={setAgreed} />
+        <TermsNotice action="continuing with Apple or Google" />
         <AppleSignInButton onClick={handleApple} loading={appleLoading} disabled={loading || googleLoading} />
         <GoogleSignInButton onClick={handleGoogle} loading={googleLoading} disabled={loading || appleLoading} />
       </div>
@@ -129,7 +126,7 @@ export default function AccountSignIn() {
               placeholder="you@example.com"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
-              className="pl-10 h-12 rounded-2xl"
+              className="pl-10 h-12 rounded-full"
               required
             />
           </div>
@@ -154,12 +151,12 @@ export default function AccountSignIn() {
               placeholder="••••••••"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
-              className="pl-10 h-12 rounded-2xl"
+              className="pl-10 h-12 rounded-full"
               required
             />
           </div>
         </div>
-        <Button type="submit" className="w-full h-14 rounded-2xl text-base font-semibold" disabled={loading || googleLoading || appleLoading}>
+        <Button type="submit" className="w-full h-14 rounded-full text-base font-semibold" disabled={loading || googleLoading || appleLoading}>
           {loading ? (
             <>
               <Loader2 className="w-4 h-4 mr-2 animate-spin" />

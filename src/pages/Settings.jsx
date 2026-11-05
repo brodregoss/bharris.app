@@ -1,12 +1,11 @@
 import React from 'react';
 import { useNavigate } from 'react-router-dom';
-import { useTheme } from 'next-themes';
+import { Capacitor } from '@capacitor/core';
 import {
   ArrowLeft,
-  Moon,
-  Sun,
   User,
   Info,
+  Compass,
   Shield,
   FileText,
   ChevronRight,
@@ -17,18 +16,21 @@ import {
   Pencil,
   Trash2,
   Loader2,
+  Moon,
+  Sun,
+  Globe,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { Switch } from '@/components/ui/switch';
-import { Label } from '@/components/ui/label';
 import { Progress } from '@/components/ui/progress';
+import { useTheme } from 'next-themes';
 import { useAuth } from '@/lib/AuthContext';
 import ChangePasswordSheet from '@/components/account/ChangePasswordSheet';
 import EditNameSheet from '@/components/account/EditNameSheet';
-import { getUsage, removePartner, resetPartnerCode } from '@/lib/accountStore';
+import UsernameSheet from '@/components/account/UsernameSheet';
+import { getCurrentUser, getUsage, removePartner, resetPartnerCode } from '@/lib/accountStore';
 import { formatPersonName } from '@/lib/personName';
-import { greetingLine, greetingNameStyle, setGreetingNameStyle } from '@/lib/greeting';
 import { usePaywall } from '@/lib/PaywallContext';
+import { APP_CONFIG } from '@/lib/appConfig';
 import { planLabel, planValue } from '@/lib/plans';
 import { trialRemainingLabel } from '../../scripts/account-plan.js';
 import {
@@ -47,19 +49,38 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
-import LegalSections, { LegalText } from '@/components/account/LegalSections';
+import LegalSections from '@/components/account/LegalSections';
 import {
   APP_NAME,
   APP_VERSION,
   ABOUT_SECTIONS,
   LEGAL_UPDATED,
-  PRIVACY_LEAD,
-  PRIVACY_SECTIONS,
-  TERMS_LEAD,
-  TERMS_SECTIONS,
 } from '@/lib/legal';
 import { devToolsUnlocked, lockDevTools, tryUnlockDevTools } from '@/lib/devToolsLock';
+import { requestHomeTourReplay } from '@/lib/appTour';
 import NotesScanLockCard from '@/components/account/NotesScanLockCard';
+function siteHomeUrl() {
+  if (typeof window === 'undefined') return 'https://bharris.app/';
+  if (Capacitor.isNativePlatform()) return 'https://bharris.app/';
+  const { origin, pathname, hostname, port } = window.location;
+  if (pathname === '/app' || pathname.startsWith('/app/')) return `${origin}/`;
+  if ((hostname === 'localhost' || hostname === '127.0.0.1') && port === '5173') {
+    return `http://${hostname}:8787/`;
+  }
+  const worker = APP_CONFIG.workerUrl;
+  if (worker) return `${worker}/`;
+  return 'https://bharris.app/';
+}
+
+async function openSiteHome() {
+  const url = siteHomeUrl();
+  if (Capacitor.isNativePlatform()) {
+    const { Browser } = await import('@capacitor/browser');
+    await Browser.open({ url });
+    return;
+  }
+  window.location.assign(url);
+}
 
 const DOCS = {
   about: {
@@ -67,38 +88,30 @@ const DOCS = {
     description: `${APP_NAME} ${APP_VERSION}`,
     sections: ABOUT_SECTIONS,
   },
-  privacy: {
-    title: 'Privacy Policy',
-    description: `Effective ${LEGAL_UPDATED}.`,
-    lead: PRIVACY_LEAD,
-    sections: PRIVACY_SECTIONS,
-  },
-  terms: {
-    title: 'Terms of Service',
-    description: `Effective ${LEGAL_UPDATED}.`,
-    lead: TERMS_LEAD,
-    sections: TERMS_SECTIONS,
-  },
 };
 
-function Row({ icon: Icon, label, value, onClick }) {
+function Row({ icon: Icon, label, value, valueClassName, onClick }) {
   const inner = (
     <>
-      {Icon && <Icon className="w-4 h-4 text-muted-foreground shrink-0" />}
-      <span className="flex-1 text-sm font-semibold text-left">{label}</span>
+      <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-background text-foreground">
+        {Icon ? <Icon className="h-4 w-4" /> : <span className="text-xs font-semibold">{label.slice(0, 1)}</span>}
+      </span>
+      <span className="min-w-0 flex-1 truncate text-left text-body text-foreground">{label}</span>
       {value && (
-        <span className="text-sm text-muted-foreground shrink-0">{value}</span>
+        <span className={`shrink-0 text-body font-semibold tabular-nums ${valueClassName || 'text-foreground'}`}>{value}</span>
       )}
-      {onClick && <ChevronRight className="w-4 h-4 text-muted-foreground shrink-0" />}
+      {onClick && <ChevronRight className="h-4 w-4 shrink-0 text-muted-foreground" />}
     </>
   );
+
+  const rowClass = 'press flex h-action w-full items-center gap-4 border-b border-border bg-surface-1 px-4 text-left last:border-b-0';
 
   if (onClick) {
     return (
       <button
         type="button"
         onClick={onClick}
-        className="w-full flex items-center gap-3 px-5 py-3.5 hover:bg-accent/60 transition text-left"
+        className={`${rowClass} transition-colors active:bg-muted`}
       >
         {inner}
       </button>
@@ -106,7 +119,7 @@ function Row({ icon: Icon, label, value, onClick }) {
   }
 
   return (
-    <div className="w-full flex items-center gap-3 px-5 py-3.5">
+    <div className={rowClass}>
       {inner}
     </div>
   );
@@ -128,36 +141,31 @@ function UsageBlock({ heading, person, onUpgrade, loading = false }) {
   const used = person?.aiQuotaUsed || 0;
   const limit = person?.aiQuotaLimit || 0;
   return (
-    <div className="p-5 space-y-3">
+    <div className="bg-surface-1 px-4 py-4">
       <div className="flex items-center gap-2">
-        <Sparkles className="w-4 h-4 text-muted-foreground shrink-0" />
-        <p className="text-sm font-bold tracking-tight">{heading}</p>
+        <p className="text-sm font-medium text-muted-foreground">{heading}</p>
         {loading && <Loader2 className="w-3.5 h-3.5 animate-spin text-muted-foreground" aria-label="Loading usage" />}
       </div>
       {person?.unlimited ? (
-        <p className="text-sm text-muted-foreground">No monthly limit.</p>
+        <p className="mt-2 text-sm text-muted-foreground">No monthly limit.</p>
       ) : person?.hasBudget || remaining > 0 ? (
         <>
-          <div className="flex items-baseline justify-between gap-3">
-            <p className="text-2xl font-bold tracking-tight">
-              {remaining}
-            </p>
-            <p className="text-xs text-muted-foreground">
-              of {limit} AI calls left this month
-            </p>
-          </div>
-          <Progress value={usedPct(person)} className="h-2" />
-          <p className="text-xs text-muted-foreground">
-            {used} used · {planLabel(person)}
+          <p className="mt-2 text-[2.6rem] font-semibold leading-none tracking-tighter tabular-nums">
+            {remaining}
           </p>
+          <p className="mt-2 text-sm font-semibold text-gain">
+            {used} used · {limit} this month
+          </p>
+          <Progress value={usedPct(person)} className="mt-3 h-1.5" />
+          <p className="mt-2 text-xs text-muted-foreground">{planLabel(person)}</p>
         </>
       ) : (
-        <p className="text-sm text-muted-foreground">
+        <p className="mt-2 text-sm font-semibold text-loss">
           This month’s AI limit is used up.
         </p>
       )}
       {person?.subscriptionTier !== 'pro' && onUpgrade && (
-        <Button className="w-full h-11 rounded-2xl" onClick={onUpgrade}>
+        <Button className="mt-4 h-12 w-full rounded-full" onClick={onUpgrade}>
           See plans
         </Button>
       )}
@@ -167,15 +175,15 @@ function UsageBlock({ heading, person, onUpgrade, loading = false }) {
 
 export default function Settings() {
   const navigate = useNavigate();
+  const { resolvedTheme, setTheme } = useTheme();
+  const light = resolvedTheme === 'light';
   const { user, firebaseUser, logout, deleteAccount } = useAuth();
   const { openPaywall } = usePaywall();
-  const { theme, setTheme, resolvedTheme } = useTheme();
-  const [ready, setReady] = React.useState(false);
   const [doc, setDoc] = React.useState(null);
   const [changePasswordOpen, setChangePasswordOpen] = React.useState(false);
   const [editNameOpen, setEditNameOpen] = React.useState(false);
+  const [usernameOpen, setUsernameOpen] = React.useState(false);
   const [usage, setUsage] = React.useState(null);
-  const [nameStyle, setNameStyle] = React.useState(() => greetingNameStyle());
   const [deleteOpen, setDeleteOpen] = React.useState(false);
   const [deleting, setDeleting] = React.useState(false);
   const [deleteError, setDeleteError] = React.useState('');
@@ -193,10 +201,6 @@ export default function Settings() {
   const [devCodeError, setDevCodeError] = React.useState('');
 
   React.useEffect(() => {
-    setReady(true);
-  }, []);
-
-  React.useEffect(() => {
     let cancelled = false;
     (async () => {
       try {
@@ -209,19 +213,16 @@ export default function Settings() {
     return () => { cancelled = true; };
   }, [user]);
 
-  const dark = ready && (resolvedTheme || theme) === 'dark';
   const open = DOCS[doc];
   const me = usage?.me || usage?.user || user;
   const billingPlan = me?.billingPlan || '';
   const onTrial = me?.subscriptionStatus === 'trialing' && !!me?.trialEndsAt;
   const trialLabel = onTrial ? trialRemainingLabel(me.trialEndsAt) : '';
-  const displayName = me?.displayName || firebaseUser?.displayName || '';
-  const greetingPreview = greetingLine(displayName, new Date(), nameStyle);
-
-  const chooseGreetingName = (style) => {
-    setGreetingNameStyle(style);
-    setNameStyle(style);
-  };
+  const profile = getCurrentUser();
+  const displayName = me?.displayName || user?.displayName || firebaseUser?.displayName || profile?.displayName || '';
+  const email = me?.email || user?.email || firebaseUser?.email || profile?.email || '';
+  const username = String(me?.username || user?.username || profile?.username || '').trim();
+  const usernameChangedAt = me?.usernameChangedAt || user?.usernameChangedAt || profile?.usernameChangedAt || '';
 
   const runPartner = async (action, key) => {
     setPartnerBusy(key);
@@ -239,46 +240,86 @@ export default function Settings() {
 
   return (
     <div className="min-h-[100dvh] bg-background text-foreground flex flex-col">
-      <header className="flex items-center gap-1 px-3 pt-safe pb-2">
-        <Button variant="ghost" size="icon" onClick={() => navigate('/')} aria-label="Back">
+      <header className="px-5 pt-safe">
+        <Button variant="ghost" size="icon" onClick={() => navigate('/')} aria-label="Back" className="-ml-2">
           <ArrowLeft className="w-5 h-5" />
         </Button>
-        <h1 className="min-w-0 truncate text-base font-bold tracking-tight">Settings</h1>
+        <h1 className="mt-6 text-display text-foreground">Settings</h1>
       </header>
       <div className="flex-1 overflow-y-auto px-5 pb-24 flex flex-col">
-        <div className="max-w-md mx-auto w-full flex-1 flex flex-col gap-4">
-          <section className="rounded-2xl border border-border bg-card overflow-hidden divide-y divide-border">
-            <div className="flex items-center gap-3 p-5">
-              <div className="w-11 h-11 rounded-full bg-muted flex items-center justify-center shrink-0">
-                <User className="w-5 h-5 text-muted-foreground" />
+        <div className="max-w-md mx-auto w-full flex-1 flex flex-col">
+          <div className="mt-6 flex items-center gap-3">
+            <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-secondary">
+              <User className="h-5 w-5" />
+            </div>
+            <div className="min-w-0 flex-1">
+              <div className="flex items-center gap-1 min-w-0">
+                <button
+                  type="button"
+                  onClick={() => setUsernameOpen(true)}
+                  className="min-w-0 truncate text-left text-lg font-semibold tracking-tight"
+                >
+                  {username ? `@${username}` : 'Choose a username'}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setUsernameOpen(true)}
+                  aria-label={username ? 'Edit username' : 'Choose a username'}
+                  className="shrink-0 rounded-full p-1.5 text-muted-foreground hover:bg-accent hover:text-foreground"
+                >
+                  <Pencil className="w-3.5 h-3.5" />
+                </button>
               </div>
-              <div className="min-w-0 flex-1">
-                <div className="flex items-center gap-1 min-w-0">
-                  <p className="min-w-0 truncate text-sm font-bold tracking-tight">
-                    {formatPersonName(me?.displayName) || me?.email || APP_NAME}
-                  </p>
-                  <button
-                    type="button"
-                    onClick={() => setEditNameOpen(true)}
-                    aria-label="Edit name"
-                    className="shrink-0 rounded-md p-1 text-muted-foreground hover:bg-accent/60 hover:text-foreground"
-                  >
-                    <Pencil className="w-3.5 h-3.5" />
-                  </button>
-                </div>
-                <p className="text-xs text-muted-foreground mt-0.5 truncate">
-                  {me?.email || 'Notes sync to this account.'}
+              <div className="flex items-center gap-1 min-w-0">
+                <p className="min-w-0 truncate text-sm text-muted-foreground">
+                  {formatPersonName(displayName) || email || 'Notes sync to this account.'}
                 </p>
+                <button
+                  type="button"
+                  onClick={() => setEditNameOpen(true)}
+                  aria-label="Edit name"
+                  className="shrink-0 rounded-full p-1.5 text-muted-foreground hover:bg-accent hover:text-foreground"
+                >
+                  <Pencil className="w-3.5 h-3.5" />
+                </button>
               </div>
             </div>
+          </div>
+
+          <div className="mt-6">
+            <p className="px-1 text-sm font-medium text-muted-foreground">Appearance</p>
+            <div className="mt-2 grid grid-cols-2 gap-1 rounded-full bg-surface-2 p-1" role="group" aria-label="Appearance">
+              <button
+                type="button"
+                aria-pressed={!light}
+                onClick={() => setTheme('dark')}
+                className={`flex h-11 items-center justify-center gap-2 rounded-full text-sm font-semibold ${
+                  light ? 'text-muted-foreground' : 'bg-background text-foreground'
+                }`}
+              >
+                <Moon className="h-4 w-4" />
+                Dark
+              </button>
+              <button
+                type="button"
+                aria-pressed={light}
+                onClick={() => setTheme('light')}
+                className={`flex h-11 items-center justify-center gap-2 rounded-full text-sm font-semibold ${
+                  light ? 'bg-background text-foreground' : 'text-muted-foreground'
+                }`}
+              >
+                <Sun className="h-4 w-4" />
+                Light
+              </button>
+            </div>
+          </div>
+
+          <div className="mt-6 overflow-hidden rounded-card border border-border">
             <Row
               icon={KeyRound}
               label="Change password"
               onClick={() => setChangePasswordOpen(true)}
             />
-          </section>
-
-          <section className="rounded-2xl border border-border bg-card overflow-hidden divide-y divide-border">
             <div>
               <Row
                 icon={Sparkles}
@@ -287,28 +328,22 @@ export default function Settings() {
                 onClick={() => navigate('/manage')}
               />
               {trialLabel && (
-                <p className="pl-12 pr-5 pb-3.5 -mt-1.5 text-sm leading-5 text-muted-foreground">
-                  {trialLabel}
-                </p>
+                <p className="mt-1.5 pl-4 text-sm text-gain">{trialLabel}</p>
               )}
             </div>
-            <UsageBlock heading="AI this month" person={me} onUpgrade={openPaywall} loading={!usage} />
+            <UsageBlock heading="AI calls left" person={me} onUpgrade={openPaywall} loading={!usage} />
             {me?.billingNotice === 'beta_ended' && !me?.billingPlan && (
-              <div className="px-5 pb-5">
-                <p className="text-xs text-muted-foreground">Your free week ended.</p>
-              </div>
+              <p className="pb-3 text-sm text-muted-foreground">Your free week ended.</p>
             )}
             {me?.billingPlan === 'guest' && (
-              <div className="px-5 pb-5">
-                <p className="text-xs text-muted-foreground">
-                  You're on a friend's partner study plan. If they cancel, you both lose access.
-                </p>
-              </div>
+              <p className="pb-3 text-sm text-muted-foreground">
+                You're on a friend's partner study plan. If they cancel, you both lose access.
+              </p>
             )}
-          </section>
+          </div>
 
           {me?.billingPlan === 'partner' && (
-            <section className="rounded-2xl border border-border bg-card p-5">
+            <section className="mt-2 border-t border-border py-4">
               <div className="flex items-center justify-between gap-3">
                 <p className="text-sm font-bold tracking-tight">Partner code</p>
                 <button
@@ -341,8 +376,8 @@ export default function Settings() {
               <div className="mt-3 flex flex-col gap-2">
                 <Button
                   type="button"
-                  variant="outline"
-                  className="h-11 rounded-xl"
+                  variant="secondary"
+                  className="h-12 rounded-full"
                   disabled={!!partnerBusy || !me.partnerCode}
                   onClick={() => {
                     if (!window.confirm('Reset the code? The old one will stop working.')) return;
@@ -354,8 +389,8 @@ export default function Settings() {
                 {me.partnerLinked && (
                   <Button
                     type="button"
-                    variant="outline"
-                    className="h-11 rounded-xl"
+                    variant="secondary"
+                    className="h-12 rounded-full"
                     disabled={!!partnerBusy}
                     onClick={() => {
                       if (!window.confirm('Remove your partner? They lose access now.')) return;
@@ -373,64 +408,13 @@ export default function Settings() {
             </section>
           )}
 
-          <section className="rounded-2xl border border-border bg-card p-5">
-            <p className="text-sm font-bold tracking-tight">Greeting name</p>
-            <p className="text-xs text-muted-foreground mt-0.5">
-              Home says {greetingPreview}.
-            </p>
-            <div className="mt-3 grid grid-cols-2 gap-2">
-              <Button
-                type="button"
-                variant={nameStyle === 'first' ? 'default' : 'outline'}
-                className="h-11 rounded-xl text-sm font-semibold"
-                onClick={() => chooseGreetingName('first')}
-              >
-                First name
-              </Button>
-              <Button
-                type="button"
-                variant={nameStyle === 'last' ? 'default' : 'outline'}
-                className="h-11 rounded-xl text-sm font-semibold"
-                onClick={() => chooseGreetingName('last')}
-              >
-                Last name
-              </Button>
-            </div>
-          </section>
-
-          <section className="rounded-2xl border border-border bg-card p-5">
-            <div className="flex items-center justify-between gap-4">
-              <div className="flex items-center gap-2 min-w-0">
-                {dark ? (
-                  <Moon className="w-4 h-4 text-muted-foreground shrink-0" />
-                ) : (
-                  <Sun className="w-4 h-4 text-muted-foreground shrink-0" />
-                )}
-                <div className="min-w-0">
-                  <Label htmlFor="dark-mode" className="text-sm font-bold tracking-tight">
-                    Dark mode
-                  </Label>
-                  <p className="text-xs text-muted-foreground mt-0.5">
-                    {dark ? 'On — easier on the eyes at night' : 'Off — light background'}
-                  </p>
-                </div>
-              </div>
-              <Switch
-                id="dark-mode"
-                checked={dark}
-                onCheckedChange={(on) => setTheme(on ? 'dark' : 'light')}
-                disabled={!ready}
-              />
-            </div>
-          </section>
-
-          <section className="rounded-2xl border border-border bg-card p-5">
-            <p className="text-sm font-bold tracking-tight">Dev tools</p>
+          <section className="border-t border-border py-4">
+            <p className="text-sm font-medium text-muted-foreground">Dev tools</p>
             {devUnlocked ? (
               <Button
                 type="button"
                 variant="outline"
-                className="mt-3 h-11 rounded-xl"
+                className="mt-3 h-11 rounded-full"
                 onClick={() => {
                   lockDevTools(accountUid);
                   setDevUnlocked(false);
@@ -469,9 +453,9 @@ export default function Settings() {
                   }}
                   aria-label="Dev tools code"
                   placeholder="Dev code"
-                  className="h-11 min-w-0 flex-1 rounded-xl border border-border bg-background px-3 text-sm"
+                  className="h-12 min-w-0 flex-1 rounded-full border border-border bg-transparent px-4 text-base"
                 />
-                <Button type="submit" variant="outline" className="h-11 rounded-xl shrink-0" disabled={!devCode.trim()}>
+                <Button type="submit" variant="secondary" className="h-12 shrink-0 rounded-full" disabled={!devCode.trim()}>
                   Unlock
                 </Button>
               </form>
@@ -483,11 +467,20 @@ export default function Settings() {
 
           {devUnlocked && <NotesScanLockCard />}
 
-          <section className="rounded-2xl border border-border bg-card overflow-hidden divide-y divide-border">
+          <section className="mt-6 overflow-hidden rounded-card border border-border">
             <Row label="Version" value={APP_VERSION} />
+            <Row icon={Globe} label="Website" onClick={openSiteHome} />
+            <Row
+              icon={Compass}
+              label="Show me around"
+              onClick={() => {
+                requestHomeTourReplay();
+                navigate('/');
+              }}
+            />
             <Row icon={Info} label="About" onClick={() => setDoc('about')} />
-            <Row icon={Shield} label="Privacy Policy" onClick={() => setDoc('privacy')} />
-            <Row icon={FileText} label="Terms of Service" onClick={() => setDoc('terms')} />
+            <Row icon={Shield} label="Privacy Policy" onClick={() => navigate('/privacy')} />
+            <Row icon={FileText} label="Terms of Service" onClick={() => navigate('/terms')} />
           </section>
 
           <button
@@ -502,7 +495,7 @@ export default function Settings() {
                 setSigningOut(false);
               }
             }}
-            className="flex items-center justify-center gap-2 text-sm text-muted-foreground hover:text-foreground disabled:opacity-60"
+            className="press mt-6 flex h-action items-center justify-center gap-2 rounded-pill bg-surface-2 text-body font-semibold text-muted-foreground transition-colors duration-150 ease-out hover:text-foreground disabled:text-tertiary"
           >
             {signingOut ? <Loader2 className="w-4 h-4 animate-spin" /> : <LogOut className="w-4 h-4" />}
             {signingOut ? 'Signing out' : 'Sign out'}
@@ -514,7 +507,7 @@ export default function Settings() {
               setDeleteError('');
               setDeleteOpen(true);
             }}
-            className="flex items-center justify-center gap-2 text-sm text-destructive hover:opacity-80"
+            className="press mt-2 flex h-action items-center justify-center gap-2 rounded-pill bg-blank/12 text-body font-semibold text-blank transition-colors duration-150 ease-out hover:bg-blank/20"
           >
             <Trash2 className="w-4 h-4" />
             Delete account
@@ -569,6 +562,16 @@ export default function Settings() {
         </AlertDialogContent>
       </AlertDialog>
 
+      <UsernameSheet
+        open={usernameOpen}
+        onOpenChange={setUsernameOpen}
+        username={username}
+        changedAt={usernameChangedAt}
+        onSaved={(nextUser) => {
+          if (nextUser) setUsage((current) => ({ ...(current || {}), me: nextUser, user: nextUser }));
+        }}
+      />
+
       <EditNameSheet
         open={editNameOpen}
         onOpenChange={setEditNameOpen}
@@ -593,11 +596,6 @@ export default function Settings() {
                 <SheetDescription>{open.description}</SheetDescription>
               </SheetHeader>
               <div className="space-y-4 pt-4 pb-6">
-                {open.lead?.map((line) => (
-                  <p key={line} className="text-sm text-muted-foreground leading-relaxed">
-                    <LegalText text={line} />
-                  </p>
-                ))}
                 <p className="text-xs text-muted-foreground">Last updated {LEGAL_UPDATED}</p>
                 <LegalSections sections={open.sections} />
               </div>

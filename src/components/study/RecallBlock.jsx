@@ -419,30 +419,30 @@ export default function RecallBlock({
       style={recognition ? fit.style : undefined}
       className={recognition ? 'flex flex-col px-5 pt-3 pb-safe overflow-hidden' : 'flex-1 flex flex-col px-5 pt-4'}
     >
-      <div className={`flex items-center justify-between text-xs text-muted-foreground shrink-0 ${recognition ? 'mb-2' : 'mb-3'}`}>
+      <div className={`flex shrink-0 items-center justify-between text-meta text-muted-foreground ${recognition ? 'mb-2' : 'mb-6'}`}>
         <span>{reviewing ? 'Practice your wording' : blockLabel}</span>
         <span>
           {timed ? `${fmtTime(timeLeftMs)} left · ` : ''}round {st.round}
         </span>
       </div>
-      <div className={`w-full max-w-md mx-auto flex flex-col ${recognition ? 'flex-1 min-h-0' : 'flex-1 items-center justify-center'}`}>
+      <div className={`mx-auto flex w-full max-w-study flex-col gap-6 ${recognition ? 'min-h-0 flex-1' : 'flex-1 items-center justify-center'}`}>
         <div
-          className={`w-full rounded-3xl border border-border bg-card shadow-sm flex flex-col ${
+          className={`flex w-full flex-col rounded-card border border-border bg-surface-1 ${
             recognition
-              ? 'min-h-0 p-4 text-left overflow-hidden'
-              : 'p-8 text-center min-h-[280px] items-center justify-center'
+              ? 'min-h-0 overflow-hidden p-6 text-left'
+              : 'min-h-card items-center justify-center p-8 text-center'
           }`}
         >
-          <p className="text-[11px] uppercase tracking-wide text-muted-foreground mb-2 shrink-0">{promptLabel}</p>
+          <p className="shrink-0 text-label uppercase text-muted-foreground">{promptLabel}</p>
           {recognition ? (
             <p
               data-mcq-prompt={defOptions ? 'term' : 'definition'}
-              className="text-base font-semibold leading-snug overflow-y-auto min-h-0 overscroll-contain"
+              className="min-h-0 overflow-y-auto overscroll-contain text-body font-semibold text-foreground"
             >
               {defOptions ? current.term : current.definition}
             </p>
           ) : (
-            <p className={reverse ? 'text-lg font-semibold tracking-tight leading-relaxed' : 'text-3xl font-bold tracking-tight'}>
+            <p className={reverse ? 'mt-6 break-words text-body text-foreground' : 'mt-6 break-words text-display text-foreground'}>
               {reverse ? flashcardDef(current) : current.term}
             </p>
           )}
@@ -465,14 +465,14 @@ export default function RecallBlock({
                         else handleMissed();
                       }, 450);
                     }}
-                    className={`w-full text-left rounded-xl border px-3.5 py-2.5 text-base leading-snug transition ${
+                    className={`press w-full rounded-input border px-4 py-3 text-left text-body leading-snug transition-colors duration-150 ease-out ${
                       recogSelected
                         ? isCorrect
-                          ? 'border-emerald-500 bg-emerald-50 text-emerald-950 dark:border-emerald-400/40 dark:bg-emerald-400/10 dark:text-emerald-100'
+                          ? 'border-know/30 bg-know/12 text-know'
                           : selected
-                          ? 'border-rose-500 bg-rose-50 text-rose-950 dark:border-rose-400/40 dark:bg-rose-400/10 dark:text-rose-100'
+                          ? 'border-loss bg-loss-soft text-loss'
                           : 'border-border'
-                        : 'border-border hover:border-muted-foreground bg-card'
+                        : 'option-surface'
                     }`}
                   >
                     {opt}
@@ -481,11 +481,11 @@ export default function RecallBlock({
               })}
             </div>
           ) : revealed ? (
-            <p className="mt-5 text-lg text-muted-foreground leading-relaxed">
+            <p className="animate-reveal-in mt-6 break-words text-body text-foreground">
               {reverse ? current.term : flashcardDef(current)}
             </p>
           ) : (
-            <p className="mt-5 text-xs text-muted-foreground">
+            <p className="mt-6 text-meta text-muted-foreground">
               {reverse
                 ? 'Say the term, then reveal.'
                 : style === 'explain'
@@ -495,25 +495,25 @@ export default function RecallBlock({
           )}
         </div>
 
-        <div className={`w-full shrink-0 ${recognition ? 'pt-3' : 'max-w-md mt-4'}`}>
+        <div className="w-full shrink-0">
           {multipleChoice ? null : recognition ? (
             recogSelected ? (
               <Button
                 onClick={() => (recogSelected === current.term ? handleGot() : handleMissed())}
-                className="w-full h-12 rounded-2xl font-semibold"
+                className="w-full h-12 rounded-full font-semibold"
               >
                 Continue
                 <ArrowRight className="w-4 h-4 ml-2" />
               </Button>
             ) : (
-              <Button disabled className="w-full h-12 rounded-2xl bg-muted text-muted-foreground font-semibold">
+              <Button disabled className="w-full">
                 Pick an answer
               </Button>
             )
           ) : !revealed ? (
             <Button
               onClick={() => setRevealed(true)}
-              className="w-full h-12 rounded-2xl font-semibold"
+              className="w-full h-12 rounded-full font-semibold"
             >
               <Eye className="w-4 h-4 mr-2" /> Show answer
             </Button>
@@ -522,21 +522,21 @@ export default function RecallBlock({
               <Button
                 onClick={handleMissed}
                 variant="destructive"
-                className="h-12 rounded-2xl font-semibold"
+                className="h-12 rounded-full font-semibold"
               >
                 <X className="w-4 h-4 mr-2" /> Missed
               </Button>
               <Button
                 onClick={handleGot}
                 variant="success"
-                className="h-12 rounded-2xl font-semibold"
+                className="h-12 rounded-full font-semibold"
               >
                 <Check className="w-4 h-4 mr-2" /> Got it
               </Button>
             </div>
           )}
         </div>
-        <p className={`text-xs text-muted-foreground shrink-0 ${recognition ? 'mt-2 text-center' : 'mt-4'}`}>
+        <p className="shrink-0 text-center text-meta text-muted-foreground">
           {singlePass
             ? `${Math.min(st.pos + 1, st.queue.length)}/${st.queue.length} seen`
             : `${gotCount} retired · ${st.queue.length} in rotation`}

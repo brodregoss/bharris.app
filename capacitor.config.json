@@ -3,7 +3,7 @@
   "appName": "bharris.app",
   "webDir": "dist",
   "bundledWebRuntime": false,
-  "backgroundColor": "#f8fafc",
+  "backgroundColor": "#000000",
   "server": {
     "iosScheme": "https",
     "hostname": "bharris-app.web.app",
@@ -18,7 +18,7 @@
   "ios": {
     "contentInset": "never",
     "preferredContentMode": "mobile",
-    "backgroundColor": "#f8fafc"
+    "backgroundColor": "#000000"
   },
   "plugins": {
     "FirebaseAuthentication": {

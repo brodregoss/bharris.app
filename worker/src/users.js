@@ -1,5 +1,8 @@
 import { periodKey, publicUser, quotaLimit } from './util.js';
 import { userShard } from './routing.js';
+import { accountAge, assessAge, normalizeReferral } from '../../src/lib/age.js';
+import { recordEvent } from './events.js';
+import { usernameRecord } from './usernames.js';
 
 const userTablesReady = new Map();
 const adminCache = new Map();
@@ -17,6 +20,9 @@ const USER_EXTRA_COLUMNS = [
   ['stripe_cancel_at_period_end', 'INTEGER'],
   ['stripe_promo', 'TEXT'],
   ['billing_checked_at', 'TEXT'],
+  ['birth_date', 'TEXT'],
+  ['guardian_consent_at', 'TEXT'],
+  ['referral_source', 'TEXT'],
 ];
 
 async function migrateUserTable(db) {
@@ -198,6 +204,54 @@ export async function updateUserBilling(env, uid, fields) {
   return getUserRow(env, uid);
 }
 
+export async function applyProfileExtras(env, uid, body) {
+  if (typeof body?.birthDate === 'string' && body.birthDate.trim()) {
+    const saved = await saveBirthDate(env, uid, body);
+    if (saved.error) return saved;
+  }
+  if (typeof body?.referral === 'string' && body.referral.trim()) {
+    await saveReferral(env, uid, body.referral);
+  }
+  return { row: await getUserRow(env, uid) };
+}
+
+async function saveBirthDate(env, uid, body) {
+  const decision = assessAge(body.birthDate, { guardianConsent: body.guardianConsent === true });
+  if (!decision.ok) {
+    return {
+      error: {
+        message: decision.message,
+        status: decision.code === 'under_13' ? 403 : 400,
+      },
+    };
+  }
+  const { db } = await userShard(env, uid);
+  const existing = await db.prepare('SELECT birth_date, guardian_consent_at FROM users WHERE firebase_uid = ?').bind(uid).first();
+  if (!existing) return { error: { message: 'Account not found.', status: 404 } };
+  if (String(existing.birth_date || '').trim()) return { row: await getUserRow(env, uid) };
+  await db.prepare(
+    'UPDATE users SET birth_date = ?, guardian_consent_at = ?, updated_at = ? WHERE firebase_uid = ?',
+  ).bind(
+    decision.iso,
+    decision.band === 'teen' ? new Date().toISOString() : '',
+    new Date().toISOString(),
+    uid,
+  ).run();
+  return { row: await getUserRow(env, uid) };
+}
+
+async function saveReferral(env, uid, source) {
+  const value = normalizeReferral(source);
+  if (!value) return;
+  const { db } = await userShard(env, uid);
+  const existing = await db.prepare('SELECT referral_source FROM users WHERE firebase_uid = ?').bind(uid).first();
+  if (!existing || String(existing.referral_source || '').trim()) return;
+  await db.prepare(
+    'UPDATE users SET referral_source = ?, updated_at = ? WHERE firebase_uid = ?',
+  ).bind(value, new Date().toISOString(), uid).run();
+  await recordEvent(env, { uid, name: 'referral', feature: value, detail: value });
+}
+
 export async function toPublicUser(env, row) {
   if (!row) return null;
   const fresh = await alignQuotaLimit(env, row);
@@ -210,11 +264,19 @@ export async function toPublicUser(env, row) {
     partnerCode = share.code;
     partnerLinked = share.linked;
   }
-  return publicUser(fresh, {
-    isAdmin: admin,
-    partnerCode,
-    partnerLinked,
-  });
+  const age = accountAge(fresh);
+  const name = await usernameRecord(env, fresh.firebase_uid);
+  return {
+    ...publicUser(fresh, {
+      isAdmin: admin,
+      partnerCode,
+      partnerLinked,
+      username: name.username,
+      usernameChangedAt: name.changedAt,
+    }),
+    ageStatus: age.status,
+    ageBand: age.band,
+  };
 }
 
 export async function alignQuotaLimit(env, row) {

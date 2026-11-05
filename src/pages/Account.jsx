@@ -4,10 +4,11 @@ import { Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useAuth } from '@/lib/AuthContext';
 import { afterAuthPath, leaveForAuthReturn } from '@/lib/onboarding';
+import { beginSocialSignup, cancelSocialSignup, settleSocialSignup } from '@/lib/signupProfile';
 import AppleSignInButton from '@/components/account/AppleSignInButton';
 import GoogleSignInButton from '@/components/account/GoogleSignInButton';
-import TermsAgreement from '@/components/account/TermsAgreement';
-import { TERMS_AGREE_ERROR } from '@/lib/legal';
+import TermsNotice from '@/components/account/TermsNotice';
+import AppLogo from '@/components/AppLogo';
 
 export default function Account() {
   const navigate = useNavigate();
@@ -18,7 +19,6 @@ export default function Account() {
   const [appleLoading, setAppleLoading] = React.useState(false);
   const [googleLoading, setGoogleLoading] = React.useState(false);
   const [socialError, setSocialError] = React.useState('');
-  const [agreed, setAgreed] = React.useState(false);
   const safeFrom = from === '/' || from === '/welcome' || from === '/settings' || from === '/history' || from === '/practice';
 
   if (isLoadingAuth) {
@@ -45,15 +45,15 @@ export default function Account() {
 
   const handleApple = async () => {
     setSocialError('');
-    if (!agreed) {
-      setSocialError(TERMS_AGREE_ERROR);
-      return;
-    }
+    beginSocialSignup();
     setAppleLoading(true);
     try {
-      await signInWithApple();
+      const signedIn = await signInWithApple();
+      if (!signedIn) return;
+      settleSocialSignup(signedIn);
       if (!leaveForAuthReturn()) navigate(afterAuthPath(), { replace: true });
     } catch (err) {
+      cancelSocialSignup();
       setSocialError(err.message || 'Could not sign in with Apple.');
     } finally {
       setAppleLoading(false);
@@ -62,15 +62,15 @@ export default function Account() {
 
   const handleGoogle = async () => {
     setSocialError('');
-    if (!agreed) {
-      setSocialError(TERMS_AGREE_ERROR);
-      return;
-    }
+    beginSocialSignup();
     setGoogleLoading(true);
     try {
       const signedIn = await signInWithGoogle();
-      if (signedIn && !leaveForAuthReturn()) navigate(afterAuthPath(), { replace: true });
+      if (!signedIn) return;
+      settleSocialSignup(signedIn);
+      if (!leaveForAuthReturn()) navigate(afterAuthPath(), { replace: true });
     } catch (err) {
+      cancelSocialSignup();
       setSocialError(err.message || 'Could not sign in with Google.');
     } finally {
       setGoogleLoading(false);
@@ -80,18 +80,19 @@ export default function Account() {
   return (
     <div className="min-h-[100dvh] bg-background text-foreground flex flex-col">
       <div className="flex-1 flex flex-col items-center justify-center px-6 pt-safe text-center">
-        <p className="text-sm font-medium tracking-wide text-muted-foreground">Welcome To</p>
-        <h1 className="text-4xl sm:text-5xl font-bold tracking-tight mt-2 leading-[1.05]">
+        <p className="text-label uppercase text-muted-foreground">Welcome To</p>
+        <h1 className="mt-3 flex items-center justify-center gap-[0.22em] text-display text-foreground">
           bharris.app
+          <AppLogo className="h-[0.85em] w-auto" />
         </h1>
-        <p className="text-base text-muted-foreground mt-4">Create an account or sign back in</p>
+        <p className="mt-4 text-meta text-muted-foreground">Create an account or sign back in</p>
         {(authError || socialError) && (
           <div className="mt-4 max-w-sm mx-auto">
             <p className="text-sm text-destructive">{socialError || authError}</p>
             {firebaseUser && !socialError && (
               <Button
                 variant="outline"
-                className="mt-3 h-11 rounded-2xl"
+                className="mt-3 h-11 rounded-full"
                 disabled={retrying}
                 onClick={async () => {
                   setRetrying(true);
@@ -112,12 +113,12 @@ export default function Account() {
       </div>
 
       <footer className="px-6 pb-safe pt-4">
-        <div className="max-w-md mx-auto w-full flex flex-col gap-3">
-          <TermsAgreement checked={agreed} onCheckedChange={setAgreed} />
+        <div className="mx-auto flex w-full max-w-study flex-col gap-3">
+          <TermsNotice action="continuing with Apple or Google" />
           <AppleSignInButton onClick={handleApple} loading={appleLoading} disabled={googleLoading} />
           <GoogleSignInButton onClick={handleGoogle} loading={googleLoading} disabled={appleLoading} />
           <Button
-            className="h-16 rounded-2xl text-lg font-bold shadow-lg"
+            className="w-full"
             onClick={() => navigate('/account/create')}
           >
             Create an account

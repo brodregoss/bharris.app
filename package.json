@@ -10,7 +10,7 @@
     "lint:fix": "eslint . --fix",
     "typecheck": "tsc -p ./jsconfig.json",
     "preview": "vite preview",
-    "test": "node --import ./test/register-alias.mjs --test src/lib/spacedCram.test.js test/site-plans.test.js test/billing-fresh.test.js test/notes-scan-lock.test.js",
+    "test": "node --import ./test/register-alias.mjs --test src/lib/spacedCram.test.js src/lib/mastery.test.js src/lib/age.test.js src/lib/cramPlan.test.js src/lib/homeBoard.test.js src/lib/username.test.js src/lib/signupProfile.test.js src/lib/sphereSpin.test.js test/site-plans.test.js test/billing-fresh.test.js test/notes-scan-lock.test.js test/product-events.test.js",
     "worker:dev": "node scripts/assemble-web.mjs || mkdir -p web-dist; npm run start --prefix worker",
     "worker:deploy": "npm run build && node scripts/assemble-web.mjs && npm run deploy --prefix worker",
     "ios:sync": "npm run build && npx cap sync ios",

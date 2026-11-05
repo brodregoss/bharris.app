@@ -3,10 +3,10 @@ import { cn } from '@/lib/utils';
 import { MASTERY_LEVELS } from '@/lib/mastery';
 
 const FILL = {
-  1: 'bg-amber-300 dark:bg-amber-600',
-  2: 'bg-amber-400 dark:bg-amber-500',
-  3: 'bg-lime-400 dark:bg-lime-600',
-  4: 'bg-emerald-500 dark:bg-emerald-600',
+  1: 'bg-blank/40',
+  2: 'bg-shaky',
+  3: 'bg-know/70',
+  4: 'bg-know',
 };
 
 export default function UnderstandingPyramid({
@@ -23,14 +23,14 @@ export default function UnderstandingPyramid({
       {tall && (
         <p
           className={cn(
-            'text-[11px] font-bold tracking-wide uppercase mb-1.5',
-            level >= 4 ? 'text-emerald-600 dark:text-emerald-300' : 'text-muted-foreground'
+            'mb-2 text-label uppercase',
+            level >= 4 ? 'text-know' : 'text-muted-foreground'
           )}
         >
           Mastered
         </p>
       )}
-      <div className="w-full flex flex-col-reverse items-center gap-[3px]">
+      <div className="flex w-full flex-col-reverse items-center gap-1">
         {MASTERY_LEVELS.map(({ level: step, label }, i) => {
           const filled = level >= step;
           return (

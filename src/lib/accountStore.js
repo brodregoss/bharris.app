@@ -1,6 +1,8 @@
 import { workerRequest } from '@/lib/workerClient';
 import { cancelPendingCloudSave } from '@/lib/sessionStore';
 import { getActiveUid, setActiveUid } from '@/lib/userStorage';
+import { normalizeReferral } from '@/lib/age';
+import { clearSignupProfile, readSignupProfile } from '@/lib/signupProfile';
 
 const USER_KEY = 'lms_user_v2';
 const listeners = new Set();
@@ -58,7 +60,12 @@ export function cacheUser(user) {
   // A sign-in refresh can arrive before the name is written. Keep the name
   // already saved for this account so the home greeting does not go blank.
   const keptName = !user.displayName && previous?.uid === user.uid ? previous.displayName : '';
-  const next = keptName ? { ...user, displayName: keptName } : user;
+  const keptUsername = user.username == null && previous?.uid === user.uid ? previous.username : '';
+  const next = {
+    ...user,
+    ...(keptName ? { displayName: keptName } : {}),
+    ...(keptUsername ? { username: keptUsername } : {}),
+  };
   localStorage.setItem(USER_KEY, JSON.stringify(next));
   if (next.uid) setActiveUid(next.uid, previousUid);
   notify();
@@ -73,6 +80,11 @@ export async function deleteCloudAccount() {
   return workerRequest('DELETE', '/v1/users/me');
 }
 
+export async function updateUsername(username) {
+  const data = await workerRequest('POST', '/v1/users/me', { username });
+  return cacheUser(data.user);
+}
+
 export async function updateDisplayName(displayName) {
   const data = await workerRequest('POST', '/v1/users/me', {
     displayName,
@@ -81,11 +93,35 @@ export async function updateDisplayName(displayName) {
   return cacheUser(data.user);
 }
 
-export async function ensureCloudUser(firebaseUser) {
-  const data = await workerRequest('POST', '/v1/users/me', {
+export async function ensureCloudUser(firebaseUser, profile) {
+  const staged = profile?.birthDate ? profile : readSignupProfile();
+  const body = {
     email: firebaseUser?.email || '',
     displayName: firebaseUser?.displayName || '',
-  });
+  };
+  if (staged?.birthDate) {
+    body.birthDate = staged.birthDate;
+    body.guardianConsent = !!staged.guardianConsent;
+  }
+  const referral = normalizeReferral(staged?.referral);
+  if (referral) body.referral = referral;
+  const username = String(staged?.username || '').trim();
+  if (username) body.username = username;
+  const data = await workerRequest('POST', '/v1/users/me', body);
+  const savedUsername = !body.username || data.user?.username === body.username;
+  if (data.user?.ageStatus === 'ok' && savedUsername) clearSignupProfile();
+  return cacheUser(data.user);
+}
+
+export async function saveAgeProfile({ birthDate, guardianConsent, referral }) {
+  const body = {
+    birthDate,
+    guardianConsent: !!guardianConsent,
+  };
+  const source = normalizeReferral(referral);
+  if (source) body.referral = source;
+  const data = await workerRequest('POST', '/v1/users/me', body);
+  if (data.user?.ageStatus === 'ok') clearSignupProfile();
   return cacheUser(data.user);
 }
 

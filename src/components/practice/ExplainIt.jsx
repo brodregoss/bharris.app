@@ -1,23 +1,23 @@
 import React from 'react';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
-import { ArrowRight, Loader2 } from 'lucide-react';
+import { ArrowRight } from 'lucide-react';
 import { invokeLlm } from '@/api/invokeLlm';
-import { parseExplainGrade, sortForPractice, MASTERY, MASTERY_LEVELS, localExplainLevel } from '@/lib/mastery';
+import AiWait from '@/components/AiWait';
+import { parseExplainGrade, MASTERY, MASTERY_LEVELS, localExplainLevel } from '@/lib/mastery';
 import UnderstandingPyramid from './UnderstandingPyramid';
+import TermPicker from '@/components/practice/TermPicker';
+import StudyScreenShell from '@/components/study/StudyScreenShell';
 
-const MAX_EXPLAIN_CHARS = 200;
+const MAX_EXPLAIN_CHARS = 800;
 
 function clampChars(text, max) {
   return String(text).slice(0, max);
 }
 
-export default function ExplainIt({ terms, onUpdateTerm, onDone }) {
-  const [queue] = React.useState(() =>
-    sortForPractice(terms)
-      .filter((t) => (t.mastery || 0) < MASTERY.MASTERED)
-      .map((t) => t.id)
-  );
+export default function ExplainIt({ terms, onUpdateTerm, onDone, onBack, rankMode }) {
+  const [picked, setPicked] = React.useState(null);
+  const queue = React.useMemo(() => (picked || []).map((t) => t.id), [picked]);
   const byId = React.useMemo(() => Object.fromEntries(terms.map((t) => [t.id, t])), [terms]);
   const [pos, setPos] = React.useState(0);
   const [draft, setDraft] = React.useState('');
@@ -44,7 +44,7 @@ export default function ExplainIt({ terms, onUpdateTerm, onDone }) {
         feedback: 'Too short to show you could teach this. Say it like you would to a classmate.',
       };
       setGrade(result);
-      onUpdateTerm(current.id, { mastery: result.level });
+      onUpdateTerm(current.id, { mastery: result.level, practiceCorrect: result.level >= MASTERY.SOLID });
       return;
     }
     setGrading(true);
@@ -78,7 +78,7 @@ export default function ExplainIt({ terms, onUpdateTerm, onDone }) {
       const parsed = parseExplainGrade(res);
       if (!parsed) throw new Error('unreadable');
       setGrade(parsed);
-      onUpdateTerm(current.id, { mastery: parsed.level });
+      onUpdateTerm(current.id, { mastery: parsed.level, practiceCorrect: parsed.level >= MASTERY.SOLID });
     } catch {
       const level = localExplainLevel(text, current.definition);
       const fallback = {
@@ -89,7 +89,7 @@ export default function ExplainIt({ terms, onUpdateTerm, onDone }) {
           'Couldn’t reach AI grading, so this is a rough keyword check. Mastered is only awarded by a full teaching grade.',
       };
       setGrade(fallback);
-      onUpdateTerm(current.id, { mastery: fallback.level });
+      onUpdateTerm(current.id, { mastery: fallback.level, practiceCorrect: fallback.level >= MASTERY.SOLID });
     }
     setGrading(false);
   };
@@ -99,25 +99,46 @@ export default function ExplainIt({ terms, onUpdateTerm, onDone }) {
     else setPos((p) => p + 1);
   };
 
-  if (!queue.length || finished) {
+  if (!picked) {
     return (
-      <div className="flex-1 flex flex-col px-5 pt-6">
-        <div className="max-w-md mx-auto w-full flex-1 flex flex-col items-center text-center pt-8">
-          <h2 className="text-2xl font-bold tracking-tight mb-2">
-            {!queue.length ? 'Nothing left to explain' : 'Explain-it wrap'}
-          </h2>
-          <p className="text-sm text-muted-foreground mb-6">
-            {!queue.length
-              ? 'Every term is already mastered. Keep it that way with a practice test now and then.'
-              : 'Your pyramid for each term is saved. Mastered only stays if you earned the peak.'}
-          </p>
-          <Button
-            onClick={onDone}
-            className="w-full h-12 rounded-2xl font-semibold"
-          >
-            Back to practice
-            <ArrowRight className="w-4 h-4 ml-2" />
-          </Button>
+      <TermPicker
+        terms={terms}
+        rankMode={rankMode}
+        verb="explain"
+        action="Start explaining"
+        onBack={onBack}
+        onStart={setPicked}
+      />
+    );
+  }
+
+  if (!queue.length || finished) {
+    const doneBody = (
+      <div className="text-center">
+        <h2 className="text-title text-foreground">
+          {!queue.length ? 'Nothing left to explain' : 'Explain-it wrap'}
+        </h2>
+        <p className="mt-3 text-body text-muted-foreground">
+          {!queue.length
+            ? 'Every term is already mastered. Keep it that way with a practice test now and then.'
+            : 'Your pyramid for each term is saved. Mastered only stays if you earned the peak.'}
+        </p>
+      </div>
+    );
+    const doneAction = (
+      <Button onClick={onDone} className="w-full">
+        Back to practice
+        <ArrowRight className="h-4 w-4" />
+      </Button>
+    );
+    if (onBack) {
+      return <StudyScreenShell onBack={onBack} action={doneAction}>{doneBody}</StudyScreenShell>;
+    }
+    return (
+      <div className="flex flex-1 flex-col px-gutter pt-8">
+        <div className="mx-auto flex w-full max-w-study flex-1 flex-col gap-6">
+          {doneBody}
+          {doneAction}
         </div>
       </div>
     );
@@ -127,90 +148,110 @@ export default function ExplainIt({ terms, onUpdateTerm, onDone }) {
 
   const label = MASTERY_LEVELS.find((l) => l.level === grade?.level)?.label;
 
-  return (
-    <div className="flex-1 flex flex-col px-5 pt-4 overflow-y-auto">
-      <p className="text-xs text-muted-foreground mb-3">
-        Explain it · {pos + 1}/{queue.length}
-      </p>
-      <div className="max-w-md mx-auto w-full flex-1 flex flex-col pb-4">
-        <div className="rounded-3xl border border-border bg-card p-5 shadow-sm">
-          <p className="text-[11px] uppercase tracking-wide text-muted-foreground mb-1">Teach this</p>
-          <p className="text-3xl font-bold tracking-tight">{current.term}</p>
-          <p className="text-xs text-muted-foreground mt-2">
-            Explain it like you would to a classmate who has never heard the term. Cover what it is and why it matters.
-          </p>
-        </div>
+  const explainBody = (
+    <>
+      <div className="animate-reveal-in rounded-card border border-border bg-surface-1 p-8">
+        <p className="text-label uppercase text-muted-foreground">Teach this</p>
+        <p className="mt-6 text-center text-display text-foreground">{current.term}</p>
+        <p className="mt-6 text-meta text-muted-foreground">
+          Explain it like you would to a classmate who has never heard the term. Cover what it is and why it matters.
+        </p>
+      </div>
 
-        {!grade ? (
-          <>
-            <Textarea
-              value={draft}
-              maxLength={MAX_EXPLAIN_CHARS}
-              onChange={(e) => setDraft(clampChars(e.target.value, MAX_EXPLAIN_CHARS))}
-              placeholder="Start with what it is, then how you'd teach it…"
-              className="mt-4 min-h-[160px] rounded-2xl text-base p-4"
-            />
-            <p className="mt-2 text-xs text-muted-foreground tabular-nums" aria-live="polite">
-              {atCharLimit
-                ? 'You’ve hit the character limit'
-                : `${draft.length}/${MAX_EXPLAIN_CHARS}`}
-            </p>
-            <Button
-              onClick={gradeExplanation}
-              disabled={!draft.trim() || grading}
-              className="mt-4 w-full h-12 rounded-2xl font-semibold"
-            >
-              {grading ? (
-                <>
-                  <Loader2 className="w-4 h-4 mr-2 animate-spin" /> Grading…
-                </>
-              ) : (
-                'Grade my explanation'
-              )}
-            </Button>
-          </>
-        ) : (
-          <div className="mt-5 space-y-4">
-            <div className="rounded-3xl border border-border bg-card p-5">
-              <UnderstandingPyramid level={grade.level} size="lg" showLabels />
-              <p className="text-center text-sm font-semibold mt-3">{label}</p>
-              {grade.feedback && (
-                <p className="text-sm text-muted-foreground mt-2 text-center leading-relaxed">{grade.feedback}</p>
-              )}
-            </div>
-            {grade.pointsHit.length > 0 && (
-              <div>
-                <p className="text-[11px] uppercase tracking-wide text-emerald-700 dark:text-emerald-300 font-semibold mb-1">You hit</p>
-                <ul className="text-sm text-muted-foreground space-y-1">
-                  {grade.pointsHit.map((p, i) => (
-                    <li key={`hit-${i}`}>· {p}</li>
-                  ))}
-                </ul>
-              </div>
+      {!grade ? (
+        <>
+          <label className="text-label uppercase text-muted-foreground" htmlFor="explain-draft">Explain the term</label>
+          <Textarea
+            id="explain-draft"
+            value={draft}
+            maxLength={MAX_EXPLAIN_CHARS}
+            onChange={(e) => setDraft(clampChars(e.target.value, MAX_EXPLAIN_CHARS))}
+            placeholder="Start with what it is, then how you'd teach it…"
+          />
+          <p className="text-meta tabular-nums text-muted-foreground" aria-live="polite">
+            {atCharLimit
+              ? 'You’ve hit the character limit'
+              : `${draft.length}/${MAX_EXPLAIN_CHARS}`}
+          </p>
+        </>
+      ) : (
+        <>
+          <div className="rounded-card border border-border bg-surface-1 p-6">
+            <UnderstandingPyramid level={grade.level} size="lg" showLabels />
+            <p className="mt-4 text-center text-body font-semibold text-foreground">{label}</p>
+            {grade.feedback && (
+              <p className="mt-2 text-center text-meta text-muted-foreground">{grade.feedback}</p>
             )}
-            {grade.pointsMissed.length > 0 && (
-              <div>
-                <p className="text-[11px] uppercase tracking-wide text-amber-700 dark:text-amber-300 font-semibold mb-1">Work on</p>
-                <ul className="text-sm text-muted-foreground space-y-1">
-                  {grade.pointsMissed.map((p, i) => (
-                    <li key={`miss-${i}`}>· {p}</li>
-                  ))}
-                </ul>
-              </div>
-            )}
-            <div className="rounded-xl bg-muted p-3 text-lg leading-relaxed">
-              <p className="text-[11px] uppercase tracking-wide text-muted-foreground">For reference</p>
-              <p className="mt-1">{current.definition}</p>
-            </div>
-            <Button
-              onClick={next}
-              className="w-full h-12 rounded-2xl font-semibold"
-            >
-              {pos + 1 >= queue.length ? 'Finish' : 'Next term'}
-              <ArrowRight className="w-4 h-4 ml-2" />
-            </Button>
           </div>
-        )}
+          {grade.pointsHit.length > 0 && (
+            <div>
+              <p className="text-label uppercase text-know">You hit</p>
+              <ul className="mt-2 space-y-1 text-body text-muted-foreground">
+                {grade.pointsHit.map((p, i) => (
+                  <li key={`hit-${i}`}>· {p}</li>
+                ))}
+              </ul>
+            </div>
+          )}
+          {grade.pointsMissed.length > 0 && (
+            <div>
+              <p className="text-label uppercase text-shaky">Work on</p>
+              <ul className="mt-2 space-y-1 text-body text-muted-foreground">
+                {grade.pointsMissed.map((p, i) => (
+                  <li key={`miss-${i}`}>· {p}</li>
+                ))}
+              </ul>
+            </div>
+          )}
+          <div className="rounded-card border border-border bg-surface-1 p-6">
+            <p className="text-label uppercase text-muted-foreground">For reference</p>
+            <p className="mt-3 text-body text-foreground">{current.definition}</p>
+          </div>
+        </>
+      )}
+    </>
+  );
+
+  const explainAction = !grade ? (
+    <Button
+      onClick={gradeExplanation}
+      disabled={!draft.trim() || grading}
+      className="w-full"
+    >
+      {grading ? (
+        <AiWait compact label="Grading" estimateMs={8000} />
+      ) : (
+        'Grade my explanation'
+      )}
+    </Button>
+  ) : (
+    <Button onClick={next} className="w-full">
+      {pos + 1 >= queue.length ? 'Finish' : 'Next term'}
+      <ArrowRight className="h-4 w-4" />
+    </Button>
+  );
+
+  if (onBack) {
+    return (
+      <StudyScreenShell
+        onBack={onBack}
+        current={pos + 1}
+        total={queue.length}
+        action={explainAction}
+      >
+        {explainBody}
+      </StudyScreenShell>
+    );
+  }
+
+  return (
+    <div className="flex flex-1 flex-col overflow-y-auto px-gutter pt-8">
+      <div className="mx-auto flex w-full max-w-study flex-1 flex-col gap-6 pb-6">
+        <p className="text-meta text-muted-foreground">
+          Explain it · {pos + 1}/{queue.length}
+        </p>
+        {explainBody}
+        {explainAction}
       </div>
     </div>
   );
